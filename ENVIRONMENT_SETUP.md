@@ -1,100 +1,124 @@
-# Environment Variables Setup Guide
+# Environment Setup Guide
 
-This guide will help you set up all the required environment variables for The Solar Grind V2.
+This guide will help you configure all the necessary environment variables for the Solar Grind application.
 
-## Quick Start
+## Required Environment Variables
 
-1. Copy the example environment file:
-   \`\`\`bash
-   cp .env.local.example .env.local
-   \`\`\`
+### 1. Supabase (Database & Authentication)
 
-2. Fill in your API keys in `.env.local`
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
+2. Create a new project or select existing one
+3. Go to Settings → API
+4. Copy the following values:
 
-3. Restart your development server:
-   \`\`\`bash
-   npm run dev
-   \`\`\`
+\`\`\`env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+\`\`\`
 
-## Required API Keys
+### 2. Stripe (Payments)
 
-### Google Maps API Key (CRITICAL for address autocomplete)
+1. Go to [Stripe Dashboard](https://dashboard.stripe.com)
+2. Get your API keys from Developers → API keys
+3. For webhooks, go to Developers → Webhooks
 
-1. **Go to Google Cloud Console**: https://console.cloud.google.com/
-2. **Create or select a project**
-3. **Enable the following APIs**:
-   - Places API (New)
+\`\`\`env
+STRIPE_SECRET_KEY=sk_test_... (for test) or sk_live_... (for production)
+STRIPE_PUBLISHABLE_KEY=pk_test_... (for test) or pk_live_... (for production)
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_... (same as above)
+STRIPE_WEBHOOK_SECRET=whsec_... (from webhook endpoint)
+STRIPE_PRO_MONTHLY_PRICE_ID=price_... (create a monthly subscription price)
+\`\`\`
+
+### 3. Google APIs (Server-side only)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Enable the required APIs:
+   - Maps JavaScript API
    - Geocoding API
-   - Static Maps API
-   - Street View Static API
    - Elevation API
-4. **Create credentials**:
-   - Go to "Credentials" → "Create Credentials" → "API Key"
-   - Copy the API key
-5. **Add to .env.local**:
-   \`\`\`
-   GOOGLE_MAPS_API_KEY=AIzaSyC4R6AN7SmxxdKVQjfVR2C_your_actual_key_here
-   \`\`\`
+3. Create API credentials
 
-### NREL API Key (Required for solar data)
+\`\`\`env
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+GOOGLE_GEOCODING_API_KEY=your_google_geocoding_api_key
+GOOGLE_ELEVATION_API_KEY=your_google_elevation_api_key
+\`\`\`
 
-1. **Sign up**: https://developer.nrel.gov/signup/
-2. **Get your API key** from the dashboard
-3. **Add to .env.local**:
-   \`\`\`
-   NREL_API_KEY=your_nrel_api_key_here
-   \`\`\`
+### 4. NREL API (Solar Data)
 
-### Supabase (Required for database)
+1. Go to [NREL Developer Network](https://developer.nrel.gov)
+2. Sign up for an API key
+3. Add to your environment:
 
-1. **Create project**: https://supabase.com/dashboard
-2. **Get your keys** from Settings → API
-3. **Add to .env.local**:
-   \`\`\`
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
-   \`\`\`
+\`\`\`env
+NREL_API_KEY=your_nrel_api_key
+\`\`\`
 
-### Stripe (Required for payments)
+### 5. reCAPTCHA (Form Protection)
 
-1. **Create account**: https://dashboard.stripe.com/
-2. **Get your keys** from Developers → API keys
-3. **Add to .env.local**:
-   \`\`\`
-   STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here
-   STRIPE_SECRET_KEY=sk_test_your_key_here
-   STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
-   \`\`\`
+1. Go to [Google reCAPTCHA](https://www.google.com/recaptcha/admin)
+2. Create a new site (v2 checkbox)
+3. Add your domain
+4. Get the secret key (server-side only):
 
-## Verification
+\`\`\`env
+RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
+\`\`\`
 
-After setting up your environment variables:
+### 6. Application Configuration
 
-1. **Check configuration**: Visit `/environment-check`
-2. **Test APIs**: Visit `/api-status`
-3. **Test address autocomplete**: Visit `/test-address-autocomplete`
+\`\`\`env
+NEXT_PUBLIC_BASE_URL=http://localhost:3000 (for development)
+NEXT_PUBLIC_AXIOM_INGEST_ENDPOINT=your_axiom_endpoint (optional)
+\`\`\`
 
-## Troubleshooting
+## Setup Instructions
 
-### Address autocomplete not working
-- Verify `GOOGLE_MAPS_API_KEY` is set correctly
-- Check that Places API is enabled in Google Cloud Console
-- Ensure billing is set up in Google Cloud Console
+1. Copy `.env.local.example` to `.env.local`
+2. Fill in all the values with your actual API keys
+3. Restart your development server
+4. Test each integration using the status endpoints
 
-### API errors
-- Check the `/api-status` page for detailed error messages
-- Verify all required APIs are enabled
-- Check API quotas and billing
+## Testing Your Configuration
 
-### Database errors
-- Verify Supabase credentials are correct
-- Check that your Supabase project is active
-- Ensure RLS policies are configured correctly
+Visit these endpoints to test your configuration:
+
+- `/api/status/all` - Check all services
+- `/api/status/supabase` - Test Supabase connection
+- `/api/status/stripe` - Test Stripe configuration
+- `/api/status/nrel` - Test NREL API
+- `/api/status/recaptcha` - Test reCAPTCHA configuration
 
 ## Security Notes
 
-- Never commit `.env.local` to version control
-- Use test keys for development
-- Rotate keys regularly in production
-- Set up proper API restrictions in Google Cloud Console
+- Never commit your `.env.local` file to version control
+- Use different API keys for development and production
+- Regularly rotate your API keys
+- Set up proper domain restrictions for your Google API keys
+- Use Stripe test mode during development
+- Google Maps API keys are kept server-side only for security
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Supabase "Auth session missing" error**
+   - This is normal when not logged in
+   - The app will work in demo mode without Supabase
+
+2. **Stripe checkout errors**
+   - Make sure you're using the correct test/live keys
+   - Check that webhook endpoints are configured
+
+3. **Google Maps not loading**
+   - Verify API key has proper permissions
+   - Check domain restrictions
+   - Ensure billing is enabled in Google Cloud Console
+
+4. **NREL API rate limits**
+   - Free tier has limited requests
+   - Consider caching responses
+
+For more help, check the console logs or contact support.

@@ -51,18 +51,18 @@ export default function TestStripeCheckout() {
 
   const testPrices = [
     {
-      id: "price_1RdGtXD80D06ku9UWRTdDUHh",
-      name: "Single Report",
-      description: "$4.99 one-time payment",
-      icon: FileText,
-      color: "orange",
-    },
-    {
       id: "price_1RdGemD80D06ku9UO6X1lR35",
       name: "Professional",
       description: "$29.99/month subscription",
       icon: Crown,
       color: "blue",
+    },
+    {
+      id: "price_single_report_production",
+      name: "Single Report",
+      description: "$4.99 one-time payment",
+      icon: FileText,
+      color: "orange",
     },
   ]
 
@@ -92,11 +92,10 @@ export default function TestStripeCheckout() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <Badge className="mb-4 bg-orange-100 text-orange-800">🧪 Stripe Diagnostics</Badge>
-          <h1 className="text-3xl font-bold text-slate-800 mb-4">Stripe Checkout Tester</h1>
+          <Badge className="mb-4 bg-blue-100 text-blue-800">Production Checkout Testing</Badge>
+          <h1 className="text-3xl font-bold text-slate-800 mb-4">Stripe Checkout Validator</h1>
           <p className="text-slate-600 max-w-2xl mx-auto">
-            Test your Stripe price IDs to identify why checkout pages are showing as broken. This will validate your
-            prices, products, and create test checkout sessions.
+            Validate your production Stripe configuration to ensure checkout flows work correctly for customers.
           </p>
         </div>
 
@@ -142,7 +141,7 @@ export default function TestStripeCheckout() {
                         Testing...
                       </>
                     ) : (
-                      "Test This Price"
+                      "Validate Price"
                     )}
                   </Button>
 
@@ -224,7 +223,7 @@ export default function TestStripeCheckout() {
 
                       {/* Session Status */}
                       <div className="bg-slate-50 p-3 rounded">
-                        <h4 className="font-medium text-sm mb-2">Test Session</h4>
+                        <h4 className="font-medium text-sm mb-2">Checkout Session</h4>
                         <div className="space-y-1 text-xs">
                           <div className="flex items-center justify-between">
                             <span>Created:</span>
@@ -247,7 +246,7 @@ export default function TestStripeCheckout() {
                                 onClick={() => window.open(result.session.url, "_blank")}
                               >
                                 <ExternalLink className="h-3 w-3 mr-1" />
-                                Test Checkout (Opens in new tab)
+                                Test Checkout Flow
                               </Button>
                             </>
                           )}
@@ -293,26 +292,38 @@ export default function TestStripeCheckout() {
         {/* Instructions */}
         <Card className="bg-blue-50 border-blue-200">
           <CardHeader>
-            <CardTitle className="text-blue-800">How to Fix Broken Checkout</CardTitle>
+            <CardTitle className="text-blue-800">Production Readiness Checklist</CardTitle>
           </CardHeader>
           <CardContent className="text-blue-700 text-sm space-y-2">
             <p>
-              <strong>If tests show issues:</strong>
+              <strong>Before going live, ensure:</strong>
             </p>
             <ul className="list-disc list-inside space-y-1 ml-4">
-              <li>Price doesn't exist: Create the price in your Stripe dashboard</li>
-              <li>Price inactive: Activate the price in Stripe dashboard</li>
-              <li>Product inactive: Activate the product in Stripe dashboard</li>
-              <li>Session creation fails: Fix the price/product issues first</li>
+              <li>All prices exist and are active in your Stripe dashboard</li>
+              <li>Products are properly configured and active</li>
+              <li>Checkout sessions create successfully</li>
+              <li>Success and cancel URLs are correctly configured</li>
+              <li>Webhook endpoints are set up for payment processing</li>
             </ul>
+          </CardContent>
+        </Card>
+
+        {/* Production Setup Guide */}
+        <Card className="mt-6 bg-green-50 border-green-200">
+          <CardHeader>
+            <CardTitle className="text-green-800">Production Setup</CardTitle>
+          </CardHeader>
+          <CardContent className="text-green-700 text-sm space-y-2">
             <p>
-              <strong>If tests pass but create working checkout links:</strong>
+              <strong>To create production prices in Stripe:</strong>
             </p>
-            <ul className="list-disc list-inside space-y-1 ml-4">
-              <li>Compare the working test URL with your broken checkout URL</li>
-              <li>Check for differences in session configuration</li>
-              <li>Verify your success/cancel URLs are correct</li>
-            </ul>
+            <ol className="list-decimal list-inside space-y-1 ml-4">
+              <li>Go to your Stripe Dashboard → Products</li>
+              <li>Create "Single Solar Report" - $4.99 USD, One-time payment</li>
+              <li>Create "Professional Plan" - $29.99 USD, Monthly subscription</li>
+              <li>Copy the price IDs and update your environment variables</li>
+              <li>Test the checkout flows before launch</li>
+            </ol>
           </CardContent>
         </Card>
       </div>

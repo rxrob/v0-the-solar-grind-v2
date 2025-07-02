@@ -1,413 +1,233 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import {
-  CreditCard,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  TestTube,
-  Play,
-  RotateCcw,
-  FileText,
-  Loader2,
-  ArrowLeft,
-  Shield,
-  Clock,
-  Zap,
-} from "lucide-react"
+import { CheckCircle, Shield, Download, MapPin, Calculator, BarChart3, FileText, Clock, DollarSign } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 import Link from "next/link"
 
-interface TestResult {
-  step: string
-  status: "pending" | "success" | "error"
-  message: string
-  data?: any
-  timestamp: string
-}
+export default function SingleReportPurchasePage() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
-export default function TestSingleReportPurchasePage() {
-  const [testEmail, setTestEmail] = useState("test@example.com")
-  const [isRunning, setIsRunning] = useState(false)
-  const [testResults, setTestResults] = useState<TestResult[]>([])
-  const [sessionId, setSessionId] = useState<string | null>(null)
-
-  const addTestResult = (step: string, status: "pending" | "success" | "error", message: string, data?: any) => {
-    const result: TestResult = {
-      step,
-      status,
-      message,
-      data,
-      timestamp: new Date().toISOString(),
+  const handlePurchase = async () => {
+    if (!user) {
+      setError("Please sign in to purchase a report")
+      return
     }
-    setTestResults((prev) => [...prev, result])
-    console.log(`[${step}]`, { status, message, data })
-  }
 
-  const runPurchaseTest = async () => {
-    setIsRunning(true)
-    setTestResults([])
+    setLoading(true)
+    setError(null)
 
     try {
-      // Step 1: Create checkout session
-      addTestResult("checkout-session", "pending", "Creating Stripe checkout session...")
-
-      const checkoutResponse = await fetch("/api/create-checkout-session", {
+      const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: testEmail,
-          priceId: "price_single_report", // This would be your actual price ID
-          successUrl: `${typeof window !== "undefined" ? window.location.origin : ""}/test-single-report-purchase?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${typeof window !== "undefined" ? window.location.origin : ""}/test-single-report-purchase`,
+          priceId: "price_1RdGtXD80D06ku9UWRTdDUHh",
+          mode: "payment",
+          successUrl: `${window.location.origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: window.location.href,
+          metadata: {
+            type: "single_report",
+            userId: user.id,
+          },
         }),
       })
 
-      if (!checkoutResponse.ok) {
-        throw new Error(`Checkout session creation failed: ${checkoutResponse.statusText}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create checkout session")
       }
 
-      const checkoutData = await checkoutResponse.json()
-      addTestResult("checkout-session", "success", "Checkout session created successfully", checkoutData)
-
-      if (checkoutData.url) {
-        setSessionId(checkoutData.sessionId)
-        addTestResult("redirect", "pending", "Redirecting to Stripe checkout...")
-
-        // Redirect to Stripe checkout
-        if (typeof window !== "undefined") {
-          window.location.href = checkoutData.url
-        }
+      if (data.url) {
+        window.location.href = data.url
       } else {
-        throw new Error("No checkout URL returned")
+        throw new Error("No checkout URL received")
       }
-    } catch (error) {
-      addTestResult("checkout-session", "error", `Error: ${error instanceof Error ? error.message : "Unknown error"}`)
+    } catch (err) {
+      console.error("Purchase error:", err)
+      setError(err instanceof Error ? err.message : "An error occurred during purchase")
     } finally {
-      setIsRunning(false)
-    }
-  }
-
-  const verifySession = async () => {
-    if (!sessionId) {
-      addTestResult("verification", "error", "No session ID available for verification")
-      return
-    }
-
-    try {
-      addTestResult("verification", "pending", "Verifying payment session...")
-
-      const verifyResponse = await fetch(`/api/verify-session?session_id=${sessionId}`)
-      const verifyData = await verifyResponse.json()
-
-      if (verifyResponse.ok && verifyData.success) {
-        addTestResult("verification", "success", "Payment verified successfully", verifyData)
-        addTestResult("database", "success", "User record created/updated in database", verifyData.user)
-      } else {
-        addTestResult("verification", "error", `Verification failed: ${verifyData.error || "Unknown error"}`)
-      }
-    } catch (error) {
-      addTestResult(
-        "verification",
-        "error",
-        `Verification error: ${error instanceof Error ? error.message : "Unknown error"}`,
-      )
-    }
-  }
-
-  const clearResults = () => {
-    setTestResults([])
-    setSessionId(null)
-  }
-
-  // Check for session_id in URL params on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search)
-      const sessionIdFromUrl = urlParams.get("session_id")
-      if (sessionIdFromUrl) {
-        setSessionId(sessionIdFromUrl)
-        addTestResult("return", "success", "Returned from Stripe checkout", { sessionId: sessionIdFromUrl })
-      }
-    }
-  }, [])
-
-  const getStatusIcon = (status: "pending" | "success" | "error") => {
-    switch (status) {
-      case "pending":
-        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-      case "success":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case "error":
-        return <XCircle className="h-4 w-4 text-red-500" />
-    }
-  }
-
-  const getStatusColor = (status: "pending" | "success" | "error") => {
-    switch (status) {
-      case "pending":
-        return "border-blue-200 bg-blue-50"
-      case "success":
-        return "border-green-200 bg-green-50"
-      case "error":
-        return "border-red-200 bg-red-50"
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Home
-                </Link>
-              </Button>
-              <div className="flex items-center gap-2">
-                <TestTube className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold">Single Report Purchase Test</span>
-                <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                  <Shield className="h-3 w-3 mr-1" />
-                  Test Suite
-                </Badge>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Badge variant="outline" className="text-green-600 border-green-600">
-                $4.99 Test
-              </Badge>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-12">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <Badge variant="secondary" className="mb-4 bg-amber-100 text-amber-800">
+            Single Report Purchase
+          </Badge>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Professional Solar Analysis Report</h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Get a comprehensive solar analysis for your property with detailed financial projections and professional
+            recommendations.
+          </p>
         </div>
-      </div>
 
-      <div className="container mx-auto px-6 py-8 max-w-4xl">
-        {/* Test Configuration */}
-        <Card className="mb-8 shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-6 w-6 text-blue-600" />
-              Single Report Purchase Test Configuration
-            </CardTitle>
-            <CardDescription>
-              Test the complete $4.99 single report purchase flow including Stripe checkout and webhook processing
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Email Configuration */}
-            <div className="space-y-2">
-              <Label htmlFor="testEmail">Test Email Address</Label>
-              <Input
-                id="testEmail"
-                type="email"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-                placeholder="test@example.com"
-                className="max-w-md"
-              />
-              <p className="text-sm text-gray-600">
-                This email will be used for the test purchase and user account creation
-              </p>
-            </div>
-
-            {/* Test Card Information */}
-            <div className="space-y-4">
-              <h4 className="font-semibold">Stripe Test Card Information</h4>
-              <div className="grid md:grid-cols-2 gap-4">
-                <Card className="border-green-200 bg-green-50">
-                  <CardContent className="p-4">
-                    <h5 className="font-medium text-green-800 mb-2">✅ Successful Payment</h5>
-                    <div className="space-y-1 text-sm text-green-700">
-                      <div>Card: 4242 4242 4242 4242</div>
-                      <div>Expiry: Any future date</div>
-                      <div>CVC: Any 3 digits</div>
-                      <div>ZIP: Any 5 digits</div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-red-200 bg-red-50">
-                  <CardContent className="p-4">
-                    <h5 className="font-medium text-red-800 mb-2">❌ Declined Payment</h5>
-                    <div className="space-y-1 text-sm text-red-700">
-                      <div>Card: 4000 0000 0000 0002</div>
-                      <div>Expiry: Any future date</div>
-                      <div>CVC: Any 3 digits</div>
-                      <div>ZIP: Any 5 digits</div>
-                    </div>
-                  </CardContent>
-                </Card>
+        <div className="grid gap-8 lg:grid-cols-2">
+          {/* Product Details */}
+          <Card className="h-fit">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-2xl">Solar Analysis Report</CardTitle>
+                <div className="text-right">
+                  <div className="text-3xl font-bold text-green-600">$4.99</div>
+                  <div className="text-sm text-gray-500">One-time payment</div>
+                </div>
               </div>
-            </div>
+              <CardDescription>Complete solar feasibility analysis with professional-grade insights</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4">
+                <div className="flex items-start space-x-3">
+                  <MapPin className="h-5 w-5 text-blue-500 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium">Satellite Imagery Analysis</h4>
+                    <p className="text-sm text-gray-600">High-resolution roof analysis with shading assessment</p>
+                  </div>
+                </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-4">
-              <Button
-                onClick={runPurchaseTest}
-                disabled={isRunning || !testEmail}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-              >
-                {isRunning ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating Session...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Test $4.99 Purchase
-                  </>
-                )}
-              </Button>
+                <div className="flex items-start space-x-3">
+                  <Calculator className="h-5 w-5 text-green-500 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium">Precise Calculations</h4>
+                    <p className="text-sm text-gray-600">
+                      System sizing based on your energy usage and roof characteristics
+                    </p>
+                  </div>
+                </div>
 
-              {sessionId && (
-                <Button
-                  onClick={verifySession}
-                  variant="outline"
-                  className="border-green-600 text-green-600 bg-transparent"
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Verify Session
-                </Button>
+                <div className="flex items-start space-x-3">
+                  <BarChart3 className="h-5 w-5 text-purple-500 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium">Financial Projections</h4>
+                    <p className="text-sm text-gray-600">15-year cost analysis with ROI and payback calculations</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <FileText className="h-5 w-5 text-orange-500 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium">Professional PDF Report</h4>
+                    <p className="text-sm text-gray-600">Comprehensive report suitable for contractors and financing</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h4 className="font-medium flex items-center">
+                  <Clock className="h-4 w-4 mr-2" />
+                  What's Included
+                </h4>
+                <div className="grid gap-2">
+                  {[
+                    "Detailed roof analysis with measurements",
+                    "Optimal solar panel placement recommendations",
+                    "Energy production estimates",
+                    "Cost-benefit analysis with local incentives",
+                    "Environmental impact calculations",
+                    "Professional PDF report (10-15 pages)",
+                  ].map((feature, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Purchase Card */}
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <DollarSign className="h-5 w-5 mr-2" />
+                Complete Your Purchase
+              </CardTitle>
+              <CardDescription>Secure payment processing powered by Stripe</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {!user && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800 mb-3">Please sign in to purchase a report</p>
+                  <div className="flex space-x-2">
+                    <Link href="/login">
+                      <Button size="sm" variant="outline">
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Link href="/signup">
+                      <Button size="sm">Create Account</Button>
+                    </Link>
+                  </div>
+                </div>
               )}
 
-              <Button onClick={clearResults} variant="outline" disabled={testResults.length === 0}>
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Clear Results
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span>Solar Analysis Report</span>
+                  <span className="font-medium">$4.99</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center font-medium">
+                  <span>Total</span>
+                  <span className="text-lg">$4.99</span>
+                </div>
+              </div>
+
+              <Button
+                onClick={handlePurchase}
+                disabled={loading || !user}
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                size="lg"
+              >
+                {loading ? "Processing..." : "Purchase Report - $4.99"}
               </Button>
-            </div>
 
-            {/* Instructions */}
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <div className="space-y-2">
-                  <div className="font-semibold">Test Instructions:</div>
-                  <ol className="list-decimal list-inside space-y-1 text-sm">
-                    <li>Configure your test email address above</li>
-                    <li>Click "Test $4.99 Purchase" to create a Stripe checkout session</li>
-                    <li>You'll be redirected to Stripe's checkout page</li>
-                    <li>Use the test card information provided above</li>
-                    <li>Complete the checkout process</li>
-                    <li>You'll be redirected back here with session verification</li>
-                    <li>Check the results below and monitor webhook logs</li>
-                  </ol>
+              <div className="space-y-3 text-sm text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <Shield className="h-4 w-4" />
+                  <span>Secure payment processing</span>
                 </div>
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
+                <div className="flex items-center space-x-2">
+                  <Download className="h-4 w-4" />
+                  <span>Instant download after payment</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>30-day money-back guarantee</span>
+                </div>
+              </div>
 
-        {/* Test Results */}
-        {testResults.length > 0 && (
-          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-6 w-6 text-blue-600" />
-                Test Results
-              </CardTitle>
-              <CardDescription>Real-time test execution results and logs</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {testResults.map((result, index) => (
-                <div key={index} className={`border rounded-lg p-4 ${getStatusColor(result.status)}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(result.status)}
-                      <span className="font-medium capitalize">{result.step.replace("-", " ")}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <Clock className="h-3 w-3" />
-                      {new Date(result.timestamp).toLocaleTimeString()}
-                    </div>
-                  </div>
-                  <p className="text-sm mb-2">{result.message}</p>
-                  {result.data && (
-                    <details className="text-xs">
-                      <summary className="cursor-pointer font-medium">View Data</summary>
-                      <pre className="mt-2 p-2 bg-gray-100 rounded overflow-x-auto">
-                        {JSON.stringify(result.data, null, 2)}
-                      </pre>
-                    </details>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Session Information */}
-        {sessionId && (
-          <Card className="mt-6 shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-6 w-6 text-amber-500" />
-                Session Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="font-medium">Session ID:</span>
-                  <code className="text-sm bg-gray-100 px-2 py-1 rounded">{sessionId}</code>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Test Email:</span>
-                  <span className="text-sm">{testEmail}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Amount:</span>
-                  <span className="text-sm font-semibold text-green-600">$4.99</span>
-                </div>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-600">
+                  By purchasing, you agree to our Terms of Service and Privacy Policy. Your payment information is
+                  processed securely by Stripe and never stored on our servers.
+                </p>
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Monitoring Tips */}
-        <Card className="mt-6 shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle>Monitoring & Debugging</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-semibold mb-2">What to Monitor:</h4>
-                <ul className="space-y-1 text-sm text-gray-600">
-                  <li>• Browser console for detailed request/response logs</li>
-                  <li>• Vercel function logs for webhook processing</li>
-                  <li>• Stripe dashboard for payment events</li>
-                  <li>• Supabase dashboard for database updates</li>
-                </ul>
-              </div>
-              <Separator />
-              <div>
-                <h4 className="font-semibold mb-2">Expected Flow:</h4>
-                <ol className="space-y-1 text-sm text-gray-600 list-decimal list-inside">
-                  <li>Checkout session created successfully</li>
-                  <li>User redirected to Stripe checkout</li>
-                  <li>Payment completed with test card</li>
-                  <li>Webhook received and processed</li>
-                  <li>User record created/updated in database</li>
-                  <li>Success page displayed with session verification</li>
-                </ol>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     </div>
   )

@@ -1,94 +1,66 @@
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  const startTime = Date.now()
-
   try {
     const secretKey = process.env.RECAPTCHA_SECRET_KEY
-    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
 
-    if (!secretKey || !siteKey) {
+    if (!secretKey) {
       return NextResponse.json({
-        name: "reCAPTCHA Security",
-        category: "Security",
-        endpoint: "/api/status/recaptcha",
-        critical: false,
-        status: "error",
-        message: "reCAPTCHA keys not configured",
-        response_time: Date.now() - startTime,
-        details: {
-          secret_key_configured: !!secretKey,
-          site_key_configured: !!siteKey,
-          error: "RECAPTCHA_SECRET_KEY or NEXT_PUBLIC_RECAPTCHA_SITE_KEY not set",
-        },
-        timestamp: new Date().toISOString(),
-        http_status: 500,
+        service: "reCAPTCHA",
+        status: "not_configured",
+        message: "reCAPTCHA secret key not configured",
+        configured: false,
       })
     }
 
-    // Test reCAPTCHA API accessibility (without actual verification)
-    const testUrl = "https://www.google.com/recaptcha/api/siteverify"
-    const testResponse = await fetch(testUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: `secret=${secretKey}&response=test`,
-    })
-
-    const responseTime = Date.now() - startTime
-
-    if (!testResponse.ok) {
-      return NextResponse.json({
-        name: "reCAPTCHA Security",
-        category: "Security",
-        endpoint: "/api/status/recaptcha",
-        critical: false,
-        status: "error",
-        message: `reCAPTCHA API unreachable: ${testResponse.status}`,
-        response_time: responseTime,
-        details: {
-          http_status: testResponse.status,
-          error: "Cannot reach Google reCAPTCHA API",
+    // Test reCAPTCHA API connectivity (without exposing the site key)
+    try {
+      const testResponse = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        timestamp: new Date().toISOString(),
-        http_status: testResponse.status,
+        body: new URLSearchParams({
+          secret: secretKey,
+          response: "test-token", // This will fail but tests connectivity
+        }),
+      })
+
+      const testResult = await testResponse.json()
+
+      return NextResponse.json({
+        service: "reCAPTCHA",
+        status: "configured",
+        message: "reCAPTCHA API is accessible",
+        configured: true,
+        api_accessible: testResponse.ok,
+        test_response: {
+          success: testResult.success,
+          // Don't expose error codes that might reveal configuration details
+          has_errors: Array.isArray(testResult["error-codes"]) && testResult["error-codes"].length > 0,
+        },
+      })
+    } catch (error: any) {
+      return NextResponse.json({
+        service: "reCAPTCHA",
+        status: "error",
+        message: "Failed to connect to reCAPTCHA API",
+        configured: true,
+        api_accessible: false,
+        error: "Connection failed",
       })
     }
-
-    const data = await testResponse.json()
-
-    // Expected response for test token should be success: false
-    // This confirms the API is reachable and responding
-    return NextResponse.json({
-      name: "reCAPTCHA Security",
-      category: "Security",
-      endpoint: "/api/status/recaptcha",
-      critical: false,
-      status: "healthy",
-      message: "reCAPTCHA API accessible and configured",
-      response_time: responseTime,
-      details: {
-        api_reachable: true,
-        keys_configured: true,
-        site_key_prefix: siteKey.substring(0, 10) + "...",
-        test_response_received: !!data,
+  } catch (error: any) {
+    console.error("reCAPTCHA status check error:", error)
+    return NextResponse.json(
+      {
+        service: "reCAPTCHA",
+        status: "error",
+        message: "Failed to check reCAPTCHA status",
+        configured: false,
+        error: error.message,
       },
-      timestamp: new Date().toISOString(),
-      http_status: 200,
-    })
-  } catch (error) {
-    return NextResponse.json({
-      name: "reCAPTCHA Security",
-      category: "Security",
-      endpoint: "/api/status/recaptcha",
-      critical: false,
-      status: "error",
-      message: `Request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      response_time: Date.now() - startTime,
-      details: { error: error instanceof Error ? error.message : "Unknown error" },
-      timestamp: new Date().toISOString(),
-      http_status: 500,
-    })
+      { status: 500 },
+    )
   }
 }

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { MapPin, Search, Loader2 } from "lucide-react"
-import { google } from "google-maps"
 
 interface AddressResult {
   formatted_address: string
@@ -23,6 +22,13 @@ interface AddressAutocompleteProps {
   disabled?: boolean
 }
 
+declare global {
+  interface Window {
+    google: any
+    initGoogleMaps: () => void
+  }
+}
+
 export function AddressAutocomplete({
   onAddressSelect,
   placeholder = "Enter an address...",
@@ -30,12 +36,12 @@ export function AddressAutocomplete({
   disabled = false,
 }: AddressAutocompleteProps) {
   const [query, setQuery] = useState("")
-  const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([])
+  const [predictions, setPredictions] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
-  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null)
-  const placesService = useRef<google.maps.places.PlacesService | null>(null)
+  const autocompleteService = useRef<any>(null)
+  const placesService = useRef<any>(null)
 
   // Initialize Google Maps services
   useEffect(() => {
@@ -43,8 +49,8 @@ export function AddressAutocomplete({
       try {
         // Check if Google Maps is already loaded
         if (window.google && window.google.maps) {
-          autocompleteService.current = new google.maps.places.AutocompleteService()
-          placesService.current = new google.maps.places.PlacesService(document.createElement("div"))
+          autocompleteService.current = new window.google.maps.places.AutocompleteService()
+          placesService.current = new window.google.maps.places.PlacesService(document.createElement("div"))
           setGoogleMapsLoaded(true)
           return
         }
@@ -65,8 +71,8 @@ export function AddressAutocomplete({
           script.async = true
           script.defer = true
           script.onload = () => {
-            autocompleteService.current = new google.maps.places.AutocompleteService()
-            placesService.current = new google.maps.places.PlacesService(document.createElement("div"))
+            autocompleteService.current = new window.google.maps.places.AutocompleteService()
+            placesService.current = new window.google.maps.places.PlacesService(document.createElement("div"))
             setGoogleMapsLoaded(true)
           }
           document.head.appendChild(script)
@@ -95,9 +101,9 @@ export function AddressAutocomplete({
         types: ["address"],
         componentRestrictions: { country: "us" },
       },
-      (predictions, status) => {
+      (predictions: any, status: any) => {
         setLoading(false)
-        if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
           setPredictions(predictions)
           setShowDropdown(true)
         } else {
@@ -120,9 +126,9 @@ export function AddressAutocomplete({
         placeId: placeId,
         fields: ["formatted_address", "geometry", "place_id"],
       },
-      (place, status) => {
+      (place: any, status: any) => {
         setLoading(false)
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
           const addressResult: AddressResult = {
             formatted_address: place.formatted_address || "",
             place_id: place.place_id || "",

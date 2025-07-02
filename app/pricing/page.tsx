@@ -1,20 +1,59 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calculator, DollarSign, Check, FileText, Users, Zap, Crown, Building, Home } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Calculator,
+  DollarSign,
+  Check,
+  FileText,
+  Users,
+  Zap,
+  Crown,
+  Building,
+  Home,
+  AlertTriangle,
+  TestTube,
+  Loader2,
+} from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function PricingPage() {
   const [isLoading, setIsLoading] = useState<string | null>(null)
+  const [stripeError, setStripeError] = useState<string | null>(null)
+  const [environment, setEnvironment] = useState<"test" | "live" | "unknown">("unknown")
+  const { toast } = useToast()
 
-  const handleStripeCheckout = async (priceId: string, planName: string) => {
-    setIsLoading(priceId)
+  // Detect environment on component mount
+  useEffect(() => {
+    const detectEnvironment = async () => {
+      try {
+        const response = await fetch("/api/check-stripe-environment")
+        if (response.ok) {
+          const data = await response.json()
+          if (data.environment && data.environment.type) {
+            setEnvironment(data.environment.type)
+          }
+        }
+      } catch (error) {
+        console.error("Failed to detect environment:", error)
+      }
+    }
+
+    detectEnvironment()
+  }, [])
+
+  const handleStripeCheckout = async (purchaseType: "single_report" | "subscription", planName: string) => {
+    setIsLoading(purchaseType)
+    setStripeError(null)
 
     try {
-      console.log(`Starting checkout for ${planName} with price ID: ${priceId}`)
+      console.log(`🚀 Starting checkout for ${planName} (${purchaseType})`)
+      console.log(`🔧 Environment: ${environment}`)
 
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
@@ -22,38 +61,60 @@ export default function PricingPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          priceId,
+          purchaseType,
+          email: undefined, // Let Stripe collect email
+          userId: undefined, // No user ID for now
         }),
       })
 
-      console.log(`Checkout response status: ${response.status}`)
+      console.log(`📡 Checkout response status: ${response.status}`)
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.error("Checkout error:", errorData)
-        alert(`Error: ${errorData.error || "Unknown error occurred"}`)
+        console.error("❌ Checkout error:", errorData)
+
+        setStripeError(errorData.details || errorData.error || "Unknown error occurred")
+        toast({
+          title: "Payment Error",
+          description: errorData.error || "Failed to create checkout session",
+          variant: "destructive",
+        })
         return
       }
 
-      const { url, sessionId, error } = await response.json()
-      console.log(`Checkout session created: ${sessionId}`)
+      const { url, sessionId, environment: sessionEnv, priceId, productId } = await response.json()
 
-      if (error) {
-        console.error("Stripe error:", error)
-        alert(`Error: ${error}`)
-        return
-      }
+      console.log(`✅ Checkout session created:`)
+      console.log(`   - Session ID: ${sessionId}`)
+      console.log(`   - Environment: ${sessionEnv}`)
+      console.log(`   - Price ID: ${priceId}`)
+      console.log(`   - Product ID: ${productId}`)
+      console.log(`   - Checkout URL: ${url}`)
 
       if (url) {
-        console.log(`Redirecting to Stripe checkout: ${url}`)
+        toast({
+          title: "Redirecting to Stripe",
+          description: `Opening ${sessionEnv} mode checkout...`,
+        })
+
+        console.log(`🔄 Redirecting to: ${url}`)
         window.location.href = url
       } else {
-        console.error("No checkout URL received")
-        alert("Error: No checkout URL received. Please try again.")
+        console.error("❌ No checkout URL received")
+        toast({
+          title: "Payment Error",
+          description: "No checkout URL received. Please try again.",
+          variant: "destructive",
+        })
       }
     } catch (error) {
-      console.error("Error creating checkout session:", error)
-      alert("Something went wrong. Please try again or contact support at rob@mysolarai.com")
+      console.error("💥 Error creating checkout session:", error)
+      setStripeError(error instanceof Error ? error.message : "Unknown error")
+      toast({
+        title: "Payment Error",
+        description: "Something went wrong. Please try again or contact support.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(null)
     }
@@ -89,7 +150,7 @@ export default function PricingPage() {
                   <span>Dashboard</span>
                 </Link>
                 <Link
-                  href="/basic-calculator"
+                  href="/calculator"
                   className="flex items-center space-x-1 rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   <Calculator className="h-4 w-4" />
@@ -120,7 +181,15 @@ export default function PricingPage() {
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-16">
-          <Badge className="mb-4 bg-orange-100 text-orange-800 border-orange-200">⚡ AI-Powered Solar Analysis</Badge>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Badge className="bg-orange-100 text-orange-800 border-orange-200">⚡ AI-Powered Solar Analysis</Badge>
+            {environment !== "unknown" && (
+              <Badge variant={environment === "test" ? "secondary" : "destructive"} className="flex items-center gap-1">
+                {environment === "test" ? <TestTube className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+                {environment.toUpperCase()} MODE
+              </Badge>
+            )}
+          </div>
           <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-6">
             Choose the Perfect Plan for Your <span className="text-orange-500">Solar</span>{" "}
             <span className="text-blue-600">Business</span>
@@ -131,70 +200,37 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Debug Section */}
-        <div className="max-w-4xl mx-auto mb-8">
-          <Card className="bg-red-50 border-red-200">
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-red-800 mb-2">🚨 Stripe Checkout Debug Info</h3>
-              <p className="text-red-700 text-sm mb-4">
-                Your checkout sessions are being created successfully, but the Stripe checkout page shows as broken.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="bg-white p-3 rounded border">
-                  <strong>Possible Issues:</strong>
-                  <br />• Price ID doesn't exist in live Stripe account
-                  <br />• Product is inactive in Stripe dashboard
-                  <br />• Price is inactive in Stripe dashboard
-                  <br />• Webhook endpoint configuration issue
-                </div>
-                <div className="bg-white p-3 rounded border">
-                  <strong>Quick Fix:</strong>
-                  <br />
-                  1. Visit{" "}
-                  <Link href="/test-stripe-checkout" className="text-blue-600 underline">
-                    /test-stripe-checkout
-                  </Link>
-                  <br />
-                  2. Run diagnostics on your price IDs
-                  <br />
-                  3. Check if prices exist and are active
-                  <br />
-                  4. Use working price IDs from diagnostics
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Environment Info */}
+        {environment === "test" && (
+          <div className="max-w-4xl mx-auto mb-8">
+            <Alert className="border-blue-200 bg-blue-50">
+              <TestTube className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <strong>Test Mode Active:</strong> You're in development mode. Payments will use test cards and won't
+                charge real money.
+                <br />
+                <strong>Test Card:</strong> 4242 4242 4242 4242 | Expiry: Any future date | CVC: Any 3 digits
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
-        {/* Test Payment Section */}
-        <div className="max-w-4xl mx-auto mb-8">
-          <Card className="bg-yellow-50 border-yellow-200">
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-yellow-800 mb-2">🧪 Payment Testing Mode</h3>
-              <p className="text-yellow-700 text-sm mb-4">Use Stripe test card numbers for testing payments:</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="bg-white p-3 rounded border">
-                  <strong>Successful Payment:</strong>
-                  <br />
-                  Card: 4242 4242 4242 4242
-                  <br />
-                  Expiry: Any future date
-                  <br />
-                  CVC: Any 3 digits
-                </div>
-                <div className="bg-white p-3 rounded border">
-                  <strong>Declined Payment:</strong>
-                  <br />
-                  Card: 4000 0000 0000 0002
-                  <br />
-                  Expiry: Any future date
-                  <br />
-                  CVC: Any 3 digits
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Stripe Setup Alert */}
+        {stripeError && (
+          <div className="max-w-4xl mx-auto mb-8">
+            <Alert className="border-red-200 bg-red-50">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800">
+                <strong>Payment Error:</strong> {stripeError}
+                <br />
+                <br />
+                <strong>Current Environment:</strong> {environment}
+                <br />
+                Please check your Stripe configuration or try again.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto mb-16">
@@ -250,9 +286,14 @@ export default function PricingPage() {
               <CardTitle className="text-2xl text-slate-800">1 Professional Report</CardTitle>
               <CardDescription className="text-slate-600">Single professional analysis with PDF report</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-slate-800">$4.99</span>
+                <span className="text-4xl font-bold text-slate-800">${environment === "test" ? "1.00" : "4.99"}</span>
                 <span className="text-slate-500">/one-time</span>
               </div>
+              {environment === "test" && (
+                <Badge variant="secondary" className="mt-2">
+                  Test Price
+                </Badge>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="space-y-3">
@@ -284,20 +325,22 @@ export default function PricingPage() {
 
               <Button
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                onClick={() => handleStripeCheckout("price_1RdGtXD80D06ku9UWRTdDUHh", "Single Report")}
-                disabled={isLoading === "price_1RdGtXD80D06ku9UWRTdDUHh"}
+                onClick={() => handleStripeCheckout("single_report", "Single Report")}
+                disabled={isLoading === "single_report"}
               >
-                {isLoading === "price_1RdGtXD80D06ku9UWRTdDUHh" ? (
+                {isLoading === "single_report" ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Processing...
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating Checkout...
                   </>
                 ) : (
-                  "Get Report ($4.99)"
+                  `Get Report ($${environment === "test" ? "1.00" : "4.99"}${environment === "test" ? " - TEST" : ""})`
                 )}
               </Button>
 
-              <p className="text-xs text-slate-500 text-center">Instant access after payment</p>
+              <p className="text-xs text-slate-500 text-center">
+                {environment === "test" ? "Test mode - no real charges" : "Instant access after payment"}
+              </p>
             </CardContent>
           </Card>
 
@@ -313,9 +356,14 @@ export default function PricingPage() {
               <CardTitle className="text-2xl text-slate-800">Professional</CardTitle>
               <CardDescription className="text-slate-600">For solar professionals and installers</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-slate-800">$29.99</span>
+                <span className="text-4xl font-bold text-slate-800">${environment === "test" ? "5.00" : "29.99"}</span>
                 <span className="text-slate-500">/per month</span>
               </div>
+              {environment === "test" && (
+                <Badge variant="secondary" className="mt-2">
+                  Test Price
+                </Badge>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="space-y-3">
@@ -351,20 +399,22 @@ export default function PricingPage() {
 
               <Button
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => handleStripeCheckout("price_1RdGemD80D06ku9UO6X1lR35", "Professional")}
-                disabled={isLoading === "price_1RdGemD80D06ku9UO6X1lR35"}
+                onClick={() => handleStripeCheckout("subscription", "Professional")}
+                disabled={isLoading === "subscription"}
               >
-                {isLoading === "price_1RdGemD80D06ku9UO6X1lR35" ? (
+                {isLoading === "subscription" ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Processing...
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating Checkout...
                   </>
                 ) : (
-                  "Start Free Trial ($29.99/mo)"
+                  `Start ${environment === "test" ? "Test " : ""}Trial ($${environment === "test" ? "5.00" : "29.99"}/mo)`
                 )}
               </Button>
 
-              <p className="text-xs text-slate-500 text-center">1-day free trial, then $29.99/month</p>
+              <p className="text-xs text-slate-500 text-center">
+                {environment === "test" ? "7-day test trial - no real charges" : "1-day free trial, then $29.99/month"}
+              </p>
             </CardContent>
           </Card>
 
@@ -435,7 +485,7 @@ export default function PricingPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white" asChild>
-                  <Link href="/basic-calculator">
+                  <Link href="/calculator">
                     <Calculator className="mr-2 h-5 w-5" />
                     Try Free Calculator
                   </Link>
@@ -455,6 +505,22 @@ export default function PricingPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Debug Info */}
+        {environment === "test" && (
+          <div className="mt-8 text-center">
+            <Card className="max-w-md mx-auto bg-blue-50 border-blue-200">
+              <CardContent className="p-4">
+                <h3 className="font-semibold text-blue-800 mb-2">Debug Info</h3>
+                <div className="text-sm text-blue-700 space-y-1">
+                  <div>Environment: {environment}</div>
+                  <div>Single Report: ${environment === "test" ? "1.00" : "4.99"}</div>
+                  <div>Subscription: ${environment === "test" ? "5.00" : "29.99"}/mo</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   )

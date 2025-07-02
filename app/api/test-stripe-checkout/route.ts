@@ -9,8 +9,8 @@ export async function POST(request: NextRequest) {
   try {
     const { priceId } = await request.json()
 
-    console.log("🧪 === STRIPE CHECKOUT TEST START ===")
-    console.log("📋 Testing Price ID:", priceId)
+    console.log("🔍 === STRIPE VALIDATION START ===")
+    console.log("📋 Validating Price ID:", priceId)
 
     // Validate environment
     const isTestKey = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")
@@ -64,23 +64,23 @@ export async function POST(request: NextRequest) {
           payment_method_types: ["card"],
           line_items: [{ price: priceId, quantity: 1 }],
           mode: mode,
-          success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}&test=true`,
-          cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing?test_canceled=true`,
+          success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing`,
           metadata: {
-            test_session: "true",
+            validation_test: "true",
             price_id: priceId,
-            test_timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString(),
           },
         }
 
         if (mode === "subscription") {
           sessionConfig.subscription_data = {
-            trial_period_days: 1,
+            trial_period_days: 7,
           }
         }
 
         sessionData = await stripe.checkout.sessions.create(sessionConfig)
-        console.log("✅ Test Session Created Successfully:")
+        console.log("✅ Validation Session Created:")
         console.log("   - Session ID:", sessionData.id)
         console.log("   - URL:", sessionData.url)
         console.log("   - Mode:", sessionData.mode)
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log("🧪 === STRIPE CHECKOUT TEST COMPLETE ===")
+    console.log("🔍 === STRIPE VALIDATION COMPLETE ===")
 
     return NextResponse.json({
       success: true,
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("💥 Test API Error:", error)
+    console.error("💥 Validation API Error:", error)
     return NextResponse.json(
       {
         success: false,

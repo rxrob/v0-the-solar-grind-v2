@@ -1,252 +1,175 @@
 import { NextResponse } from "next/server"
-
-interface EnvironmentVariable {
-  name: string
-  value: string | null
-  required: boolean
-  description: string
-  category: string
-}
-
-interface CategoryData {
-  variables: EnvironmentVariable[]
-  total: number
-  configured: number
-  required: number
-  required_configured: number
-}
+import { isSupabaseAvailable } from "@/lib/supabase"
 
 export async function GET() {
-  try {
-    const environmentVariables: EnvironmentVariable[] = [
-      // Database
-      {
-        name: "NEXT_PUBLIC_SUPABASE_URL",
-        value: process.env.NEXT_PUBLIC_SUPABASE_URL || null,
-        required: true,
-        description: "Supabase project URL for database connection",
-        category: "Database",
-      },
-      {
-        name: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-        value: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || null,
-        required: true,
-        description: "Supabase anonymous key for client-side access",
-        category: "Database",
-      },
-      {
-        name: "SUPABASE_SERVICE_ROLE_KEY",
-        value: process.env.SUPABASE_SERVICE_ROLE_KEY || null,
-        required: true,
-        description: "Supabase service role key for server-side operations",
-        category: "Database",
-      },
+  console.log("[SERVER] 🔍 === ENVIRONMENT CHECK START ===")
 
-      // Google Services
-      {
-        name: "GOOGLE_MAPS_API_KEY",
-        value: process.env.GOOGLE_MAPS_API_KEY || null,
-        required: true,
-        description: "Google Maps API key for map functionality",
-        category: "Google Services",
-      },
-      {
-        name: "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY",
-        value: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || null,
-        required: true,
-        description: "Google Maps API key for client-side map rendering",
-        category: "Google Services",
-      },
-      {
-        name: "GOOGLE_GEOCODING_API_KEY",
-        value: process.env.GOOGLE_GEOCODING_API_KEY || null,
-        required: true,
-        description: "Google Geocoding API key for address conversion",
-        category: "Google Services",
-      },
-      {
-        name: "GOOGLE_ELEVATION_API_KEY",
-        value: process.env.GOOGLE_ELEVATION_API_KEY || null,
-        required: true,
-        description: "Google Elevation API key for terrain analysis",
-        category: "Google Services",
-      },
-
-      // Solar Data
-      {
-        name: "NREL_API_KEY",
-        value: process.env.NREL_API_KEY || null,
-        required: true,
-        description: "NREL API key for solar irradiance and weather data",
-        category: "Solar Data",
-      },
-
-      // Payments
-      {
-        name: "STRIPE_PUBLISHABLE_KEY",
-        value: process.env.STRIPE_PUBLISHABLE_KEY || null,
-        required: true,
-        description: "Stripe publishable key for client-side payment processing",
-        category: "Payments",
-      },
-      {
-        name: "STRIPE_SECRET_KEY",
-        value: process.env.STRIPE_SECRET_KEY || null,
-        required: true,
-        description: "Stripe secret key for server-side payment processing",
-        category: "Payments",
-      },
-      {
-        name: "STRIPE_WEBHOOK_SECRET",
-        value: process.env.STRIPE_WEBHOOK_SECRET || null,
-        required: true,
-        description: "Stripe webhook secret for secure webhook verification",
-        category: "Payments",
-      },
-
-      // Security
-      {
-        name: "RECAPTCHA_SECRET_KEY",
-        value: process.env.RECAPTCHA_SECRET_KEY || null,
-        required: true,
-        description: "reCAPTCHA secret key for server-side verification",
-        category: "Security",
-      },
-      {
-        name: "NEXT_PUBLIC_RECAPTCHA_SITE_KEY",
-        value: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || null,
-        required: true,
-        description: "reCAPTCHA site key for client-side integration",
-        category: "Security",
-      },
-
-      // Optional/Development
-      {
-        name: "NEXT_PUBLIC_BASE_URL",
-        value: process.env.NEXT_PUBLIC_BASE_URL || null,
-        required: false,
-        description: "Base URL for the application (auto-detected if not set)",
-        category: "Configuration",
-      },
-      {
-        name: "NEXT_PUBLIC_AXIOM_INGEST_ENDPOINT",
-        value: process.env.NEXT_PUBLIC_AXIOM_INGEST_ENDPOINT || null,
-        required: false,
-        description: "Axiom logging endpoint for analytics",
-        category: "Analytics",
-      },
-    ]
-
-    // Group by category
-    const categories: Record<string, CategoryData> = {}
-
-    environmentVariables.forEach((env) => {
-      if (!categories[env.category]) {
-        categories[env.category] = {
-          variables: [],
-          total: 0,
-          configured: 0,
-          required: 0,
-          required_configured: 0,
-        }
-      }
-
-      categories[env.category].variables.push(env)
-      categories[env.category].total++
-
-      if (env.value) {
-        categories[env.category].configured++
-      }
-
-      if (env.required) {
-        categories[env.category].required++
-        if (env.value) {
-          categories[env.category].required_configured++
-        }
-      }
-    })
-
-    // Calculate summary
-    const totalVariables = environmentVariables.length
-    const configuredVariables = environmentVariables.filter((env) => env.value).length
-    const requiredVariables = environmentVariables.filter((env) => env.required).length
-    const requiredConfigured = environmentVariables.filter((env) => env.required && env.value).length
-
-    const configurationPercentage = Math.round((configuredVariables / totalVariables) * 100)
-    const requiredPercentage = Math.round((requiredConfigured / requiredVariables) * 100)
-
-    // Find missing required variables
-    const missingRequired = environmentVariables
-      .filter((env) => env.required && !env.value)
-      .map((env) => ({
-        name: env.name,
-        description: env.description,
-        category: env.category,
-      }))
-
-    // Generate recommendations
-    const recommendations: string[] = []
-
-    if (missingRequired.length > 0) {
-      recommendations.push(`Configure ${missingRequired.length} missing required environment variables`)
-    }
-
-    if (requiredPercentage < 100) {
-      recommendations.push("Complete required variable configuration for full functionality")
-    }
-
-    if (!process.env.NEXT_PUBLIC_BASE_URL) {
-      recommendations.push("Set NEXT_PUBLIC_BASE_URL for production deployment")
-    }
-
-    // Generate environment template
-    const envTemplate = environmentVariables
-      .map((env) => {
-        const comment = `# ${env.description} (${env.required ? "Required" : "Optional"})`
-        const line = `${env.name}=${env.value || ""}`
-        return `${comment}\n${line}`
-      })
-      .join("\n\n")
-
-    // Determine overall status
-    let status: "complete" | "partial" | "missing"
-    let message: string
-
-    if (requiredPercentage === 100) {
-      status = "complete"
-      message = "All required environment variables are configured"
-    } else if (requiredPercentage > 0) {
-      status = "partial"
-      message = `${requiredConfigured}/${requiredVariables} required variables configured`
-    } else {
-      status = "missing"
-      message = "Critical environment variables are missing"
-    }
-
-    return NextResponse.json({
-      status,
-      message,
-      categories,
-      missing_required: missingRequired,
-      recommendations,
-      env_template: envTemplate,
-      summary: {
-        total_variables: totalVariables,
-        configured_variables: configuredVariables,
-        required_variables: requiredVariables,
-        required_configured: requiredConfigured,
-        configuration_percentage: configurationPercentage,
-        required_percentage: requiredPercentage,
-      },
-    })
-  } catch (error) {
-    console.error("Environment check error:", error)
-    return NextResponse.json(
-      {
-        error: "Failed to check environment configuration",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+  const environment = {
+    supabase: {
+      configured: false,
+      url_present: false,
+      anon_key_present: false,
+      service_role_present: false,
+      issues: [] as string[],
+    },
+    stripe: {
+      configured: false,
+      secret_key_present: false,
+      publishable_key_present: false,
+      webhook_secret_present: false,
+      environment_type: "unknown" as "test" | "live" | "unknown",
+      issues: [] as string[],
+    },
+    google: {
+      configured: false,
+      maps_key_present: false,
+      geocoding_key_present: false,
+      elevation_key_present: false,
+      issues: [] as string[],
+    },
+    nrel: {
+      configured: false,
+      api_key_present: false,
+      issues: [] as string[],
+    },
+    overall: {
+      status: "unknown" as "healthy" | "partial" | "critical" | "unknown",
+      critical_issues: 0,
+      warnings: 0,
+    },
   }
+
+  // Check Supabase
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  environment.supabase.url_present = !!supabaseUrl
+  environment.supabase.anon_key_present = !!supabaseAnonKey
+  environment.supabase.service_role_present = !!supabaseServiceKey
+
+  if (!supabaseUrl) {
+    environment.supabase.issues.push("NEXT_PUBLIC_SUPABASE_URL is missing")
+  } else if (supabaseUrl === "your_supabase_project_url" || supabaseUrl.includes("your-project")) {
+    environment.supabase.issues.push("NEXT_PUBLIC_SUPABASE_URL contains placeholder value")
+  } else if (!supabaseUrl.startsWith("https://") || !supabaseUrl.includes(".supabase.co")) {
+    environment.supabase.issues.push("NEXT_PUBLIC_SUPABASE_URL format is invalid")
+  }
+
+  if (!supabaseAnonKey) {
+    environment.supabase.issues.push("NEXT_PUBLIC_SUPABASE_ANON_KEY is missing")
+  } else if (supabaseAnonKey === "your_supabase_anon_key" || supabaseAnonKey.includes("your_")) {
+    environment.supabase.issues.push("NEXT_PUBLIC_SUPABASE_ANON_KEY contains placeholder value")
+  }
+
+  if (!supabaseServiceKey) {
+    environment.supabase.issues.push("SUPABASE_SERVICE_ROLE_KEY is missing")
+  } else if (supabaseServiceKey === "your_supabase_service_role_key" || supabaseServiceKey.includes("your_")) {
+    environment.supabase.issues.push("SUPABASE_SERVICE_ROLE_KEY contains placeholder value")
+  }
+
+  environment.supabase.configured = isSupabaseAvailable()
+
+  // Check Stripe
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+  const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+
+  environment.stripe.secret_key_present = !!stripeSecretKey
+  environment.stripe.publishable_key_present = !!stripePublishableKey
+  environment.stripe.webhook_secret_present = !!stripeWebhookSecret
+
+  if (stripeSecretKey) {
+    if (stripeSecretKey.startsWith("sk_test_")) {
+      environment.stripe.environment_type = "test"
+    } else if (stripeSecretKey.startsWith("sk_live_")) {
+      environment.stripe.environment_type = "live"
+    }
+  }
+
+  if (!stripeSecretKey) {
+    environment.stripe.issues.push("STRIPE_SECRET_KEY is missing")
+  }
+
+  if (!stripePublishableKey) {
+    environment.stripe.issues.push("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing")
+  } else {
+    const publishableIsTest = stripePublishableKey.startsWith("pk_test_")
+    const publishableIsLive = stripePublishableKey.startsWith("pk_live_")
+    const secretIsTest = stripeSecretKey?.startsWith("sk_test_")
+    const secretIsLive = stripeSecretKey?.startsWith("sk_live_")
+
+    if ((secretIsTest && publishableIsLive) || (secretIsLive && publishableIsTest)) {
+      environment.stripe.issues.push("Stripe key environment mismatch (test vs live)")
+    }
+  }
+
+  if (!stripeWebhookSecret) {
+    environment.stripe.issues.push("STRIPE_WEBHOOK_SECRET is missing")
+  }
+
+  environment.stripe.configured = environment.stripe.issues.length === 0
+
+  // Check Google APIs
+  const googleMapsKey = process.env.GOOGLE_MAPS_API_KEY
+  const googleGeocodingKey = process.env.GOOGLE_GEOCODING_API_KEY
+  const googleElevationKey = process.env.GOOGLE_ELEVATION_API_KEY
+
+  environment.google.maps_key_present = !!googleMapsKey
+  environment.google.geocoding_key_present = !!googleGeocodingKey
+  environment.google.elevation_key_present = !!googleElevationKey
+
+  if (!googleMapsKey) {
+    environment.google.issues.push("GOOGLE_MAPS_API_KEY is missing")
+  }
+  if (!googleGeocodingKey) {
+    environment.google.issues.push("GOOGLE_GEOCODING_API_KEY is missing")
+  }
+  if (!googleElevationKey) {
+    environment.google.issues.push("GOOGLE_ELEVATION_API_KEY is missing")
+  }
+
+  environment.google.configured = environment.google.issues.length === 0
+
+  // Check NREL
+  const nrelApiKey = process.env.NREL_API_KEY
+
+  environment.nrel.api_key_present = !!nrelApiKey
+
+  if (!nrelApiKey) {
+    environment.nrel.issues.push("NREL_API_KEY is missing")
+  }
+
+  environment.nrel.configured = environment.nrel.issues.length === 0
+
+  // Calculate overall status
+  const totalIssues =
+    environment.supabase.issues.length +
+    environment.stripe.issues.length +
+    environment.google.issues.length +
+    environment.nrel.issues.length
+
+  const criticalServices = [environment.stripe.configured, environment.google.configured, environment.nrel.configured]
+  const criticalConfigured = criticalServices.filter(Boolean).length
+
+  if (totalIssues === 0) {
+    environment.overall.status = "healthy"
+  } else if (criticalConfigured >= 2) {
+    environment.overall.status = "partial"
+  } else {
+    environment.overall.status = "critical"
+  }
+
+  environment.overall.critical_issues = totalIssues
+  environment.overall.warnings = environment.supabase.configured ? 0 : 1
+
+  console.log("[SERVER] 📊 Environment Status:")
+  console.log(`[SERVER]    - Overall: ${environment.overall.status}`)
+  console.log(`[SERVER]    - Supabase: ${environment.supabase.configured ? "✅" : "❌"}`)
+  console.log(`[SERVER]    - Stripe: ${environment.stripe.configured ? "✅" : "❌"}`)
+  console.log(`[SERVER]    - Google: ${environment.google.configured ? "✅" : "❌"}`)
+  console.log(`[SERVER]    - NREL: ${environment.nrel.configured ? "✅" : "❌"}`)
+  console.log("[SERVER] ✅ === ENVIRONMENT CHECK COMPLETE ===")
+
+  return NextResponse.json(environment)
 }

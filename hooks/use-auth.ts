@@ -1,106 +1,152 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
+import { supabase, isSupabaseAvailable } from "@/lib/supabase"
+import type { User, Session } from "@supabase/supabase-js"
 
-interface User {
-  id: string
-  email: string
-  subscription_tier: "free" | "pro" | "enterprise"
-  subscription_plan?: string
+interface AuthState {
+  user: User | null
+  session: Session | null
+  loading: boolean
+  isAuthenticated: boolean
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    session: null,
+    loading: true,
+    isAuthenticated: false,
+  })
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
       try {
+        if (!isSupabaseAvailable()) {
+          console.log("🔄 Demo mode: No authentication available")
+          setAuthState({
+            user: null,
+            session: null,
+            loading: false,
+            isAuthenticated: false,
+          })
+          return
+        }
+
         const {
           data: { session },
+          error,
         } = await supabase.auth.getSession()
 
+        if (error && error.message !== "Auth session missing!") {
+          console.error("Error getting session:", error.message)
+        }
+
+        setAuthState({
+          user: session?.user ?? null,
+          session,
+          loading: false,
+          isAuthenticated: !!session?.user,
+        })
+
         if (session?.user) {
-          // In demo mode, create a mock user
-          setUser({
-            id: session.user.id,
-            email: session.user.email || "demo@example.com",
-            subscription_tier: "pro", // Demo user has pro access
-            subscription_plan: "professional",
-          })
-        } else {
-          // Demo mode - create a mock user for testing
-          setUser({
-            id: "demo-user-id",
-            email: "demo@example.com",
-            subscription_tier: "pro",
-            subscription_plan: "professional",
-          })
+          console.log("✅ User authenticated:", session.user.email)
         }
       } catch (error) {
-        console.warn("Auth error, using demo mode:", error)
-        // Fallback to demo user
-        setUser({
-          id: "demo-user-id",
-          email: "demo@example.com",
-          subscription_tier: "pro",
-          subscription_plan: "professional",
+        console.error("Error in getInitialSession:", error)
+        setAuthState({
+          user: null,
+          session: null,
+          loading: false,
+          isAuthenticated: false,
         })
-      } finally {
-        setLoading(false)
       }
     }
 
     getInitialSession()
 
     // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
-      if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || "demo@example.com",
-          subscription_tier: "pro",
-          subscription_plan: "professional",
-        })
-      } else {
-        // Keep demo user even when signed out
-        setUser({
-          id: "demo-user-id",
-          email: "demo@example.com",
-          subscription_tier: "pro",
-          subscription_plan: "professional",
-        })
-      }
-      setLoading(false)
-    })
+    if (isSupabaseAvailable()) {
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // Only log meaningful auth state changes
+        if (event !== "INITIAL_SESSION" || session) {
+          console.log("🔄 Auth state changed:", event, session?.user?.email || "no user")
+        }
 
-    return () => {
-      subscription?.unsubscribe()
+        setAuthState({
+          user: session?.user ?? null,
+          session,
+          loading: false,
+          isAuthenticated: !!session?.user,
+        })
+      })
+
+      return () => subscription.unsubscribe()
     }
   }, [])
 
-  const signOut = async () => {
+  // Helper functions for client-side auth operations
+  const signInClient = async (email: string, password: string) => {
+    if (!isSupabaseAvailable()) {
+      return { error: "Authentication not available in demo mode" }
+    }
+
     try {
-      await supabase.auth.signOut()
-      // Keep demo user after sign out
-      setUser({
-        id: "demo-user-id",
-        email: "demo@example.com",
-        subscription_tier: "pro",
-        subscription_plan: "professional",
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       })
+      return { data, error }
     } catch (error) {
-      console.warn("Sign out error:", error)
+      console.error("Client sign in error:", error)
+      return { error: "An unexpected error occurred" }
+    }
+  }
+
+  const signUpClient = async (email: string, password: string, fullName?: string) => {
+    if (!isSupabaseAvailable()) {
+      return { error: "Authentication not available in demo mode" }
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      })
+      return { data, error }
+    } catch (error) {
+      console.error("Client sign up error:", error)
+      return { error: "An unexpected error occurred" }
+    }
+  }
+
+  const signOutClient = async () => {
+    if (!isSupabaseAvailable()) {
+      return { error: null }
+    }
+
+    try {
+      const { error } = await supabase.auth.signOut()
+      return { error }
+    } catch (error) {
+      console.error("Client sign out error:", error)
+      return { error: "An unexpected error occurred" }
     }
   }
 
   return {
-    user,
-    loading,
-    signOut,
+    ...authState,
+    signIn: signInClient,
+    signUp: signUpClient,
+    signOut: signOutClient,
+    isSupabaseAvailable: isSupabaseAvailable(),
   }
 }

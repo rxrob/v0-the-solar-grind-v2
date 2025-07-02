@@ -5,159 +5,117 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Download,
-  Copy,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  Server,
+  RefreshCw,
   Database,
-  Globe,
   CreditCard,
-  Shield,
+  Map,
   Sun,
-  Key,
+  ExternalLink,
 } from "lucide-react"
-import Link from "next/link"
 
-interface EnvironmentData {
-  status: "complete" | "partial" | "missing"
-  message: string
-  categories: Record<
-    string,
-    {
-      variables: Array<{
-        name: string
-        value: string | null
-        required: boolean
-        description: string
-        category: string
-      }>
-      total: number
-      configured: number
-      required: number
-      required_configured: number
-    }
-  >
-  missing_required: Array<{
-    name: string
-    description: string
-    category: string
-  }>
-  recommendations: string[]
-  env_template: string
-  summary: {
-    total_variables: number
-    configured_variables: number
-    required_variables: number
-    required_configured: number
-    configuration_percentage: number
-    required_percentage: number
+interface EnvironmentStatus {
+  supabase: {
+    configured: boolean
+    url_present: boolean
+    anon_key_present: boolean
+    service_role_present: boolean
+    issues: string[]
+  }
+  stripe: {
+    configured: boolean
+    secret_key_present: boolean
+    publishable_key_present: boolean
+    webhook_secret_present: boolean
+    environment_type: "test" | "live" | "unknown"
+    issues: string[]
+  }
+  google: {
+    configured: boolean
+    maps_key_present: boolean
+    geocoding_key_present: boolean
+    elevation_key_present: boolean
+    issues: string[]
+  }
+  nrel: {
+    configured: boolean
+    api_key_present: boolean
+    issues: string[]
+  }
+  overall: {
+    status: "healthy" | "partial" | "critical" | "unknown"
+    critical_issues: number
+    warnings: number
   }
 }
 
 export default function EnvironmentCheckPage() {
-  const [envData, setEnvData] = useState<EnvironmentData | null>(null)
+  const [status, setStatus] = useState<EnvironmentStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showValues, setShowValues] = useState(false)
-  const [copiedTemplate, setCopiedTemplate] = useState(false)
 
-  const fetchEnvironmentData = async () => {
+  const fetchStatus = async () => {
+    setLoading(true)
+    setError(null)
+
     try {
-      setError(null)
       const response = await fetch("/api/check-environment")
-      const data = await response.json()
-
-      if (response.ok) {
-        setEnvData(data)
-      } else {
-        setError(data.message || "Failed to fetch environment data")
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
+
+      const data = await response.json()
+      setStatus(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error occurred")
+      console.error("Failed to fetch environment status:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchEnvironmentData()
+    fetchStatus()
   }, [])
 
-  const maskValue = (value: string | null) => {
-    if (!value) return "Not set"
-    if (showValues) return value
-    return value?.substring(0, 8) + "..." || "Not set"
+  const getStatusIcon = (configured: boolean) => {
+    return configured ? (
+      <CheckCircle className="h-5 w-5 text-green-500" />
+    ) : (
+      <XCircle className="h-5 w-5 text-red-500" />
+    )
   }
 
-  const downloadTemplate = () => {
-    if (!envData) return
-
-    const blob = new Blob([envData.env_template], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = ".env.local"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+  const getStatusBadge = (configured: boolean) => {
+    return (
+      <Badge variant={configured ? "default" : "destructive"} className="ml-2">
+        {configured ? "Configured" : "Missing"}
+      </Badge>
+    )
   }
 
-  const copyTemplate = async () => {
-    if (!envData) return
-
-    try {
-      await navigator.clipboard.writeText(envData.env_template)
-      setCopiedTemplate(true)
-      setTimeout(() => setCopiedTemplate(false), 2000)
-    } catch (err) {
-      console.error("Failed to copy template:", err)
-    }
-  }
-
-  const getCategoryIcon = (category: string) => {
-    switch (category.toLowerCase()) {
-      case "database":
-        return <Database className="h-5 w-5 text-blue-500" />
-      case "google services":
-        return <Globe className="h-5 w-5 text-green-500" />
-      case "solar data":
-        return <Sun className="h-5 w-5 text-yellow-500" />
-      case "payments":
-        return <CreditCard className="h-5 w-5 text-purple-500" />
-      case "security":
-        return <Shield className="h-5 w-5 text-red-500" />
+  const getOverallStatusColor = (status: string) => {
+    switch (status) {
+      case "healthy":
+        return "text-green-600 bg-green-50 border-green-200"
+      case "partial":
+        return "text-yellow-600 bg-yellow-50 border-yellow-200"
+      case "critical":
+        return "text-red-600 bg-red-50 border-red-200"
       default:
-        return <Key className="h-5 w-5 text-gray-500" />
+        return "text-gray-600 bg-gray-50 border-gray-200"
     }
   }
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-32" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          ))}
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
+          <p className="text-gray-600">Checking environment configuration...</p>
         </div>
       </div>
     )
@@ -165,388 +123,303 @@ export default function EnvironmentCheckPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert variant="destructive">
-          <XCircle className="h-4 w-4" />
-          <AlertDescription>Failed to load environment data: {error}</AlertDescription>
-        </Alert>
-        <Button onClick={fetchEnvironmentData} className="mt-4">
-          Retry
-        </Button>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center text-red-600">
+              <XCircle className="h-5 w-5 mr-2" />
+              Environment Check Failed
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <Button onClick={fetchStatus} className="w-full">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry Check
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
-  if (!envData) return null
+  if (!status) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-600">No status data available</p>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Home
-                </Link>
-              </Button>
-              <div className="flex items-center gap-2">
-                <Server className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold">Environment Configuration</span>
-                <Badge
-                  className={
-                    envData.status === "complete"
-                      ? "bg-green-100 text-green-800"
-                      : envData.status === "partial"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-red-100 text-red-800"
-                  }
-                >
-                  {envData.status === "complete" ? "Complete" : envData.status === "partial" ? "Partial" : "Incomplete"}
-                </Badge>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" onClick={() => setShowValues(!showValues)} className="min-w-[120px]">
-                <span className="inline-block w-[100px]">
-                  {showValues ? (
-                    <>
-                      <EyeOff className="h-4 w-4 mr-2 inline" />
-                      Hide Values
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="h-4 w-4 mr-2 inline" />
-                      Show Values
-                    </>
-                  )}
-                </span>
-              </Button>
-              <Button onClick={fetchEnvironmentData} size="sm">
-                Refresh
-              </Button>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="container mx-auto px-4 max-w-4xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Environment Configuration</h1>
+          <p className="text-gray-600">Check the status of all required services and API keys</p>
         </div>
-      </div>
 
-      <div className="container mx-auto px-6 py-8 max-w-7xl space-y-8">
-        {/* Configuration Overview */}
-        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+        {/* Overall Status */}
+        <Card className={`mb-8 border-2 ${getOverallStatusColor(status.overall.status)}`}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Server className="h-5 w-5" />
-              Configuration Overview
+            <CardTitle className="flex items-center">
+              {status.overall.status === "healthy" ? (
+                <CheckCircle className="h-6 w-6 mr-2 text-green-500" />
+              ) : status.overall.status === "partial" ? (
+                <AlertTriangle className="h-6 w-6 mr-2 text-yellow-500" />
+              ) : (
+                <XCircle className="h-6 w-6 mr-2 text-red-500" />
+              )}
+              Overall Status: {status.overall.status.toUpperCase()}
             </CardTitle>
-            <CardDescription>{envData.message}</CardDescription>
+            <CardDescription>
+              {status.overall.critical_issues === 0
+                ? "All services are properly configured"
+                : `${status.overall.critical_issues} configuration issues found`}
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-4 gap-6">
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-600">Overall Progress</div>
-                <div className="text-2xl font-bold text-blue-600">{envData.summary.configuration_percentage}%</div>
-                <div className="text-xs text-gray-500">
-                  {envData.summary.configured_variables}/{envData.summary.total_variables} configured
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-600">Required Variables</div>
-                <div className="text-2xl font-bold text-green-600">
-                  {envData.summary.required_configured}/{envData.summary.required_variables}
-                </div>
-                <div className="text-xs text-gray-500">{envData.summary.required_percentage}% complete</div>
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-600">Missing Required</div>
-                <div className="text-2xl font-bold text-red-600">{envData.missing_required.length}</div>
-                <div className="text-xs text-gray-500">Need attention</div>
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-600">Categories</div>
-                <div className="text-2xl font-bold text-purple-600">{Object.keys(envData.categories).length}</div>
-                <div className="text-xs text-gray-500">Service groups</div>
-              </div>
-            </div>
-          </CardContent>
+          {status.overall.critical_issues > 0 && (
+            <CardContent>
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Some services are not configured. The application will work in limited mode until all issues are
+                  resolved.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          )}
         </Card>
 
-        {/* Missing Required Variables Alert */}
-        {envData.missing_required.length > 0 && (
-          <>
-            <Alert variant="destructive" className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>Missing required environment variables:</AlertDescription>
-            </Alert>
-            <div className="space-y-2 -mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
-              {envData.missing_required.map((env, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-white rounded border border-red-200"
-                >
-                  <div>
-                    <div className="font-medium text-red-800">{env.name}</div>
-                    <div className="text-sm text-red-600">{env.description}</div>
+        {/* Service Status Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Supabase */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Database className="h-5 w-5 mr-2 text-blue-500" />
+                Supabase Database
+                {getStatusBadge(status.supabase.configured)}
+              </CardTitle>
+              <CardDescription>User authentication and data storage</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Project URL</span>
+                  {getStatusIcon(status.supabase.url_present)}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Anonymous Key</span>
+                  {getStatusIcon(status.supabase.anon_key_present)}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Service Role Key</span>
+                  {getStatusIcon(status.supabase.service_role_present)}
+                </div>
+              </div>
+
+              {status.supabase.issues.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-red-600 mb-2">Issues:</h4>
+                  <ul className="text-sm text-red-600 space-y-1">
+                    {status.supabase.issues.map((issue, index) => (
+                      <li key={index}>• {issue}</li>
+                    ))}
+                  </ul>
+                  <div className="mt-3">
+                    <Button size="sm" variant="outline" asChild>
+                      <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Supabase Dashboard
+                      </a>
+                    </Button>
                   </div>
-                  <Badge variant="outline" className="text-red-700 border-red-300">
-                    {env.category}
-                  </Badge>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Recommendations */}
-        {envData.recommendations.length > 0 && (
-          <>
-            <Alert className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>Configuration recommendations:</AlertDescription>
-            </Alert>
-            <div className="space-y-2 -mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              {envData.recommendations.map((rec, index) => (
-                <div key={index} className="text-sm text-blue-800">
-                  • {rec}
+          {/* Stripe */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <CreditCard className="h-5 w-5 mr-2 text-purple-500" />
+                Stripe Payments
+                {getStatusBadge(status.stripe.configured)}
+              </CardTitle>
+              <CardDescription>Payment processing ({status.stripe.environment_type} mode)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Secret Key</span>
+                  {getStatusIcon(status.stripe.secret_key_present)}
                 </div>
-              ))}
-            </div>
-          </>
-        )}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Publishable Key</span>
+                  {getStatusIcon(status.stripe.publishable_key_present)}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Webhook Secret</span>
+                  {getStatusIcon(status.stripe.webhook_secret_present)}
+                </div>
+              </div>
 
-        {/* Environment Variables by Category */}
-        <Tabs defaultValue="categories" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="categories">By Category</TabsTrigger>
-            <TabsTrigger value="all">All Variables</TabsTrigger>
-            <TabsTrigger value="missing">Missing Only</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="categories" className="space-y-6">
-            {Object.entries(envData.categories).map(([category, data]) => (
-              <Card key={category} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {getCategoryIcon(category)}
-                      {category}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">
-                        {data.configured}/{data.total} configured
-                      </Badge>
-                      <Badge variant="secondary">
-                        {data.required_configured}/{data.required} required
-                      </Badge>
-                    </div>
-                  </CardTitle>
-                  <CardDescription>Configuration status for {category.toLowerCase()}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {data.variables.map((variable) => (
-                      <div
-                        key={variable.name}
-                        className={`p-4 rounded-lg border ${
-                          variable.value
-                            ? "bg-green-50 border-green-200"
-                            : variable.required
-                              ? "bg-red-50 border-red-200"
-                              : "bg-gray-50 border-gray-200"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            {variable.value ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-red-500" />
-                            )}
-                            <div>
-                              <div className="font-medium">{variable.name}</div>
-                              <div className="text-sm text-gray-600">{variable.description}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {variable.required && (
-                              <Badge variant="outline" className="text-xs">
-                                Required
-                              </Badge>
-                            )}
-                            <Badge
-                              className={variable.value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
-                            >
-                              {variable.value ? "Set" : "Missing"}
-                            </Badge>
-                          </div>
-                        </div>
-                        {variable.value && (
-                          <div className="mt-2 p-2 bg-white/50 rounded border">
-                            <div className="text-xs font-medium text-gray-600 mb-1">Current Value:</div>
-                            <div className="font-mono text-sm">{maskValue(variable.value)}</div>
-                          </div>
-                        )}
-                      </div>
+              {status.stripe.issues.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-red-600 mb-2">Issues:</h4>
+                  <ul className="text-sm text-red-600 space-y-1">
+                    {status.stripe.issues.map((issue, index) => (
+                      <li key={index}>• {issue}</li>
                     ))}
+                  </ul>
+                  <div className="mt-3">
+                    <Button size="sm" variant="outline" asChild>
+                      <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Stripe Dashboard
+                      </a>
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-
-          <TabsContent value="all" className="space-y-4">
-            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle>All Environment Variables</CardTitle>
-                <CardDescription>Complete list of all environment variables</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {Object.values(envData.categories)
-                    .flatMap((cat) => cat.variables)
-                    .map((variable) => (
-                      <div
-                        key={variable.name}
-                        className={`flex items-center justify-between p-4 rounded-lg border ${
-                          variable.value
-                            ? "bg-green-50 border-green-200"
-                            : variable.required
-                              ? "bg-red-50 border-red-200"
-                              : "bg-gray-50 border-gray-200"
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          {variable.value ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-red-500" />
-                          )}
-                          <div>
-                            <div className="font-medium">{variable.name}</div>
-                            <div className="text-sm text-gray-600">{variable.category}</div>
-                            <div className="text-xs text-gray-500">{variable.description}</div>
-                            {variable.value && (
-                              <div className="text-xs font-mono mt-1">{maskValue(variable.value)}</div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {variable.required && (
-                            <Badge variant="outline" className="text-xs">
-                              Required
-                            </Badge>
-                          )}
-                          <Badge className={variable.value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                            {variable.value ? "Set" : "Missing"}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              )}
+            </CardContent>
+          </Card>
 
-          <TabsContent value="missing" className="space-y-4">
-            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle>Missing Variables</CardTitle>
-                <CardDescription>Environment variables that need to be configured</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {Object.values(envData.categories)
-                    .flatMap((cat) => cat.variables)
-                    .filter((variable) => !variable.value)
-                    .map((variable) => (
-                      <div
-                        key={variable.name}
-                        className={`flex items-center justify-between p-4 rounded-lg border ${
-                          variable.required ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <XCircle className="h-4 w-4 text-red-500" />
-                          <div>
-                            <div className="font-medium">{variable.name}</div>
-                            <div className="text-sm text-gray-600">{variable.category}</div>
-                            <div className="text-xs text-gray-500">{variable.description}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {variable.required && (
-                            <Badge variant="destructive" className="text-xs">
-                              Required
-                            </Badge>
-                          )}
-                          <Badge variant="secondary">Missing</Badge>
-                        </div>
-                      </div>
-                    ))}
+          {/* Google APIs */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Map className="h-5 w-5 mr-2 text-green-500" />
+                Google APIs
+                {getStatusBadge(status.google.configured)}
+              </CardTitle>
+              <CardDescription>Maps, geocoding, and elevation data</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Maps API Key</span>
+                  {getStatusIcon(status.google.maps_key_present)}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Geocoding API Key</span>
+                  {getStatusIcon(status.google.geocoding_key_present)}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Elevation API Key</span>
+                  {getStatusIcon(status.google.elevation_key_present)}
+                </div>
+              </div>
 
-        {/* Template Download */}
-        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle>Environment Template</CardTitle>
-            <CardDescription>Download or copy the complete .env.local template</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <Button onClick={downloadTemplate} className="flex items-center gap-2">
-                <Download className="h-4 w-4" />
-                Download .env.local
-              </Button>
-              <Button
-                variant="outline"
-                onClick={copyTemplate}
-                className="flex items-center gap-2 min-w-[140px] bg-transparent"
-              >
-                <Copy className="h-4 w-4" />
-                <span className="inline-block w-[120px]">{copiedTemplate ? "Copied!" : "Copy to Clipboard"}</span>
-              </Button>
-            </div>
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
-              <div className="text-xs font-medium text-gray-600 mb-2">Template Preview:</div>
-              <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                {envData.env_template.split("\n").slice(0, 10).join("\n")}
-                {envData.env_template.split("\n").length > 10 && "\n... (truncated)"}
-              </pre>
-            </div>
-          </CardContent>
-        </Card>
+              {status.google.issues.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-red-600 mb-2">Issues:</h4>
+                  <ul className="text-sm text-red-600 space-y-1">
+                    {status.google.issues.map((issue, index) => (
+                      <li key={index}>• {issue}</li>
+                    ))}
+                  </ul>
+                  <div className="mt-3">
+                    <Button size="sm" variant="outline" asChild>
+                      <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Google Cloud Console
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Quick Actions */}
-        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tasks and helpful links</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Button variant="outline" asChild>
-                <Link href="/api-status">
-                  <Server className="h-4 w-4 mr-2" />
-                  Check API Status
-                </Link>
-              </Button>
-              <Button variant="outline" onClick={fetchEnvironmentData}>
-                Refresh Configuration
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Application
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          {/* NREL */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Sun className="h-5 w-5 mr-2 text-orange-500" />
+                NREL Solar Data
+                {getStatusBadge(status.nrel.configured)}
+              </CardTitle>
+              <CardDescription>Solar irradiance and weather data</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">API Key</span>
+                  {getStatusIcon(status.nrel.api_key_present)}
+                </div>
+              </div>
+
+              {status.nrel.issues.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-red-600 mb-2">Issues:</h4>
+                  <ul className="text-sm text-red-600 space-y-1">
+                    {status.nrel.issues.map((issue, index) => (
+                      <li key={index}>• {issue}</li>
+                    ))}
+                  </ul>
+                  <div className="mt-3">
+                    <Button size="sm" variant="outline" asChild>
+                      <a href="https://developer.nrel.gov" target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        NREL Developer Portal
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-8 text-center">
+          <Button onClick={fetchStatus} className="mr-4">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh Status
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="/stripe-environment-check">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Detailed Stripe Check
+            </a>
+          </Button>
+        </div>
+
+        {/* Help Section */}
+        {status.overall.critical_issues > 0 && (
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle>Need Help?</CardTitle>
+              <CardDescription>Follow these steps to configure your environment</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">1. Create your .env.local file</h4>
+                  <p className="text-sm text-gray-600">
+                    Copy .env.local.example to .env.local and fill in your actual API keys
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">2. Get your API keys</h4>
+                  <p className="text-sm text-gray-600">
+                    Visit each service's dashboard to get your API keys and configuration values
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">3. Restart your application</h4>
+                  <p className="text-sm text-gray-600">
+                    After updating your environment variables, restart your development server
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

@@ -5,198 +5,192 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-06-20",
 })
 
-// Price ID mapping
-const PRICE_IDS = {
-  SINGLE_REPORT: "price_1RdGtXD80D06ku9UWRTdDUHh",
-  SUBSCRIPTION: "price_1RdGemD80D06ku9UO6X1lR35",
-}
-
 export async function POST(request: NextRequest) {
-  console.log("[SERVER] 🚀 === CREATE CHECKOUT SESSION START ===")
-
   try {
     const body = await request.json()
-    console.log("[SERVER] 📋 Request Body:", JSON.stringify(body, null, 2))
+    console.log("📝 Checkout request body:", body)
 
-    let purchaseType: string
-    let priceId: string
-    let email: string | undefined
-    let userId: string | undefined
+    // Accept both purchaseType and priceType for backward compatibility
+    const { purchaseType, priceType, userId, userEmail } = body
+    const finalPurchaseType = purchaseType || priceType
 
-    // Support both old format (priceId) and new format (purchaseType)
-    if (body.priceId) {
-      console.log("[SERVER] 📦 Using old format (priceId):")
-      priceId = body.priceId
-      console.log(`[SERVER]    - Price ID: ${priceId}`)
-
-      // Determine purchase type from price ID
-      if (priceId === PRICE_IDS.SINGLE_REPORT) {
-        purchaseType = "single_report"
-      } else if (priceId === PRICE_IDS.SUBSCRIPTION) {
-        purchaseType = "subscription"
-      } else {
-        console.error("[SERVER] ❌ Invalid price ID:", priceId)
-        return NextResponse.json({ error: "Invalid price ID" }, { status: 400 })
-      }
-
-      console.log(`[SERVER]    - Determined Purchase Type: ${purchaseType}`)
-      email = body.email
-      userId = body.userId
-    } else if (body.purchaseType) {
-      console.log("[SERVER] 📦 Using new format (purchaseType):")
-      purchaseType = body.purchaseType
-      email = body.email
-      userId = body.userId
-
-      console.log(`[SERVER]    - Purchase Type: ${purchaseType}`)
-      console.log(`[SERVER]    - Email: ${email}`)
-      console.log(`[SERVER]    - User ID: ${userId}`)
-
-      // Get price ID from purchase type
-      if (purchaseType === "single_report") {
-        priceId = PRICE_IDS.SINGLE_REPORT
-      } else if (purchaseType === "subscription") {
-        priceId = PRICE_IDS.SUBSCRIPTION
-      } else {
-        console.error("[SERVER] ❌ Invalid purchase type:", purchaseType)
-        return NextResponse.json({ error: "Invalid purchase type" }, { status: 400 })
-      }
-
-      console.log(`[SERVER]    - Mapped to Price ID: ${priceId}`)
-    } else {
-      console.error("[SERVER] ❌ Missing purchase type or price ID")
-      return NextResponse.json({ error: "Missing purchase type" }, { status: 400 })
+    if (!finalPurchaseType) {
+      console.error("❌ Missing priceType or purchaseType")
+      return NextResponse.json({ error: "Missing priceType", received: body }, { status: 400 })
     }
 
-    // Validate Stripe configuration
-    console.log("[SERVER] 🔑 Stripe Key Configuration:")
-    const isTestKey = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")
-    const isLiveKey = process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_")
-    console.log(`[SERVER]    - Using Test Key: ${isTestKey ? "✅ YES" : "❌ NO"}`)
-    console.log(`[SERVER]    - Using Live Key: ${isLiveKey ? "✅ YES" : "❌ NO"}`)
+    console.log("🛒 Processing checkout for:", finalPurchaseType)
 
-    if (!isTestKey && !isLiveKey) {
-      console.error("[SERVER] ❌ Invalid Stripe secret key format")
-      return NextResponse.json({ error: "Invalid Stripe configuration" }, { status: 500 })
-    }
+    // Check if we're in test mode
+    const isTestMode = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")
+    console.log("🔧 Stripe mode:", isTestMode ? "TEST" : "LIVE")
 
-    // Validate price with Stripe
-    console.log("[SERVER] 🔍 Validating price ID with Stripe...")
-    let price: Stripe.Price
-    try {
-      price = await stripe.prices.retrieve(priceId)
-      console.log("[SERVER] ✅ Price validation successful:")
-      console.log(`[SERVER]    - ID: ${price.id}`)
-      console.log(`[SERVER]    - Amount: ${price.unit_amount} cents`)
-      console.log(`[SERVER]    - Currency: ${price.currency}`)
-      console.log(`[SERVER]    - Type: ${price.type}`)
-      console.log(`[SERVER]    - Active: ${price.active}`)
-
-      if (!price.active) {
-        console.error("[SERVER] ❌ Price is not active")
-        return NextResponse.json({ error: "Price is not active" }, { status: 400 })
-      }
-    } catch (error) {
-      console.error("[SERVER] ❌ Price validation failed:", error)
-      return NextResponse.json({ error: "Invalid price ID" }, { status: 400 })
-    }
-
-    // Determine session mode and configuration
-    const mode = price.type === "recurring" ? "subscription" : "payment"
-    console.log("[SERVER] ⚙️ Session Configuration:")
-    console.log(`[SERVER]    - Mode: ${mode}`)
-    console.log(`[SERVER]    - Purchase Type: ${purchaseType}`)
-    console.log(`[SERVER]    - Amount: ${price.unit_amount} cents`)
-    console.log(`[SERVER]    - Currency: ${price.currency}`)
-
-    // Base URL for redirects
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://mysolarai.com"
-
-    // Create session configuration
-    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
-      mode: mode as "payment" | "subscription",
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}&type=${purchaseType}`,
-      cancel_url: `${baseUrl}/pricing?canceled=true`,
-      customer_creation: "always",
-      billing_address_collection: "required",
-      metadata: {
-        priceId,
-        purchaseType,
-        amount: price.unit_amount?.toString() || "0",
-        currency: price.currency,
-        ...(userId && { userId }),
+    // Define pricing based on environment
+    const pricing = {
+      "single-report": {
+        name: isTestMode ? "Single Solar Report (Test)" : "Single Solar Report",
+        amount: isTestMode ? 100 : 499, // $1.00 test, $4.99 live
+        currency: "usd",
+        mode: "payment" as const,
+      },
+      "pro-subscription": {
+        name: isTestMode ? "Pro Subscription (Test)" : "Pro Subscription",
+        amount: isTestMode ? 500 : 2999, // $5.00 test, $29.99 live
+        currency: "usd",
+        mode: "subscription" as const,
+        interval: "month" as const,
       },
     }
 
-    // Add email if provided
-    if (email) {
-      sessionConfig.customer_email = email
-      console.log(`[SERVER] 📧 Customer email set: ${email}`)
+    const priceConfig = pricing[finalPurchaseType as keyof typeof pricing]
+    if (!priceConfig) {
+      return NextResponse.json({ error: "Invalid purchase type", validTypes: Object.keys(pricing) }, { status: 400 })
     }
 
-    // Add subscription-specific configuration
-    if (mode === "subscription") {
+    console.log("💰 Price config:", priceConfig)
+
+    // Create or find product
+    console.log("🔍 Looking for existing product...")
+    const products = await stripe.products.list({
+      active: true,
+      limit: 100,
+    })
+
+    let product = products.data.find((p) => p.name === priceConfig.name)
+
+    if (!product) {
+      console.log("➕ Creating new product...")
+      product = await stripe.products.create({
+        name: priceConfig.name,
+        description: `${priceConfig.name} - Solar analysis and reporting`,
+        metadata: {
+          type: finalPurchaseType,
+          environment: isTestMode ? "test" : "live",
+        },
+      })
+      console.log("✅ Product created:", product.id, product.name)
+    } else {
+      console.log("✅ Found existing product:", product.id, product.name)
+    }
+
+    // Create or find price
+    console.log("🔍 Looking for existing price...")
+    const prices = await stripe.prices.list({
+      product: product.id,
+      active: true,
+    })
+
+    let price = prices.data.find(
+      (p) =>
+        p.unit_amount === priceConfig.amount &&
+        p.currency === priceConfig.currency &&
+        (priceConfig.mode === "subscription" ? p.recurring?.interval === priceConfig.interval : !p.recurring),
+    )
+
+    if (!price) {
+      console.log("➕ Creating new price...")
+      const priceData: Stripe.PriceCreateParams = {
+        product: product.id,
+        unit_amount: priceConfig.amount,
+        currency: priceConfig.currency,
+        metadata: {
+          type: finalPurchaseType,
+          environment: isTestMode ? "test" : "live",
+        },
+      }
+
+      if (priceConfig.mode === "subscription") {
+        priceData.recurring = {
+          interval: priceConfig.interval,
+        }
+      }
+
+      price = await stripe.prices.create(priceData)
+      console.log("✅ Price created:", price.id, `$${(priceConfig.amount / 100).toFixed(2)}`)
+    } else {
+      console.log("✅ Found existing price:", price.id, `$${(priceConfig.amount / 100).toFixed(2)}`)
+    }
+
+    // Create checkout session
+    console.log("🛒 Creating checkout session...")
+
+    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price: price.id,
+          quantity: 1,
+        },
+      ],
+      mode: priceConfig.mode,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing`,
+      metadata: {
+        purchaseType: finalPurchaseType,
+        userId: userId || "anonymous",
+        environment: isTestMode ? "test" : "live",
+      },
+    }
+
+    // Mode-specific configuration
+    if (priceConfig.mode === "payment") {
+      // Payment mode configuration
+      sessionConfig.customer_creation = "always"
+      sessionConfig.invoice_creation = {
+        enabled: true,
+      }
+    } else if (priceConfig.mode === "subscription") {
+      // Subscription mode configuration
       sessionConfig.subscription_data = {
         metadata: {
-          purchaseType,
-          ...(userId && { userId }),
+          purchaseType: finalPurchaseType,
+          userId: userId || "anonymous",
         },
       }
-    } else {
-      // Add payment-specific configuration
-      sessionConfig.payment_intent_data = {
-        metadata: {
-          purchaseType,
-          ...(userId && { userId }),
-        },
-      }
-      console.log("[SERVER] ✅ Added payment intent data")
+
+      // Add trial period
+      const trialDays = isTestMode ? 7 : 1
+      console.log(`🎁 Added ${trialDays}-day trial for ${isTestMode ? "test" : "live"} mode`)
+      sessionConfig.subscription_data.trial_period_days = trialDays
     }
 
-    // Add automatic tax
-    sessionConfig.automatic_tax = { enabled: true }
-
-    // Add invoice creation for subscriptions
-    if (mode === "subscription") {
-      sessionConfig.invoice_creation = { enabled: true }
+    // Add customer email if provided
+    if (userEmail) {
+      sessionConfig.customer_email = userEmail
     }
 
-    console.log("[SERVER] 📋 Final session configuration:")
-    console.log(`[SERVER]    - Mode: ${sessionConfig.mode}`)
-    console.log(`[SERVER]    - Success URL: ${sessionConfig.success_url}`)
-    console.log(`[SERVER]    - Cancel URL: ${sessionConfig.cancel_url}`)
-    console.log(`[SERVER]    - Customer Email: ${sessionConfig.customer_email || "undefined"}`)
-    console.log(`[SERVER]    - Metadata: ${JSON.stringify(sessionConfig.metadata, null, 2)}`)
+    console.log("🔧 Session config:", {
+      mode: sessionConfig.mode,
+      priceId: price.id,
+      amount: `$${(priceConfig.amount / 100).toFixed(2)}`,
+      trial: sessionConfig.subscription_data?.trial_period_days || "none",
+    })
 
-    // Create the checkout session
-    console.log("[SERVER] 🔄 Creating Stripe checkout session...")
     const session = await stripe.checkout.sessions.create(sessionConfig)
 
-    console.log("[SERVER] 🎉 SESSION CREATED SUCCESSFULLY!")
-    console.log("[SERVER] 📊 Session Details:")
-    console.log(`[SERVER]    - Session ID: ${session.id}`)
-    console.log(`[SERVER]    - Checkout URL: ${session.url}`)
-    console.log(`[SERVER]    - Mode: ${session.mode}`)
-    console.log(`[SERVER]    - Amount Total: ${session.amount_total} cents`)
-    console.log(`[SERVER]    - Currency: ${session.currency}`)
-    console.log(`[SERVER]    - Status: ${session.status}`)
-    console.log(`[SERVER]    - Live Mode: ${session.livemode ? "LIVE" : "TEST"}`)
-    console.log("[SERVER] ✅ === CREATE CHECKOUT SESSION COMPLETE ===")
+    console.log("✅ Checkout session created:", session.id)
+    console.log("🔗 Checkout URL:", session.url)
 
     return NextResponse.json({
       sessionId: session.id,
       url: session.url,
+      priceId: price.id,
+      productId: product.id,
+      amount: priceConfig.amount,
+      currency: priceConfig.currency,
+      mode: priceConfig.mode,
     })
-  } catch (error) {
-    console.error("[SERVER] ❌ === CREATE CHECKOUT SESSION ERROR ===")
-    console.error("[SERVER] Error:", error)
+  } catch (error: any) {
+    console.error("❌ Error creating checkout session:", error.message)
+    console.error("🔴 Stripe error details:", error.message)
 
-    return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Failed to create checkout session",
+        details: error.message,
+        type: error.type || "unknown_error",
+      },
+      { status: 500 },
+    )
   }
 }
