@@ -8,21 +8,18 @@ export async function GET() {
       return NextResponse.json({
         configured: false,
         error: "Google Maps API key not configured",
-        message: "Please configure GOOGLE_MAPS_API_KEY environment variable",
       })
     }
 
     return NextResponse.json({
       configured: true,
       apiKey: apiKey,
-      libraries: ["places", "geometry"],
     })
   } catch (error) {
-    console.error("Error checking Google Maps configuration:", error)
+    console.error("Error checking Google Maps config:", error)
     return NextResponse.json({
       configured: false,
       error: "Failed to check Google Maps configuration",
-      message: "Internal server error",
     })
   }
 }

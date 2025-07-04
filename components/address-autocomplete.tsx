@@ -1,43 +1,36 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { MapPin, AlertCircle } from "lucide-react"
+import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import type { google } from "google-maps"
+import { MapPin, AlertCircle } from "lucide-react"
 
 interface AddressAutocompleteProps {
-  onAddressSelect: (address: string, lat?: number, lng?: number) => void
+  onAddressSelect: (address: string, coordinates?: { lat: number; lng: number }) => void
   placeholder?: string
-  className?: string
+  label?: string
+  required?: boolean
 }
 
 interface GoogleMapsConfig {
   configured: boolean
   apiKey?: string
-  libraries?: string[]
   error?: string
-  message?: string
 }
 
 export function AddressAutocomplete({
   onAddressSelect,
   placeholder = "Enter your address",
-  className = "",
+  label = "Property Address",
+  required = false,
 }: AddressAutocompleteProps) {
-  const [input, setInput] = useState("")
-  const [predictions, setPredictions] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false)
+  const [address, setAddress] = useState("")
+  const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false)
   const [googleMapsError, setGoogleMapsError] = useState<string | null>(null)
-  const [useManualEntry, setUseManualEntry] = useState(false)
-
-  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null)
-  const placesService = useRef<google.maps.places.PlacesService | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const autocompleteRef = useRef<any | null>(null)
 
   useEffect(() => {
     initializeGoogleMaps()
@@ -45,207 +38,131 @@ export function AddressAutocomplete({
 
   const initializeGoogleMaps = async () => {
     try {
+      setIsLoading(true)
+
       // Check if Google Maps is configured
       const configResponse = await fetch("/api/google-maps-config")
       const config: GoogleMapsConfig = await configResponse.json()
 
       if (!config.configured) {
-        console.warn("Google Maps not configured:", config.message)
-        setGoogleMapsError(config.message || "Google Maps API not configured")
-        setUseManualEntry(true)
+        setGoogleMapsError(config.error || "Google Maps API not configured")
+        setIsLoading(false)
         return
       }
 
       // Check if Google Maps is already loaded
-      if (window.google && window.google.maps) {
-        initializeServices()
+      if (window.google && window.google.maps && window.google.maps.places) {
+        initializeAutocomplete()
+        setIsGoogleMapsLoaded(true)
+        setIsLoading(false)
         return
       }
 
       // Load Google Maps script
       const script = document.createElement("script")
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${config.apiKey}&libraries=${config.libraries?.join(",") || "places"}`
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${config.apiKey}&libraries=places`
       script.async = true
       script.defer = true
 
       script.onload = () => {
-        initializeServices()
+        initializeAutocomplete()
+        setIsGoogleMapsLoaded(true)
+        setIsLoading(false)
       }
 
       script.onerror = () => {
         setGoogleMapsError("Failed to load Google Maps")
-        setUseManualEntry(true)
+        setIsLoading(false)
       }
 
       document.head.appendChild(script)
     } catch (error) {
       console.error("Error initializing Google Maps:", error)
       setGoogleMapsError("Failed to initialize Google Maps")
-      setUseManualEntry(true)
-    }
-  }
-
-  const initializeServices = () => {
-    try {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        autocompleteService.current = new window.google.maps.places.AutocompleteService()
-
-        // Create a dummy div for PlacesService
-        const dummyDiv = document.createElement("div")
-        placesService.current = new window.google.maps.places.PlacesService(dummyDiv)
-
-        setGoogleMapsLoaded(true)
-        setGoogleMapsError(null)
-      } else {
-        throw new Error("Google Maps Places API not available")
-      }
-    } catch (error) {
-      console.error("Error initializing Google Maps services:", error)
-      setGoogleMapsError("Google Maps services not available")
-      setUseManualEntry(true)
-    }
-  }
-
-  const handleInputChange = async (value: string) => {
-    setInput(value)
-
-    if (!googleMapsLoaded || useManualEntry) {
-      return
-    }
-
-    if (value.length < 3) {
-      setPredictions([])
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      if (autocompleteService.current) {
-        autocompleteService.current.getPlacePredictions(
-          {
-            input: value,
-            types: ["address"],
-          },
-          (predictions, status) => {
-            setIsLoading(false)
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
-              setPredictions(predictions)
-            } else {
-              setPredictions([])
-            }
-          },
-        )
-      }
-    } catch (error) {
-      console.error("Error getting place predictions:", error)
       setIsLoading(false)
-      setPredictions([])
     }
   }
 
-  const handlePredictionSelect = async (prediction: any) => {
-    setInput(prediction.description)
-    setPredictions([])
-
-    if (!placesService.current) {
-      onAddressSelect(prediction.description)
-      return
-    }
+  const initializeAutocomplete = () => {
+    if (!inputRef.current || !window.google) return
 
     try {
-      placesService.current.getDetails(
-        {
-          placeId: prediction.place_id,
-          fields: ["geometry", "formatted_address"],
-        },
-        (place, status) => {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
-            const lat = place.geometry?.location?.lat()
-            const lng = place.geometry?.location?.lng()
-            onAddressSelect(place.formatted_address || prediction.description, lat, lng)
-          } else {
-            onAddressSelect(prediction.description)
-          }
-        },
-      )
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
+        types: ["address"],
+        componentRestrictions: { country: "us" },
+      })
+
+      autocompleteRef.current.addListener("place_changed", () => {
+        const place = autocompleteRef.current?.getPlace()
+        if (place && place.formatted_address) {
+          const coordinates = place.geometry?.location
+            ? {
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng(),
+              }
+            : undefined
+
+          setAddress(place.formatted_address)
+          onAddressSelect(place.formatted_address, coordinates)
+        }
+      })
     } catch (error) {
-      console.error("Error getting place details:", error)
-      onAddressSelect(prediction.description)
+      console.error("Error setting up autocomplete:", error)
+      setGoogleMapsError("Failed to setup address autocomplete")
     }
   }
 
-  const handleManualSubmit = () => {
-    if (input.trim()) {
-      onAddressSelect(input.trim())
-    }
+  const handleManualInput = (value: string) => {
+    setAddress(value)
+    // For manual input, we don't have coordinates
+    onAddressSelect(value)
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault()
-      if (useManualEntry) {
-        handleManualSubmit()
-      } else if (predictions.length > 0) {
-        handlePredictionSelect(predictions[0])
-      }
-    }
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        <Label htmlFor="address">{label}</Label>
+        <div className="flex items-center space-x-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          <span className="text-sm text-gray-500">Loading address search...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div className="space-y-2">
+      <Label htmlFor="address">
+        {label} {required && <span className="text-red-500">*</span>}
+      </Label>
+
       {googleMapsError && (
-        <Alert className="mb-4">
+        <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{googleMapsError}. You can still enter your address manually.</AlertDescription>
+          <AlertDescription>{googleMapsError}. You can still enter your address manually below.</AlertDescription>
         </Alert>
       )}
 
-      <div className="flex gap-2">
-        <div className="flex-1 relative">
-          <Input
-            type="text"
-            value={input}
-            onChange={(e) => handleInputChange(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={placeholder}
-            className="pr-10"
-          />
-          <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        </div>
-
-        {useManualEntry && (
-          <Button onClick={handleManualSubmit} disabled={!input.trim()} type="button">
-            Use Address
-          </Button>
-        )}
+      <div className="relative">
+        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          ref={inputRef}
+          id="address"
+          type="text"
+          placeholder={placeholder}
+          value={address}
+          onChange={(e) => handleManualInput(e.target.value)}
+          className="pl-10"
+          required={required}
+        />
       </div>
 
-      {!useManualEntry && predictions.length > 0 && (
-        <Card className="absolute top-full left-0 right-0 z-50 mt-1">
-          <CardContent className="p-0">
-            {predictions.map((prediction, index) => (
-              <button
-                key={prediction.place_id}
-                onClick={() => handlePredictionSelect(prediction)}
-                className="w-full text-left p-3 hover:bg-gray-50 border-b last:border-b-0 flex items-center gap-2"
-              >
-                <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <span className="text-sm">{prediction.description}</span>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
+      {!isGoogleMapsLoaded && !googleMapsError && (
+        <p className="text-xs text-gray-500">Address autocomplete is loading...</p>
       )}
 
-      {isLoading && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1">
-          <Card>
-            <CardContent className="p-3">
-              <div className="text-sm text-gray-500">Searching addresses...</div>
-            </CardContent>
-          </Card>
-        </div>
+      {googleMapsError && (
+        <p className="text-xs text-gray-500">Manual address entry mode - please type your complete address</p>
       )}
     </div>
   )

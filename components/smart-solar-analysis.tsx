@@ -2,321 +2,252 @@
 
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Sun, Zap, DollarSign, Leaf, Calculator, Download, Share2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Button } from "@/components/ui/button"
+import { Sun, DollarSign, Zap, Leaf, TrendingUp, Calculator, Download, Share2 } from "lucide-react"
 
 interface SmartSolarAnalysisProps {
-  address: string
-  systemSize: number
-  monthlyBill: number
-  roofArea: number
-  onAnalysisComplete?: (results: any) => void
-}
-
-interface AnalysisResults {
-  energyProduction: {
-    annual: number
-    monthly: number
-    daily: number
-  }
-  financial: {
-    systemCost: number
-    incentives: number
-    netCost: number
-    paybackPeriod: number
-    savings20Year: number
-    roi: number
-  }
-  environmental: {
-    co2Offset: number
-    treesEquivalent: number
-    carsOffRoad: number
-  }
-  technical: {
-    panelCount: number
-    inverterSize: number
-    efficiency: number
-    degradation: number
-  }
-}
-
-function SmartSolarAnalysisComponent({
-  address,
-  systemSize,
-  monthlyBill,
-  roofArea,
-  onAnalysisComplete,
-}: SmartSolarAnalysisProps) {
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [analysisProgress, setAnalysisProgress] = useState(0)
-  const [results, setResults] = useState<AnalysisResults | null>(null)
-  const [activeTab, setActiveTab] = useState("overview")
-
-  const runAnalysis = async () => {
-    setIsAnalyzing(true)
-    setAnalysisProgress(0)
-
-    try {
-      // Simulate analysis steps
-      const steps = [
-        "Analyzing location and solar irradiance...",
-        "Calculating optimal system configuration...",
-        "Processing financial projections...",
-        "Evaluating environmental impact...",
-        "Generating comprehensive report...",
-      ]
-
-      for (let i = 0; i < steps.length; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        setAnalysisProgress((i + 1) * 20)
-      }
-
-      // Generate mock results based on inputs
-      const mockResults: AnalysisResults = {
-        energyProduction: {
-          annual: systemSize * 1200, // kWh per year
-          monthly: (systemSize * 1200) / 12,
-          daily: (systemSize * 1200) / 365,
-        },
-        financial: {
-          systemCost: systemSize * 3000,
-          incentives: systemSize * 900, // 30% federal tax credit
-          netCost: systemSize * 2100,
-          paybackPeriod: 8.5,
-          savings20Year: monthlyBill * 12 * 20 * 0.7,
-          roi: 12.5,
-        },
-        environmental: {
-          co2Offset: systemSize * 800, // lbs per year
-          treesEquivalent: Math.round(systemSize * 0.8),
-          carsOffRoad: Math.round(systemSize * 0.2),
-        },
-        technical: {
-          panelCount: Math.round(systemSize / 0.4),
-          inverterSize: systemSize * 0.8,
-          efficiency: 20.5,
-          degradation: 0.5,
-        },
-      }
-
-      setResults(mockResults)
-      onAnalysisComplete?.(mockResults)
-    } catch (error) {
-      console.error("Analysis failed:", error)
-    } finally {
-      setIsAnalyzing(false)
+  analysisData: {
+    address: string
+    systemSize: number
+    annualProduction: number
+    monthlyProduction: number[]
+    financialAnalysis: {
+      systemCost: number
+      monthlyBill: number
+      monthlySavings: number
+      annualSavings: number
+      paybackPeriod: number
+      roi25Year: number
+      netPresentValue: number
+    }
+    technicalSpecs: {
+      panelCount: number
+      panelWattage: number
+      inverterType: string
+      roofArea: number
+      efficiency: number
+      degradationRate: number
+    }
+    environmental: {
+      co2OffsetAnnual: number
+      co2Offset25Year: number
+      treesEquivalent: number
+      coalOffset: number
+    }
+    incentives: {
+      federalTaxCredit: number
+      stateIncentives: number
+      utilityRebates: number
+      totalIncentives: number
     }
   }
+}
 
-  if (isAnalyzing) {
-    return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Running Smart Solar Analysis
-          </CardTitle>
-          <CardDescription>Analyzing your property for optimal solar configuration...</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Progress value={analysisProgress} className="w-full" />
-          <div className="text-center text-sm text-muted-foreground">{analysisProgress}% Complete</div>
-        </CardContent>
-      </Card>
-    )
+function SmartSolarAnalysisComponent({ analysisData }: SmartSolarAnalysisProps) {
+  const [activeTab, setActiveTab] = useState("overview")
+
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+  const getEfficiencyColor = (efficiency: number) => {
+    if (efficiency >= 90) return "text-green-600"
+    if (efficiency >= 80) return "text-yellow-600"
+    return "text-red-600"
   }
 
-  if (!results) {
-    return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sun className="h-5 w-5" />
-            Smart Solar Analysis
-          </CardTitle>
-          <CardDescription>Get a comprehensive analysis of your solar potential</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <strong>Address:</strong> {address}
-            </div>
-            <div>
-              <strong>System Size:</strong> {systemSize} kW
-            </div>
-            <div>
-              <strong>Monthly Bill:</strong> ${monthlyBill}
-            </div>
-            <div>
-              <strong>Roof Area:</strong> {roofArea} sq ft
-            </div>
-          </div>
-          <Button onClick={runAnalysis} className="w-full">
-            Start Analysis
-          </Button>
-        </CardContent>
-      </Card>
-    )
+  const getPaybackColor = (years: number) => {
+    if (years <= 7) return "text-green-600"
+    if (years <= 10) return "text-yellow-600"
+    return "text-red-600"
   }
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full max-w-6xl mx-auto space-y-6">
+      {/* Header */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sun className="h-5 w-5" />
-            Solar Analysis Results
-          </CardTitle>
-          <CardDescription>Comprehensive analysis for {address}</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-2xl">Smart Solar Analysis</CardTitle>
+              <CardDescription>{analysisData.address}</CardDescription>
+            </div>
+            <div className="flex space-x-2">
+              <Button variant="outline" size="sm">
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            </div>
+          </div>
         </CardHeader>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      {/* Main Analysis Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="financial">Financial</TabsTrigger>
-          <TabsTrigger value="technical">Technical</TabsTrigger>
-          <TabsTrigger value="environmental">Environmental</TabsTrigger>
+          <TabsTrigger value="overview" className="flex items-center space-x-2">
+            <Sun className="h-4 w-4" />
+            <span>Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="financial" className="flex items-center space-x-2">
+            <DollarSign className="h-4 w-4" />
+            <span>Financial</span>
+          </TabsTrigger>
+          <TabsTrigger value="technical" className="flex items-center space-x-2">
+            <Zap className="h-4 w-4" />
+            <span>Technical</span>
+          </TabsTrigger>
+          <TabsTrigger value="environmental" className="flex items-center space-x-2">
+            <Leaf className="h-4 w-4" />
+            <span>Environmental</span>
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  Annual Production
-                </CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">System Size</CardTitle>
+                <Calculator className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{results.energyProduction.annual.toLocaleString()} kWh</div>
+                <div className="text-2xl font-bold">{analysisData.systemSize} kW</div>
+                <p className="text-xs text-muted-foreground">{analysisData.technicalSpecs.panelCount} panels</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Annual Production</CardTitle>
+                <Sun className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analysisData.annualProduction.toLocaleString()} kWh</div>
                 <p className="text-xs text-muted-foreground">
-                  {Math.round(results.energyProduction.monthly)} kWh/month
+                  {Math.round(analysisData.annualProduction / 12).toLocaleString()} kWh/month avg
                 </p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  20-Year Savings
-                </CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Annual Savings</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${results.financial.savings20Year.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">{results.financial.paybackPeriod} year payback</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Leaf className="h-4 w-4" />
-                  CO₂ Offset
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{results.environmental.co2Offset.toLocaleString()} lbs</div>
-                <p className="text-xs text-muted-foreground">Per year</p>
+                <div className="text-2xl font-bold">
+                  ${analysisData.financialAnalysis.annualSavings.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  ${Math.round(analysisData.financialAnalysis.monthlySavings)} per month
+                </p>
               </CardContent>
             </Card>
           </div>
+
+          {/* Monthly Production Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Energy Production</CardTitle>
+              <CardDescription>Estimated monthly solar energy generation</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {months.map((month, index) => (
+                  <div key={month} className="flex items-center space-x-4">
+                    <div className="w-8 text-sm font-medium">{month}</div>
+                    <div className="flex-1">
+                      <Progress
+                        value={
+                          (analysisData.monthlyProduction[index] / Math.max(...analysisData.monthlyProduction)) * 100
+                        }
+                        className="h-2"
+                      />
+                    </div>
+                    <div className="w-20 text-sm text-right">
+                      {analysisData.monthlyProduction[index].toLocaleString()} kWh
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="financial" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Financial Tab */}
+        <TabsContent value="financial" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Investment Breakdown</CardTitle>
+                <CardTitle>Investment Summary</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <div className="flex justify-between">
-                  <span>System Cost:</span>
-                  <span className="font-semibold">${results.financial.systemCost.toLocaleString()}</span>
+                  <span>System Cost</span>
+                  <span className="font-semibold">${analysisData.financialAnalysis.systemCost.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-green-600">
-                  <span>Federal Incentives:</span>
-                  <span className="font-semibold">-${results.financial.incentives.toLocaleString()}</span>
+                <div className="flex justify-between">
+                  <span>Federal Tax Credit (30%)</span>
+                  <span className="font-semibold text-green-600">
+                    -${analysisData.incentives.federalTaxCredit.toLocaleString()}
+                  </span>
                 </div>
-                <div className="border-t pt-2 flex justify-between font-bold">
-                  <span>Net Investment:</span>
-                  <span>${results.financial.netCost.toLocaleString()}</span>
+                <div className="flex justify-between">
+                  <span>State Incentives</span>
+                  <span className="font-semibold text-green-600">
+                    -${analysisData.incentives.stateIncentives.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Utility Rebates</span>
+                  <span className="font-semibold text-green-600">
+                    -${analysisData.incentives.utilityRebates.toLocaleString()}
+                  </span>
+                </div>
+                <hr />
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Net Investment</span>
+                  <span>
+                    $
+                    {(
+                      analysisData.financialAnalysis.systemCost - analysisData.incentives.totalIncentives
+                    ).toLocaleString()}
+                  </span>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Return on Investment</CardTitle>
+                <CardTitle>Return Analysis</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <div className="flex justify-between">
-                  <span>Payback Period:</span>
-                  <span className="font-semibold">{results.financial.paybackPeriod} years</span>
+                  <span>Payback Period</span>
+                  <span className={`font-semibold ${getPaybackColor(analysisData.financialAnalysis.paybackPeriod)}`}>
+                    {analysisData.financialAnalysis.paybackPeriod.toFixed(1)} years
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Annual ROI:</span>
-                  <span className="font-semibold">{results.financial.roi}%</span>
-                </div>
-                <div className="flex justify-between text-green-600 font-bold">
-                  <span>20-Year Savings:</span>
-                  <span>${results.financial.savings20Year.toLocaleString()}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="technical" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">System Specifications</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span>Panel Count:</span>
-                  <span className="font-semibold">{results.technical.panelCount} panels</span>
+                  <span>25-Year ROI</span>
+                  <span className="font-semibold text-green-600">{analysisData.financialAnalysis.roi25Year}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>System Size:</span>
-                  <span className="font-semibold">{systemSize} kW</span>
+                  <span>Net Present Value</span>
+                  <span className="font-semibold text-green-600">
+                    ${analysisData.financialAnalysis.netPresentValue.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Inverter Size:</span>
-                  <span className="font-semibold">{results.technical.inverterSize} kW</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Panel Efficiency:</span>
-                  <span className="font-semibold">{results.technical.efficiency}%</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Performance Metrics</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span>Daily Production:</span>
-                  <span className="font-semibold">{Math.round(results.energyProduction.daily)} kWh</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Monthly Production:</span>
-                  <span className="font-semibold">{Math.round(results.energyProduction.monthly)} kWh</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Annual Degradation:</span>
-                  <span className="font-semibold">{results.technical.degradation}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Roof Utilization:</span>
-                  <span className="font-semibold">
-                    {Math.round(((results.technical.panelCount * 20) / roofArea) * 100)}%
+                  <span>25-Year Savings</span>
+                  <span className="font-semibold text-green-600">
+                    ${(analysisData.financialAnalysis.annualSavings * 25).toLocaleString()}
                   </span>
                 </div>
               </CardContent>
@@ -324,56 +255,171 @@ function SmartSolarAnalysisComponent({
           </div>
         </TabsContent>
 
-        <TabsContent value="environmental" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Technical Tab */}
+        <TabsContent value="technical" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">CO₂ Reduction</CardTitle>
+              <CardHeader>
+                <CardTitle>System Specifications</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {results.environmental.co2Offset.toLocaleString()}
+              <CardContent className="space-y-4">
+                <div className="flex justify-between">
+                  <span>Panel Count</span>
+                  <span className="font-semibold">{analysisData.technicalSpecs.panelCount}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">lbs per year</p>
+                <div className="flex justify-between">
+                  <span>Panel Wattage</span>
+                  <span className="font-semibold">{analysisData.technicalSpecs.panelWattage}W each</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Inverter Type</span>
+                  <span className="font-semibold">{analysisData.technicalSpecs.inverterType}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Required Roof Area</span>
+                  <span className="font-semibold">{analysisData.technicalSpecs.roofArea} sq ft</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>System Efficiency</span>
+                  <span className={`font-semibold ${getEfficiencyColor(analysisData.technicalSpecs.efficiency)}`}>
+                    {analysisData.technicalSpecs.efficiency}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Annual Degradation</span>
+                  <span className="font-semibold">{analysisData.technicalSpecs.degradationRate}%</span>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Trees Planted</CardTitle>
+              <CardHeader>
+                <CardTitle>Performance Metrics</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{results.environmental.treesEquivalent}</div>
-                <p className="text-xs text-muted-foreground">equivalent per year</p>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span>System Efficiency</span>
+                    <span className="font-semibold">{analysisData.technicalSpecs.efficiency}%</span>
+                  </div>
+                  <Progress value={analysisData.technicalSpecs.efficiency} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span>Energy Production vs. Consumption</span>
+                    <span className="font-semibold">95%</span>
+                  </div>
+                  <Progress value={95} className="h-2" />
+                </div>
+                <div className="pt-4">
+                  <Badge variant="secondary" className="mb-2">
+                    Performance Rating
+                  </Badge>
+                  <p className="text-sm text-muted-foreground">
+                    This system is rated as{" "}
+                    {analysisData.technicalSpecs.efficiency >= 90
+                      ? "Excellent"
+                      : analysisData.technicalSpecs.efficiency >= 80
+                        ? "Good"
+                        : "Fair"}{" "}
+                    based on efficiency and production metrics.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Environmental Tab */}
+        <TabsContent value="environmental" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Carbon Impact</CardTitle>
+                <CardDescription>Environmental benefits of your solar system</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between">
+                  <span>Annual CO₂ Offset</span>
+                  <span className="font-semibold text-green-600">
+                    {analysisData.environmental.co2OffsetAnnual.toLocaleString()} lbs
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>25-Year CO₂ Offset</span>
+                  <span className="font-semibold text-green-600">
+                    {analysisData.environmental.co2Offset25Year.toLocaleString()} lbs
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Equivalent Trees Planted</span>
+                  <span className="font-semibold text-green-600">
+                    {analysisData.environmental.treesEquivalent} trees
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Coal Offset (25 years)</span>
+                  <span className="font-semibold text-green-600">
+                    {analysisData.environmental.coalOffset.toLocaleString()} lbs
+                  </span>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Cars Off Road</CardTitle>
+              <CardHeader>
+                <CardTitle>Environmental Equivalents</CardTitle>
+                <CardDescription>Put your impact in perspective</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{results.environmental.carsOffRoad}</div>
-                <p className="text-xs text-muted-foreground">equivalent per year</p>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <Leaf className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Trees Planted</p>
+                      <p className="text-sm text-muted-foreground">
+                        {analysisData.environmental.treesEquivalent} trees over 25 years
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <TrendingUp className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Cars Off Road</p>
+                      <p className="text-sm text-muted-foreground">
+                        {Math.round(analysisData.environmental.co2OffsetAnnual / 4600)} cars per year
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                      <Zap className="h-4 w-4 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Home Energy</p>
+                      <p className="text-sm text-muted-foreground">
+                        Powers {Math.round(analysisData.annualProduction / 10800)} homes annually
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
       </Tabs>
-
-      <div className="flex gap-2">
-        <Button className="flex-1">
-          <Download className="h-4 w-4 mr-2" />
-          Download Report
-        </Button>
-        <Button variant="outline" className="flex-1 bg-transparent">
-          <Share2 className="h-4 w-4 mr-2" />
-          Share Results
-        </Button>
-      </div>
     </div>
   )
 }
 
+// Named export for compatibility
+export const SmartSolarAnalysis = SmartSolarAnalysisComponent
+
+// Default export
 export default SmartSolarAnalysisComponent
-export { SmartSolarAnalysisComponent as SmartSolarAnalysis }
