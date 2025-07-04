@@ -1,312 +1,348 @@
 "use server"
 
-import { createServerSupabaseClient, isSupabaseAvailable } from "@/lib/supabase"
 import { redirect } from "next/navigation"
-import { revalidatePath } from "next/cache"
 
-// Sign in with email and password
-export async function signInWithEmailReal(email: string, password: string) {
-  if (!isSupabaseAvailable()) {
-    return { error: "Authentication service not available - using demo mode" }
-  }
-
+export async function signUpReal(formData: FormData) {
   try {
-    const supabase = createServerSupabaseClient()
-    const { data, error } = await supabase.auth.signInWithPassword({
+    console.log("🔐 Starting user registration...")
+
+    const fullName = formData.get("fullName") as string
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
+
+    console.log("Registration data received:", {
+      fullName,
       email,
-      password,
+      passwordProvided: !!password,
+      passwordLength: password?.length || 0,
     })
 
-    if (error) {
-      return { error: error.message }
+    // Validate required fields
+    if (!email || !password) {
+      return {
+        success: false,
+        error: "Email and password are required",
+      }
     }
 
-    revalidatePath("/", "layout")
-    redirect("/dashboard")
-  } catch (error) {
-    console.error("Sign in error:", error)
-    return { error: "An unexpected error occurred during sign in" }
-  }
-}
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return {
+        success: false,
+        error: "Invalid email format",
+      }
+    }
 
-// Sign up new user
-export async function signUpReal(email: string, password: string, fullName?: string) {
-  if (!isSupabaseAvailable()) {
-    return { error: "Authentication service not available - using demo mode" }
-  }
+    // Validate password strength
+    if (password.length < 6) {
+      return {
+        success: false,
+        error: "Password must be at least 6 characters long",
+      }
+    }
 
-  try {
-    const supabase = createServerSupabaseClient()
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
+    // Check environment variables
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("❌ Missing Supabase environment variables")
+      return {
+        success: false,
+        error: "Server configuration error - missing Supabase credentials",
+        suggestion: "Check your .env.local file for NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      }
+    }
+
+    // Validate URL format
+    if (!supabaseUrl.startsWith("https://") || !supabaseUrl.includes(".supabase.co")) {
+      console.error("❌ Invalid Supabase URL format:", supabaseUrl)
+      return {
+        success: false,
+        error: "Invalid Supabase URL format",
+        details: `Expected https://your-project.supabase.co, got: ${supabaseUrl}`,
+        suggestion: "Check your NEXT_PUBLIC_SUPABASE_URL environment variable",
+      }
+    }
+
+    // Validate API key format
+    if (!supabaseKey.startsWith("eyJ")) {
+      console.error("❌ Invalid Supabase API key format")
+      return {
+        success: false,
+        error: "Invalid Supabase API key format",
+        details: "API key should start with 'eyJ'",
+        suggestion: "Check your NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable",
+      }
+    }
+
+    console.log("✅ Environment validation passed")
+
+    // Test basic connectivity with raw fetch first
+    console.log("🧪 Testing Supabase connectivity...")
+
+    try {
+      const testResponse = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+        method: "GET",
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          "Content-Type": "application/json",
         },
-      },
-    })
+      })
 
-    if (error) {
-      return { error: error.message }
+      console.log("Test response status:", testResponse.status)
+      console.log("Test response content-type:", testResponse.headers.get("content-type"))
+
+      if (!testResponse.ok) {
+        const errorText = await testResponse.text()
+        console.error("❌ Supabase connectivity test failed:", errorText.substring(0, 200))
+
+        return {
+          success: false,
+          error: "Supabase connectivity test failed",
+          details: `HTTP ${testResponse.status}: ${errorText.substring(0, 100)}`,
+          suggestion: "Check your Supabase URL and API key configuration",
+        }
+      }
+
+      console.log("✅ Basic connectivity test passed")
+    } catch (connectivityError) {
+      console.error("❌ Connectivity test error:", connectivityError)
+      return {
+        success: false,
+        error: "Network error connecting to Supabase",
+        details: connectivityError instanceof Error ? connectivityError.message : String(connectivityError),
+        suggestion: "Check your internet connection and Supabase configuration",
+      }
     }
 
-    revalidatePath("/", "layout")
-    return { success: true, message: "Check your email to confirm your account" }
+    // Now try the actual signup with raw fetch to get better error details
+    console.log("🔗 Attempting signup with raw fetch...")
+
+    const signupPayload = {
+      email: email.trim().toLowerCase(),
+      password: password,
+      data: {
+        full_name: fullName || "",
+      },
+    }
+
+    try {
+      const signupResponse = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+        method: "POST",
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(signupPayload),
+      })
+
+      console.log("Signup response status:", signupResponse.status)
+      console.log("Signup response content-type:", signupResponse.headers.get("content-type"))
+
+      const responseText = await signupResponse.text()
+      console.log("Raw response (first 200 chars):", responseText.substring(0, 200))
+
+      if (!signupResponse.ok) {
+        console.error("❌ Signup failed with status:", signupResponse.status)
+        return {
+          success: false,
+          error: "Authentication signup failed",
+          details: `HTTP ${signupResponse.status}: ${responseText.substring(0, 100)}`,
+          rawResponse: responseText.substring(0, 500),
+        }
+      }
+
+      // Try to parse the response
+      let responseData
+      try {
+        responseData = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error("❌ Failed to parse signup response as JSON:", parseError)
+        return {
+          success: false,
+          error: "Invalid response format from Supabase",
+          details: "Supabase returned non-JSON response",
+          rawResponse: responseText.substring(0, 500),
+          suggestion: "This usually indicates a configuration issue with your Supabase project",
+        }
+      }
+
+      if (!responseData.user) {
+        console.error("❌ No user in response:", responseData)
+        return {
+          success: false,
+          error: "User creation failed - no user data returned",
+          details: "Supabase returned success but no user object",
+        }
+      }
+
+      console.log("✅ Auth user created:", responseData.user.id)
+
+      // Now create user profile using raw fetch as well
+      console.log("👤 Creating user profile in database...")
+
+      const profilePayload = {
+        id: responseData.user.id,
+        email: responseData.user.email,
+        full_name: fullName || "",
+        subscription_type: "free",
+        created_at: new Date().toISOString(),
+      }
+
+      try {
+        const profileResponse = await fetch(`${supabaseUrl}/rest/v1/users`, {
+          method: "POST",
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify(profilePayload),
+        })
+
+        if (!profileResponse.ok) {
+          const profileErrorText = await profileResponse.text()
+          console.error("❌ Profile creation failed:", profileErrorText)
+          return {
+            success: true,
+            message: "User account created successfully (profile setup had issues)",
+            user: {
+              id: responseData.user.id,
+              email: responseData.user.email,
+              fullName: fullName || "",
+            },
+            warning: "Profile creation encountered an issue but account is functional",
+            profileError: profileErrorText.substring(0, 100),
+          }
+        }
+
+        console.log("✅ User profile created successfully")
+      } catch (profileError) {
+        console.error("❌ Profile creation request failed:", profileError)
+        return {
+          success: true,
+          message: "User account created successfully (profile setup had issues)",
+          user: {
+            id: responseData.user.id,
+            email: responseData.user.email,
+            fullName: fullName || "",
+          },
+          warning: "Profile creation failed but authentication account exists",
+        }
+      }
+
+      return {
+        success: true,
+        message: "User account created successfully!",
+        user: {
+          id: responseData.user.id,
+          email: responseData.user.email,
+          fullName: fullName || "",
+        },
+      }
+    } catch (signupError) {
+      console.error("❌ Signup request failed:", signupError)
+
+      if (signupError instanceof SyntaxError && signupError.message.includes("Unexpected token")) {
+        return {
+          success: false,
+          error: "Invalid server response from Supabase",
+          details: "Supabase returned HTML instead of JSON - this indicates a configuration issue",
+          suggestion: "Double-check your NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY",
+          rawError: signupError.message,
+        }
+      }
+
+      return {
+        success: false,
+        error: "Authentication request failed",
+        details: signupError instanceof Error ? signupError.message : String(signupError),
+      }
+    }
   } catch (error) {
-    console.error("Sign up error:", error)
-    return { error: "An unexpected error occurred during sign up" }
+    console.error("💥 Unexpected error during signup:", error)
+    return {
+      success: false,
+      error: "Unexpected error during registration",
+      details: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 
-// Sign out user
-export async function signOutReal() {
-  if (!isSupabaseAvailable()) {
-    redirect("/")
-    return
-  }
-
+export async function signInReal(formData: FormData) {
   try {
-    const supabase = createServerSupabaseClient()
-    await supabase.auth.signOut()
-    revalidatePath("/", "layout")
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
+
+    if (!email || !password) {
+      return {
+        success: false,
+        error: "Email and password are required",
+      }
+    }
+
+    // Use raw fetch for sign in as well
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseKey) {
+      return {
+        success: false,
+        error: "Server configuration error",
+      }
+    }
+
+    const signinPayload = {
+      email: email.trim().toLowerCase(),
+      password: password,
+    }
+
+    const signinResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(signinPayload),
+    })
+
+    if (!signinResponse.ok) {
+      const errorText = await signinResponse.text()
+      return {
+        success: false,
+        error: "Sign in failed",
+        details: errorText.substring(0, 100),
+      }
+    }
+
+    const responseData = await signinResponse.json()
+
+    if (responseData.user) {
+      redirect("/dashboard")
+    }
+
+    return {
+      success: true,
+      message: "Signed in successfully",
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Sign in failed",
+    }
+  }
+}
+
+export async function signOutReal() {
+  try {
     redirect("/")
   } catch (error) {
     console.error("Sign out error:", error)
-    redirect("/")
   }
 }
-
-// Get current user
-export async function getCurrentUserReal() {
-  if (!isSupabaseAvailable()) {
-    return { user: null, error: "Authentication service not available" }
-  }
-
-  try {
-    const supabase = createServerSupabaseClient()
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-
-    if (error) {
-      return { user: null, error: error.message }
-    }
-
-    return { user, error: null }
-  } catch (error) {
-    console.error("Get user error:", error)
-    return { user: null, error: "Failed to get user information" }
-  }
-}
-
-// Reset password
-export async function resetPasswordReal(email: string) {
-  if (!isSupabaseAvailable()) {
-    return { error: "Authentication service not available - using demo mode" }
-  }
-
-  try {
-    const supabase = createServerSupabaseClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
-    })
-
-    if (error) {
-      return { error: error.message }
-    }
-
-    return { success: true, message: "Password reset email sent" }
-  } catch (error) {
-    console.error("Reset password error:", error)
-    return { error: "An unexpected error occurred" }
-  }
-}
-
-// Update password
-export async function updatePasswordReal(newPassword: string) {
-  if (!isSupabaseAvailable()) {
-    return { error: "Authentication service not available - using demo mode" }
-  }
-
-  try {
-    const supabase = createServerSupabaseClient()
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    })
-
-    if (error) {
-      return { error: error.message }
-    }
-
-    return { success: true, message: "Password updated successfully" }
-  } catch (error) {
-    console.error("Update password error:", error)
-    return { error: "An unexpected error occurred" }
-  }
-}
-
-// Update user profile
-export async function updateUserProfileReal(updates: { full_name?: string; email?: string }) {
-  if (!isSupabaseAvailable()) {
-    return { error: "Authentication service not available - using demo mode" }
-  }
-
-  try {
-    const supabase = createServerSupabaseClient()
-    const { error } = await supabase.auth.updateUser({
-      data: updates,
-    })
-
-    if (error) {
-      return { error: error.message }
-    }
-
-    revalidatePath("/", "layout")
-    return { success: true, message: "Profile updated successfully" }
-  } catch (error) {
-    console.error("Update profile error:", error)
-    return { error: "An unexpected error occurred" }
-  }
-}
-
-// Check user permissions
-export async function checkUserPermissions() {
-  if (!isSupabaseAvailable()) {
-    // Return demo permissions when Supabase is not available
-    return {
-      user: {
-        id: "demo-user",
-        email: "demo@example.com",
-        subscription_status: "pro",
-        subscription_type: "monthly",
-        trial_ends_at: null,
-        calculations_used: 0,
-        max_calculations: 1000,
-      },
-      permissions: {
-        canAccessPro: true,
-        canGenerateReports: true,
-        calculationsRemaining: 1000,
-      },
-    }
-  }
-
-  try {
-    const supabase = createServerSupabaseClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return {
-        user: null,
-        permissions: {
-          canAccessPro: false,
-          canGenerateReports: false,
-          calculationsRemaining: 0,
-        },
-      }
-    }
-
-    // Get user data from database
-    const { data: userData, error: dbError } = await supabase.from("users").select("*").eq("id", user.id).single()
-
-    if (dbError) {
-      console.error("Database error:", dbError)
-      return {
-        user: null,
-        permissions: {
-          canAccessPro: false,
-          canGenerateReports: false,
-          calculationsRemaining: 0,
-        },
-      }
-    }
-
-    const isPro = userData?.subscription_status === "active" || userData?.subscription_status === "pro"
-    const calculationsUsed = userData?.calculations_used || 0
-    const maxCalculations = isPro ? 1000 : 5
-    const calculationsRemaining = Math.max(0, maxCalculations - calculationsUsed)
-
-    return {
-      user: userData,
-      permissions: {
-        canAccessPro: isPro,
-        canGenerateReports: isPro,
-        calculationsRemaining,
-      },
-    }
-  } catch (error) {
-    console.error("Check permissions error:", error)
-    return {
-      user: null,
-      permissions: {
-        canAccessPro: false,
-        canGenerateReports: false,
-        calculationsRemaining: 0,
-      },
-    }
-  }
-}
-
-// Track usage
-export async function trackUsageReal(calculationType = "basic") {
-  if (!isSupabaseAvailable()) {
-    console.log("📊 Demo mode: Usage tracking simulated")
-    return { success: true, message: "Usage tracked (demo mode)" }
-  }
-
-  try {
-    const supabase = createServerSupabaseClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { error: "User not authenticated" }
-    }
-
-    // Update user's calculation count
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({
-        calculations_used: supabase.raw("calculations_used + 1"),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", user.id)
-
-    if (updateError) {
-      console.error("Usage tracking error:", updateError)
-      return { error: "Failed to track usage" }
-    }
-
-    // Log the calculation
-    const { error: logError } = await supabase.from("solar_calculations").insert({
-      user_id: user.id,
-      calculation_type: calculationType,
-      created_at: new Date().toISOString(),
-    })
-
-    if (logError) {
-      console.error("Calculation logging error:", logError)
-      // Don't return error here as usage was still tracked
-    }
-
-    return { success: true, message: "Usage tracked successfully" }
-  } catch (error) {
-    console.error("Track usage error:", error)
-    return { error: "An unexpected error occurred while tracking usage" }
-  }
-}
-
-// Export functions without "Real" suffix for backward compatibility
-export const signIn = signInWithEmailReal
-export const signUp = signUpReal
-export const signOut = signOutReal
-export const getCurrentUser = getCurrentUserReal
-export const resetPassword = resetPasswordReal
-export const updatePassword = updatePasswordReal

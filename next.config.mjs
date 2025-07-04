@@ -2,18 +2,8 @@
 const nextConfig = {
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000', '*.vercel.app']
-    }
-  },
-  images: {
-    domains: ['images.unsplash.com', 'via.placeholder.com'],
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
-    ],
-    unoptimized: true,
+      allowedOrigins: ["localhost:3000", "*.vercel.app"],
+    },
   },
   eslint: {
     ignoreDuringBuilds: true,
@@ -21,37 +11,39 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  async headers() {
-    return [
+  images: {
+    domains: [
+      'maps.googleapis.com',
+      'maps.google.com',
+      'streetviewpixels-pa.googleapis.com',
+      'lh3.googleusercontent.com'
+    ],
+    remotePatterns: [
       {
-        source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
-        ],
+        protocol: 'https',
+        hostname: 'maps.googleapis.com',
+        pathname: '/maps/api/streetview/**',
       },
-    ]
-  },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
+      {
+        protocol: 'https',
+        hostname: 'maps.google.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'streetviewpixels-pa.googleapis.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        pathname: '/**',
       }
-    }
-    return config
+    ],
+    unoptimized: true,
   },
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
-  },
-  poweredByHeader: false,
-  compress: true,
-  generateEtags: false,
-  httpAgentOptions: {
-    keepAlive: true,
   },
 }
 

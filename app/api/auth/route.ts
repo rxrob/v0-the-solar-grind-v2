@@ -1,40 +1,25 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase"
+import { NextResponse } from "next/server"
+import { createSupabaseServerClient } from "@/lib/supabase-server"
 
-export async function POST(request: NextRequest) {
+export async function GET() {
   try {
-    const { email, password, action } = await request.json()
-    const supabase = createClient()
+    const supabase = await createSupabaseServerClient()
 
-    if (action === "signup") {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
 
-      if (error) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 400 })
-      }
-
-      return NextResponse.json({ success: true, data })
-    }
-
-    if (action === "signin") {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 400 })
-      }
-
-      return NextResponse.json({ success: true, data })
-    }
-
-    return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 })
+    return NextResponse.json({
+      authenticated: !!session,
+      user: session?.user || null,
+    })
   } catch (error) {
-    console.error("Auth error:", error)
-    return NextResponse.json({ success: false, error: "Authentication failed" }, { status: 500 })
+    return NextResponse.json(
+      {
+        authenticated: false,
+        error: error instanceof Error ? error.message : "Authentication check failed",
+      },
+      { status: 500 },
+    )
   }
 }

@@ -1,152 +1,99 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase, isSupabaseAvailable } from "@/lib/supabase"
-import type { User, Session } from "@supabase/supabase-js"
+import { createSupabaseClient } from "@/lib/supabase"
+import type { User } from "@supabase/supabase-js"
 
 interface AuthState {
   user: User | null
-  session: Session | null
   loading: boolean
-  isAuthenticated: boolean
+  error: string | null
 }
 
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
-    session: null,
     loading: true,
-    isAuthenticated: false,
+    error: null,
   })
+
+  const supabase = createSupabaseClient()
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        if (!isSupabaseAvailable()) {
-          console.log("🔄 Demo mode: No authentication available")
-          setAuthState({
-            user: null,
-            session: null,
-            loading: false,
-            isAuthenticated: false,
-          })
-          return
-        }
-
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession()
 
-        if (error && error.message !== "Auth session missing!") {
-          console.error("Error getting session:", error.message)
+        if (error) {
+          console.error("❌ Error getting session:", error.message)
+          setAuthState({ user: null, loading: false, error: error.message })
+        } else {
+          setAuthState({ user: session?.user ?? null, loading: false, error: null })
         }
-
-        setAuthState({
-          user: session?.user ?? null,
-          session,
-          loading: false,
-          isAuthenticated: !!session?.user,
-        })
-
-        if (session?.user) {
-          console.log("✅ User authenticated:", session.user.email)
-        }
-      } catch (error) {
-        console.error("Error in getInitialSession:", error)
-        setAuthState({
-          user: null,
-          session: null,
-          loading: false,
-          isAuthenticated: false,
-        })
+      } catch (err: any) {
+        console.error("❌ Session error:", err)
+        setAuthState({ user: null, loading: false, error: err.message })
       }
     }
 
     getInitialSession()
 
     // Listen for auth changes
-    if (isSupabaseAvailable()) {
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange(async (event, session) => {
-        // Only log meaningful auth state changes
-        if (event !== "INITIAL_SESSION" || session) {
-          console.log("🔄 Auth state changed:", event, session?.user?.email || "no user")
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("🔄 Auth state changed:", event, session?.user?.email)
+      setAuthState({ user: session?.user ?? null, loading: false, error: null })
+    })
 
-        setAuthState({
-          user: session?.user ?? null,
-          session,
-          loading: false,
-          isAuthenticated: !!session?.user,
-        })
-      })
-
-      return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase.auth])
 
-  // Helper functions for client-side auth operations
-  const signInClient = async (email: string, password: string) => {
-    if (!isSupabaseAvailable()) {
-      return { error: "Authentication not available in demo mode" }
-    }
+  return authState
+}
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      return { data, error }
-    } catch (error) {
-      console.error("Client sign in error:", error)
-      return { error: "An unexpected error occurred" }
-    }
-  }
+// Auth helper functions
+export const authHelpers = {
+  async signIn(email: string, password: string) {
+    const supabase = createSupabaseClient()
+    return await supabase.auth.signInWithPassword({ email, password })
+  },
 
-  const signUpClient = async (email: string, password: string, fullName?: string) => {
-    if (!isSupabaseAvailable()) {
-      return { error: "Authentication not available in demo mode" }
-    }
+  async signUp(email: string, password: string) {
+    const supabase = createSupabaseClient()
+    return await supabase.auth.signUp({ email, password })
+  },
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
-      })
-      return { data, error }
-    } catch (error) {
-      console.error("Client sign up error:", error)
-      return { error: "An unexpected error occurred" }
-    }
-  }
+  async signOut() {
+    const supabase = createSupabaseClient()
+    return await supabase.auth.signOut()
+  },
 
-  const signOutClient = async () => {
-    if (!isSupabaseAvailable()) {
-      return { error: null }
-    }
+  async signInWithGoogle() {
+    const supabase = createSupabaseClient()
+    return await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+  },
 
-    try {
-      const { error } = await supabase.auth.signOut()
-      return { error }
-    } catch (error) {
-      console.error("Client sign out error:", error)
-      return { error: "An unexpected error occurred" }
-    }
-  }
+  async resetPassword(email: string) {
+    const supabase = createSupabaseClient()
+    return await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+  },
 
-  return {
-    ...authState,
-    signIn: signInClient,
-    signUp: signUpClient,
-    signOut: signOutClient,
-    isSupabaseAvailable: isSupabaseAvailable(),
-  }
+  async updatePassword(password: string) {
+    const supabase = createSupabaseClient()
+    return await supabase.auth.updateUser({ password })
+  },
 }

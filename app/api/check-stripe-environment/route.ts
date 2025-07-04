@@ -6,107 +6,130 @@ export async function GET() {
     const secretKey = process.env.STRIPE_SECRET_KEY
     const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+    const priceId = process.env.STRIPE_PRO_MONTHLY_PRICE_ID
 
-    if (!secretKey) {
-      return NextResponse.json({
-        configured: false,
-        error: "STRIPE_SECRET_KEY not configured",
-      })
+    const diagnosis = {
+      environment: {
+        secretKey: {
+          exists: !!secretKey,
+          format: secretKey
+            ? secretKey.startsWith("sk_test_")
+              ? "TEST"
+              : secretKey.startsWith("sk_live_")
+                ? "LIVE"
+                : "INVALID"
+            : "MISSING",
+          length: secretKey ? secretKey.length : 0,
+        },
+        publishableKey: {
+          exists: !!publishableKey,
+          format: publishableKey
+            ? publishableKey.startsWith("pk_test_")
+              ? "TEST"
+              : publishableKey.startsWith("pk_live_")
+                ? "LIVE"
+                : "INVALID"
+            : "MISSING",
+          length: publishableKey ? publishableKey.length : 0,
+        },
+        webhookSecret: {
+          exists: !!webhookSecret,
+          format: webhookSecret ? (webhookSecret.startsWith("whsec_") ? "VALID" : "INVALID") : "MISSING",
+        },
+        priceId: {
+          exists: !!priceId,
+          format: priceId ? (priceId.startsWith("price_") ? "VALID" : "INVALID") : "MISSING",
+        },
+      },
+      compatibility: {
+        keysMatch: false,
+        environment: "UNKNOWN",
+      },
+      connectionTest: null as any,
+      recommendations: [] as string[],
     }
 
-    const stripe = new Stripe(secretKey, {
-      apiVersion: "2024-06-20",
-    })
+    // Check key compatibility
+    if (secretKey && publishableKey) {
+      const secretIsTest = secretKey.startsWith("sk_test_")
+      const publishableIsTest = publishableKey.startsWith("pk_test_")
 
-    // Detect environment
-    const isTestMode = secretKey.startsWith("sk_test_")
-    const expectedPublishablePrefix = isTestMode ? "pk_test_" : "pk_live_"
-
-    console.log("🔧 Stripe Environment Check:")
-    console.log("- Secret Key:", secretKey ? `${secretKey.substring(0, 12)}...` : "NOT SET")
-    console.log("- Publishable Key:", publishableKey ? `${publishableKey.substring(0, 12)}...` : "NOT SET")
-    console.log("- Webhook Secret:", webhookSecret ? "SET" : "NOT SET")
-    console.log("- Environment:", isTestMode ? "TEST" : "LIVE")
-
-    // Check key consistency
-    const keyMismatch = publishableKey && !publishableKey.startsWith(expectedPublishablePrefix)
-
-    // Test Stripe API connection
-    let account = null
-    let connectionError = null
-    try {
-      account = await stripe.accounts.retrieve()
-      console.log("✅ Stripe API connection successful")
-    } catch (error: any) {
-      connectionError = error.message
-      console.error("❌ Stripe API connection failed:", error.message)
+      diagnosis.compatibility.keysMatch = secretIsTest === publishableIsTest
+      diagnosis.compatibility.environment = secretIsTest ? "TEST" : "LIVE"
     }
 
-    // Get existing products for debugging
-    let products = []
-    try {
-      const productList = await stripe.products.list({ limit: 10, active: true })
-      products = productList.data.map((p) => ({
-        id: p.id,
-        name: p.name,
-        created: new Date(p.created * 1000).toISOString(),
-      }))
-    } catch (error) {
-      console.error("Error fetching products:", error)
+    // Test Stripe connection
+    if (secretKey && secretKey.startsWith("sk_")) {
+      try {
+        const stripe = new Stripe(secretKey, {
+          apiVersion: "2024-06-20",
+        })
+
+        const account = await stripe.accounts.retrieve()
+
+        diagnosis.connectionTest = {
+          success: true,
+          accountId: account.id,
+          country: account.country,
+          currency: account.default_currency,
+          chargesEnabled: account.charges_enabled,
+          payoutsEnabled: account.payouts_enabled,
+        }
+
+        console.log("✅ Stripe connection test successful")
+      } catch (error: any) {
+        diagnosis.connectionTest = {
+          success: false,
+          error: error.message,
+        }
+        console.error("❌ Stripe connection test failed:", error)
+      }
     }
 
-    // Get existing prices for debugging
-    let prices = []
-    try {
-      const priceList = await stripe.prices.list({ limit: 10, active: true })
-      prices = priceList.data.map((p) => ({
-        id: p.id,
-        amount: p.unit_amount,
-        currency: p.currency,
-        interval: p.recurring?.interval || "one-time",
-        product: p.product,
-      }))
-    } catch (error) {
-      console.error("Error fetching prices:", error)
+    // Generate recommendations
+    if (!diagnosis.environment.secretKey.exists) {
+      diagnosis.recommendations.push("Set STRIPE_SECRET_KEY environment variable")
+    } else if (diagnosis.environment.secretKey.format === "INVALID") {
+      diagnosis.recommendations.push("STRIPE_SECRET_KEY should start with sk_test_ or sk_live_")
+    }
+
+    if (!diagnosis.environment.publishableKey.exists) {
+      diagnosis.recommendations.push("Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable")
+    } else if (diagnosis.environment.publishableKey.format === "INVALID") {
+      diagnosis.recommendations.push("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY should start with pk_test_ or pk_live_")
+    }
+
+    if (!diagnosis.compatibility.keysMatch) {
+      diagnosis.recommendations.push(
+        "Secret key and publishable key must be from the same environment (both test or both live)",
+      )
+    }
+
+    if (!diagnosis.environment.webhookSecret.exists) {
+      diagnosis.recommendations.push("Set STRIPE_WEBHOOK_SECRET for webhook handling (recommended)")
+    }
+
+    if (!diagnosis.environment.priceId.exists) {
+      diagnosis.recommendations.push("Set STRIPE_PRO_MONTHLY_PRICE_ID for subscription pricing")
+    }
+
+    if (diagnosis.connectionTest && !diagnosis.connectionTest.success) {
+      diagnosis.recommendations.push("Check that your Stripe account is active and API keys are correct")
     }
 
     return NextResponse.json({
-      configured: true,
-      environment: isTestMode ? "test" : "live",
-      keys: {
-        secretKey: secretKey ? `${secretKey.substring(0, 12)}...` : null,
-        publishableKey: publishableKey ? `${publishableKey.substring(0, 12)}...` : null,
-        webhookSecret: !!webhookSecret,
-      },
-      keyMismatch,
-      expectedPublishablePrefix,
-      connection: {
-        success: !connectionError,
-        error: connectionError,
-        account: account
-          ? {
-              id: account.id,
-              country: account.country,
-              default_currency: account.default_currency,
-              email: account.email,
-            }
-          : null,
-      },
-      products,
-      prices,
-      recommendations: [
-        ...(!publishableKey ? ["Add NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY to environment"] : []),
-        ...(keyMismatch ? [`Publishable key should start with ${expectedPublishablePrefix}`] : []),
-        ...(!webhookSecret ? ["Add STRIPE_WEBHOOK_SECRET for webhook handling"] : []),
-        ...(connectionError ? ["Check Stripe API key validity"] : []),
-      ],
+      status: "diagnosis_complete",
+      diagnosis,
+      nextSteps:
+        diagnosis.recommendations.length > 0 ? diagnosis.recommendations : ["Stripe configuration looks good!"],
     })
   } catch (error: any) {
-    console.error("Environment check error:", error)
+    console.error("❌ Stripe diagnosis failed:", error)
     return NextResponse.json(
       {
-        configured: false,
+        status: "diagnosis_failed",
         error: error.message,
+        timestamp: new Date().toISOString(),
       },
       { status: 500 },
     )
