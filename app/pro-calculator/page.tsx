@@ -1,396 +1,377 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AddressAutocomplete } from "@/components/address-autocomplete"
+import { SmartSolarAnalysis } from "@/components/smart-solar-analysis"
+import { useAuth } from "@/hooks/use-auth-real"
 import {
   Calculator,
   MapPin,
+  Home,
   Zap,
-  FileText,
-  CheckCircle,
+  DollarSign,
   ArrowRight,
   ArrowLeft,
   Crown,
-  Loader2,
-  AlertCircle,
+  Lock,
+  CheckCircle,
 } from "lucide-react"
-import { AddressAutocomplete } from "@/components/address-autocomplete"
-import { SmartSolarAnalysis } from "@/components/smart-solar-analysis"
-import { AdvancedSolarCalculator } from "@/components/advanced-solar-calculator"
-import { ReportGenerator } from "@/components/report-generator"
-import { useAuth } from "@/hooks/use-auth-real"
 
-type Step = "address" | "analysis" | "calculator" | "report"
-
-interface StepConfig {
-  id: Step
-  title: string
-  description: string
-  icon: React.ReactNode
-  completed: boolean
+interface CalculatorData {
+  address: string
+  coordinates?: { lat: number; lng: number }
+  monthlyBill: number
+  roofArea: number
+  systemSize: number
+  shadingFactor: number
+  roofOrientation: string
+  roofTilt: number
 }
+
+const STEPS = [
+  { id: 1, title: "Property Details", icon: MapPin },
+  { id: 2, title: "Energy Usage", icon: Zap },
+  { id: 3, title: "Roof Analysis", icon: Home },
+  { id: 4, title: "Smart Analysis", icon: Calculator },
+]
 
 export default function ProCalculatorPage() {
   const router = useRouter()
-  const { user, loading: authLoading, session } = useAuth()
-  const [currentStep, setCurrentStep] = useState<Step>("address")
-  const [completedSteps, setCompletedSteps] = useState<Set<Step>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { user, loading, isProUser, subscription } = useAuth()
 
-  // Form data
-  const [selectedAddress, setSelectedAddress] = useState("")
-  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null)
-  const [placeId, setPlaceId] = useState("")
-  const [analysisResults, setAnalysisResults] = useState<any>(null)
-  const [calculationResults, setCalculationResults] = useState<any>(null)
+  const [currentStep, setCurrentStep] = useState(1)
+  const [calculatorData, setCalculatorData] = useState<CalculatorData>({
+    address: "",
+    monthlyBill: 0,
+    roofArea: 0,
+    systemSize: 0,
+    shadingFactor: 1,
+    roofOrientation: "south",
+    roofTilt: 30,
+  })
 
-  const steps: StepConfig[] = [
-    {
-      id: "address",
-      title: "Property Address",
-      description: "Enter the property address for solar analysis",
-      icon: <MapPin className="h-5 w-5" />,
-      completed: completedSteps.has("address"),
-    },
-    {
-      id: "analysis",
-      title: "Smart Analysis",
-      description: "AI-powered solar potential analysis",
-      icon: <Zap className="h-5 w-5" />,
-      completed: completedSteps.has("analysis"),
-    },
-    {
-      id: "calculator",
-      title: "Advanced Calculator",
-      description: "Detailed system sizing and calculations",
-      icon: <Calculator className="h-5 w-5" />,
-      completed: completedSteps.has("calculator"),
-    },
-    {
-      id: "report",
-      title: "Professional Report",
-      description: "Generate comprehensive PDF report",
-      icon: <FileText className="h-5 w-5" />,
-      completed: completedSteps.has("report"),
-    },
-  ]
-
-  // Check authentication and subscription status
+  // Redirect if not authenticated or not pro user
   useEffect(() => {
-    const checkAccess = async () => {
-      if (authLoading) return
-
+    if (!loading) {
       if (!user) {
         router.push("/login?redirect=/pro-calculator")
         return
       }
 
-      try {
-        // Check subscription status
-        const response = await fetch("/api/verify-user-status", {
-          headers: {
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-        })
-
-        if (!response.ok) {
-          throw new Error("Failed to verify subscription status")
-        }
-
-        const data = await response.json()
-        setSubscriptionStatus(data.subscription_status)
-
-        if (data.subscription_status !== "pro" && data.subscription_status !== "admin") {
-          setError("Pro subscription required to access this calculator")
-          return
-        }
-
-        setLoading(false)
-      } catch (err) {
-        console.error("Error checking access:", err)
-        setError("Failed to verify access permissions")
+      if (!isProUser) {
+        router.push("/pricing?upgrade=pro")
+        return
       }
     }
+  }, [user, loading, isProUser, router])
 
-    checkAccess()
-  }, [user, authLoading, session, router])
-
-  const handleAddressSelect = (address: string, coords: { lat: number; lng: number }, placeIdValue: string) => {
-    setSelectedAddress(address)
-    setCoordinates(coords)
-    setPlaceId(placeIdValue)
-    setCompletedSteps((prev) => new Set([...prev, "address"]))
-  }
-
-  const handleAnalysisComplete = (results: any) => {
-    setAnalysisResults(results)
-    setCompletedSteps((prev) => new Set([...prev, "analysis"]))
-  }
-
-  const handleCalculationComplete = (results: any) => {
-    setCalculationResults(results)
-    setCompletedSteps((prev) => new Set([...prev, "calculator"]))
-  }
-
-  const handleReportGenerated = () => {
-    setCompletedSteps((prev) => new Set([...prev, "report"]))
-  }
-
-  const goToStep = (step: Step) => {
-    const stepIndex = steps.findIndex((s) => s.id === step)
-    const currentIndex = steps.findIndex((s) => s.id === currentStep)
-
-    // Only allow going to completed steps or the next step
-    if (stepIndex <= currentIndex || completedSteps.has(step)) {
-      setCurrentStep(step)
-    }
-  }
-
-  const nextStep = () => {
-    const currentIndex = steps.findIndex((s) => s.id === currentStep)
-    if (currentIndex < steps.length - 1) {
-      setCurrentStep(steps[currentIndex + 1].id)
-    }
-  }
-
-  const prevStep = () => {
-    const currentIndex = steps.findIndex((s) => s.id === currentStep)
-    if (currentIndex > 0) {
-      setCurrentStep(steps[currentIndex - 1].id)
-    }
-  }
-
-  const getStepProgress = () => {
-    const currentIndex = steps.findIndex((s) => s.id === currentStep)
-    return ((currentIndex + 1) / steps.length) * 100
-  }
-
-  // Loading state
-  if (authLoading || loading) {
+  // Show loading state
+  if (loading) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-            <p className="text-muted-foreground">Loading Pro Calculator...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     )
   }
 
-  // Error state
-  if (error) {
+  // Show access denied if not pro user
+  if (!isProUser) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
-        <Card>
-          <CardContent className="pt-6">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            {error.includes("Pro subscription") && (
-              <div className="mt-4 text-center">
-                <Button onClick={() => router.push("/pricing")}>Upgrade to Pro</Button>
-              </div>
-            )}
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <Crown className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+            <CardTitle>Pro Calculator Access</CardTitle>
+            <CardDescription>This advanced calculator is available for Pro subscribers only</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center">
+              <Badge variant="outline" className="mb-4">
+                Current Plan: {subscription || "Free"}
+              </Badge>
+            </div>
+            <Button onClick={() => router.push("/pricing?upgrade=pro")} className="w-full">
+              <Crown className="h-4 w-4 mr-2" />
+              Upgrade to Pro
+            </Button>
+            <Button variant="outline" onClick={() => router.push("/calculator")} className="w-full">
+              Use Basic Calculator
+            </Button>
           </CardContent>
         </Card>
       </div>
     )
   }
 
+  const handleNext = () => {
+    if (currentStep < STEPS.length) {
+      setCurrentStep(currentStep + 1)
+    }
+  }
+
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1)
+    }
+  }
+
+  const handleAddressSelect = (address: string, lat?: number, lng?: number) => {
+    setCalculatorData((prev) => ({
+      ...prev,
+      address,
+      coordinates: lat && lng ? { lat, lng } : undefined,
+    }))
+  }
+
+  const updateCalculatorData = (field: keyof CalculatorData, value: any) => {
+    setCalculatorData((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  const calculateSystemSize = () => {
+    // Simple system size calculation based on monthly bill
+    const estimatedAnnualUsage = (calculatorData.monthlyBill * 12) / 0.12 // Assuming $0.12/kWh
+    const systemSize = estimatedAnnualUsage / 1200 // Assuming 1200 kWh/kW/year
+    updateCalculatorData("systemSize", Math.round(systemSize * 10) / 10)
+  }
+
+  const progress = (currentStep / STEPS.length) * 100
+
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      <div className="space-y-8">
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-2">
-            <Crown className="h-8 w-8 text-yellow-500" />
-            <h1 className="text-4xl font-bold">Pro Solar Calculator</h1>
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Crown className="h-6 w-6 text-yellow-500" />
+            <h1 className="text-3xl font-bold">Pro Solar Calculator</h1>
           </div>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Advanced AI-powered solar analysis with professional reporting capabilities
-          </p>
-          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-            Pro Feature
-          </Badge>
+          <p className="text-muted-foreground">Advanced solar analysis with detailed insights and recommendations</p>
         </div>
 
         {/* Progress Bar */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span>Progress</span>
-                <span>{Math.round(getStepProgress())}% Complete</span>
-              </div>
-              <Progress value={getStepProgress()} className="w-full" />
+        <Card className="mb-8">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-medium">Progress</span>
+              <span className="text-sm text-muted-foreground">
+                Step {currentStep} of {STEPS.length}
+              </span>
             </div>
-          </CardContent>
-        </Card>
+            <Progress value={progress} className="mb-4" />
 
-        {/* Step Navigation */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {steps.map((step, index) => (
-                <button
-                  key={step.id}
-                  onClick={() => goToStep(step.id)}
-                  disabled={
-                    !completedSteps.has(step.id) &&
-                    step.id !== currentStep &&
-                    index > steps.findIndex((s) => s.id === currentStep)
-                  }
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    currentStep === step.id
-                      ? "border-blue-500 bg-blue-50"
-                      : completedSteps.has(step.id)
-                        ? "border-green-500 bg-green-50 hover:bg-green-100"
-                        : "border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    {completedSteps.has(step.id) ? <CheckCircle className="h-5 w-5 text-green-600" /> : step.icon}
-                    <span className="font-medium">{step.title}</span>
+            {/* Step Indicators */}
+            <div className="flex justify-between">
+              {STEPS.map((step) => {
+                const Icon = step.icon
+                const isActive = step.id === currentStep
+                const isCompleted = step.id < currentStep
+
+                return (
+                  <div key={step.id} className="flex flex-col items-center">
+                    <div
+                      className={`
+                      w-10 h-10 rounded-full flex items-center justify-center mb-2
+                      ${
+                        isActive
+                          ? "bg-blue-600 text-white"
+                          : isCompleted
+                            ? "bg-green-600 text-white"
+                            : "bg-gray-200 text-gray-400"
+                      }
+                    `}
+                    >
+                      {isCompleted ? <CheckCircle className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                    </div>
+                    <span className={`text-xs text-center ${isActive ? "text-blue-600 font-medium" : "text-gray-500"}`}>
+                      {step.title}
+                    </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{step.description}</p>
-                </button>
-              ))}
+                )
+              })}
             </div>
           </CardContent>
         </Card>
 
         {/* Step Content */}
-        <div className="space-y-6">
-          {currentStep === "address" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
-                  Property Address
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <AddressAutocomplete
-                  onAddressSelect={handleAddressSelect}
-                  placeholder="Enter property address (e.g., 1600 Amphitheatre Parkway, Mountain View, CA)"
-                  label="Property Address"
-                />
-
-                {selectedAddress && coordinates && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-green-700 mb-2">
-                      <CheckCircle className="h-4 w-4" />
-                      <span className="font-medium">Address Selected</span>
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {React.createElement(STEPS[currentStep - 1].icon, { className: "h-5 w-5" })}
+              {STEPS[currentStep - 1].title}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Step 1: Property Details */}
+            {currentStep === 1 && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="address">Property Address</Label>
+                  <AddressAutocomplete
+                    onAddressSelect={handleAddressSelect}
+                    placeholder="Enter your property address"
+                    className="mt-2"
+                  />
+                  {calculatorData.address && (
+                    <div className="mt-2 p-3 bg-green-50 rounded-lg">
+                      <div className="flex items-center gap-2 text-green-700">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="text-sm">Address confirmed: {calculatorData.address}</span>
+                      </div>
                     </div>
-                    <p className="text-sm text-green-600">{selectedAddress}</p>
-                    <p className="text-xs text-green-500 font-mono">
-                      {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
-                    </p>
-                  </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Energy Usage */}
+            {currentStep === 2 && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="monthlyBill">Average Monthly Electric Bill ($)</Label>
+                  <Input
+                    id="monthlyBill"
+                    type="number"
+                    value={calculatorData.monthlyBill || ""}
+                    onChange={(e) => updateCalculatorData("monthlyBill", Number.parseFloat(e.target.value) || 0)}
+                    placeholder="Enter your average monthly bill"
+                    className="mt-2"
+                  />
+                </div>
+
+                {calculatorData.monthlyBill > 0 && (
+                  <Alert>
+                    <DollarSign className="h-4 w-4" />
+                    <AlertDescription>
+                      Based on your ${calculatorData.monthlyBill}/month bill, you use approximately{" "}
+                      {Math.round((calculatorData.monthlyBill * 12) / 0.12)} kWh annually.
+                    </AlertDescription>
+                  </Alert>
                 )}
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            )}
 
-          {currentStep === "analysis" && selectedAddress && coordinates && (
-            <SmartSolarAnalysis
-              address={selectedAddress}
-              coordinates={coordinates}
-              onAnalysisComplete={handleAnalysisComplete}
-            />
-          )}
+            {/* Step 3: Roof Analysis */}
+            {currentStep === 3 && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="roofArea">Available Roof Area (sq ft)</Label>
+                  <Input
+                    id="roofArea"
+                    type="number"
+                    value={calculatorData.roofArea || ""}
+                    onChange={(e) => updateCalculatorData("roofArea", Number.parseFloat(e.target.value) || 0)}
+                    placeholder="Enter available roof area"
+                    className="mt-2"
+                  />
+                </div>
 
-          {currentStep === "calculator" && (
-            <AdvancedSolarCalculator
-              address={selectedAddress}
-              coordinates={coordinates}
-              analysisResults={analysisResults}
-              onCalculationComplete={handleCalculationComplete}
-            />
-          )}
+                <div>
+                  <Label htmlFor="roofOrientation">Roof Orientation</Label>
+                  <select
+                    id="roofOrientation"
+                    value={calculatorData.roofOrientation}
+                    onChange={(e) => updateCalculatorData("roofOrientation", e.target.value)}
+                    className="mt-2 w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="south">South</option>
+                    <option value="southeast">Southeast</option>
+                    <option value="southwest">Southwest</option>
+                    <option value="east">East</option>
+                    <option value="west">West</option>
+                  </select>
+                </div>
 
-          {currentStep === "report" && (
-            <ReportGenerator
-              address={selectedAddress}
-              coordinates={coordinates}
-              analysisResults={analysisResults}
-              calculationResults={calculationResults}
-              onReportGenerated={handleReportGenerated}
-            />
+                <div>
+                  <Label htmlFor="roofTilt">Roof Tilt (degrees)</Label>
+                  <Input
+                    id="roofTilt"
+                    type="number"
+                    value={calculatorData.roofTilt || ""}
+                    onChange={(e) => updateCalculatorData("roofTilt", Number.parseFloat(e.target.value) || 0)}
+                    placeholder="Enter roof tilt angle"
+                    className="mt-2"
+                  />
+                </div>
+
+                <Button onClick={calculateSystemSize} variant="outline" className="w-full bg-transparent">
+                  Calculate Recommended System Size
+                </Button>
+
+                {calculatorData.systemSize > 0 && (
+                  <Alert>
+                    <Calculator className="h-4 w-4" />
+                    <AlertDescription>
+                      Recommended system size: {calculatorData.systemSize} kW (
+                      {Math.round(calculatorData.systemSize / 0.4)} panels)
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+
+            {/* Step 4: Smart Analysis */}
+            {currentStep === 4 && (
+              <div className="space-y-4">
+                {calculatorData.address && calculatorData.systemSize > 0 ? (
+                  <SmartSolarAnalysis
+                    address={calculatorData.address}
+                    systemSize={calculatorData.systemSize}
+                    monthlyBill={calculatorData.monthlyBill}
+                    roofArea={calculatorData.roofArea}
+                  />
+                ) : (
+                  <Alert>
+                    <Lock className="h-4 w-4" />
+                    <AlertDescription>Please complete the previous steps to run the smart analysis.</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Navigation */}
+        <div className="flex justify-between">
+          <Button variant="outline" onClick={handlePrevious} disabled={currentStep === 1}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Previous
+          </Button>
+
+          {currentStep < STEPS.length ? (
+            <Button
+              onClick={handleNext}
+              disabled={
+                (currentStep === 1 && !calculatorData.address) ||
+                (currentStep === 2 && calculatorData.monthlyBill <= 0) ||
+                (currentStep === 3 && (calculatorData.roofArea <= 0 || calculatorData.systemSize <= 0))
+              }
+            >
+              Next
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          ) : (
+            <Button onClick={() => router.push("/dashboard/pro")}>
+              Go to Dashboard
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
           )}
         </div>
-
-        {/* Navigation Buttons */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={prevStep}
-                disabled={currentStep === "address"}
-                className="flex items-center gap-2 bg-transparent"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Previous
-              </Button>
-
-              <Button
-                onClick={nextStep}
-                disabled={
-                  currentStep === "report" ||
-                  (currentStep === "address" && !completedSteps.has("address")) ||
-                  (currentStep === "analysis" && !completedSteps.has("analysis")) ||
-                  (currentStep === "calculator" && !completedSteps.has("calculator"))
-                }
-                className="flex items-center gap-2"
-              >
-                Next
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Help Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Need Help?</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <h4 className="font-medium mb-2">Getting Started</h4>
-                <ul className="space-y-1 text-muted-foreground">
-                  <li>• Enter a valid property address</li>
-                  <li>• Wait for smart analysis to complete</li>
-                  <li>• Review and adjust calculations</li>
-                  <li>• Generate professional report</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-medium mb-2">Pro Features</h4>
-                <ul className="space-y-1 text-muted-foreground">
-                  <li>• AI-powered solar analysis</li>
-                  <li>• Advanced system calculations</li>
-                  <li>• Professional PDF reports</li>
-                  <li>• Detailed financial projections</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

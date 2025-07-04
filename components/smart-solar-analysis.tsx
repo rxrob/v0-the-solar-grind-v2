@@ -1,186 +1,128 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Sun, Zap, DollarSign, TrendingUp, MapPin, Loader2, AlertCircle, CheckCircle, Info } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Sun, Zap, DollarSign, Leaf, Calculator, Download, Share2 } from "lucide-react"
 
 interface SmartSolarAnalysisProps {
   address: string
-  coordinates: { lat: number; lng: number }
-  systemSize?: number
-  monthlyBill?: number
+  systemSize: number
+  monthlyBill: number
+  roofArea: number
   onAnalysisComplete?: (results: any) => void
 }
 
 interface AnalysisResults {
-  solarPotential: {
-    annualSunHours: number
-    solarIrradiance: number
-    roofSuitability: string
-    shadingFactors: string[]
+  energyProduction: {
+    annual: number
+    monthly: number
+    daily: number
   }
-  systemRecommendation: {
-    recommendedSize: number
-    panelCount: number
-    estimatedCost: number
+  financial: {
+    systemCost: number
+    incentives: number
+    netCost: number
     paybackPeriod: number
-  }
-  financialProjection: {
-    annualSavings: number
-    twentyYearSavings: number
+    savings20Year: number
     roi: number
-    incentives: string[]
   }
-  environmentalImpact: {
+  environmental: {
     co2Offset: number
     treesEquivalent: number
+    carsOffRoad: number
+  }
+  technical: {
+    panelCount: number
+    inverterSize: number
+    efficiency: number
+    degradation: number
   }
 }
 
-const SmartSolarAnalysis = ({
+function SmartSolarAnalysisComponent({
   address,
-  coordinates,
-  systemSize = 0,
-  monthlyBill = 0,
+  systemSize,
+  monthlyBill,
+  roofArea,
   onAnalysisComplete,
-}: SmartSolarAnalysisProps) => {
-  const [analyzing, setAnalyzing] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [currentStep, setCurrentStep] = useState("")
+}: SmartSolarAnalysisProps) {
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisProgress, setAnalysisProgress] = useState(0)
   const [results, setResults] = useState<AnalysisResults | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("overview")
 
-  const analysisSteps = [
-    { name: "Fetching solar irradiance data", duration: 2000 },
-    { name: "Analyzing roof characteristics", duration: 1500 },
-    { name: "Calculating system requirements", duration: 1000 },
-    { name: "Projecting financial returns", duration: 1500 },
-    { name: "Generating recommendations", duration: 1000 },
-  ]
-
-  const runSmartAnalysis = async () => {
-    setAnalyzing(true)
-    setProgress(0)
-    setError(null)
-    setResults(null)
+  const runAnalysis = async () => {
+    setIsAnalyzing(true)
+    setAnalysisProgress(0)
 
     try {
-      // Simulate progressive analysis steps
-      for (let i = 0; i < analysisSteps.length; i++) {
-        const step = analysisSteps[i]
-        setCurrentStep(step.name)
+      // Simulate analysis steps
+      const steps = [
+        "Analyzing location and solar irradiance...",
+        "Calculating optimal system configuration...",
+        "Processing financial projections...",
+        "Evaluating environmental impact...",
+        "Generating comprehensive report...",
+      ]
 
-        // Simulate API calls and processing time
-        await new Promise((resolve) => setTimeout(resolve, step.duration))
-
-        setProgress(((i + 1) / analysisSteps.length) * 100)
+      for (let i = 0; i < steps.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        setAnalysisProgress((i + 1) * 20)
       }
 
-      // Simulate API call to smart solar analysis endpoint
-      const response = await fetch("/api/smart-solar-analysis", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          address,
-          coordinates,
-          systemSize,
-          monthlyBill,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to complete solar analysis")
-      }
-
-      const analysisData = await response.json()
-
-      // Mock results if API doesn't return proper data
+      // Generate mock results based on inputs
       const mockResults: AnalysisResults = {
-        solarPotential: {
-          annualSunHours: analysisData.solarPotential?.annualSunHours || 2800,
-          solarIrradiance: analysisData.solarPotential?.solarIrradiance || 5.2,
-          roofSuitability: analysisData.solarPotential?.roofSuitability || "Excellent",
-          shadingFactors: analysisData.solarPotential?.shadingFactors || [
-            "Minimal tree coverage",
-            "No nearby tall buildings",
-          ],
+        energyProduction: {
+          annual: systemSize * 1200, // kWh per year
+          monthly: (systemSize * 1200) / 12,
+          daily: (systemSize * 1200) / 365,
         },
-        systemRecommendation: {
-          recommendedSize: analysisData.systemRecommendation?.recommendedSize || systemSize || 8.5,
-          panelCount: analysisData.systemRecommendation?.panelCount || Math.ceil((systemSize || 8.5) / 0.4),
-          estimatedCost: analysisData.systemRecommendation?.estimatedCost || (systemSize || 8.5) * 3000,
-          paybackPeriod: analysisData.systemRecommendation?.paybackPeriod || 7.2,
+        financial: {
+          systemCost: systemSize * 3000,
+          incentives: systemSize * 900, // 30% federal tax credit
+          netCost: systemSize * 2100,
+          paybackPeriod: 8.5,
+          savings20Year: monthlyBill * 12 * 20 * 0.7,
+          roi: 12.5,
         },
-        financialProjection: {
-          annualSavings: analysisData.financialProjection?.annualSavings || monthlyBill * 12 * 0.85,
-          twentyYearSavings: analysisData.financialProjection?.twentyYearSavings || monthlyBill * 12 * 0.85 * 20,
-          roi: analysisData.financialProjection?.roi || 285,
-          incentives: analysisData.financialProjection?.incentives || [
-            "30% Federal Tax Credit",
-            "State Rebates Available",
-          ],
+        environmental: {
+          co2Offset: systemSize * 800, // lbs per year
+          treesEquivalent: Math.round(systemSize * 0.8),
+          carsOffRoad: Math.round(systemSize * 0.2),
         },
-        environmentalImpact: {
-          co2Offset: analysisData.environmentalImpact?.co2Offset || (systemSize || 8.5) * 1200,
-          treesEquivalent: analysisData.environmentalImpact?.treesEquivalent || Math.round((systemSize || 8.5) * 28),
+        technical: {
+          panelCount: Math.round(systemSize / 0.4),
+          inverterSize: systemSize * 0.8,
+          efficiency: 20.5,
+          degradation: 0.5,
         },
       }
 
       setResults(mockResults)
       onAnalysisComplete?.(mockResults)
-    } catch (err) {
-      console.error("Smart analysis error:", err)
-      setError(err instanceof Error ? err.message : "Analysis failed")
+    } catch (error) {
+      console.error("Analysis failed:", error)
     } finally {
-      setAnalyzing(false)
-      setCurrentStep("")
+      setIsAnalyzing(false)
     }
   }
 
-  if (analyzing) {
+  if (isAnalyzing) {
     return (
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Smart Solar Analysis in Progress
+            <Calculator className="h-5 w-5" />
+            Running Smart Solar Analysis
           </CardTitle>
+          <CardDescription>Analyzing your property for optimal solar configuration...</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>{currentStep}</span>
-              <span>{Math.round(progress)}%</span>
-            </div>
-            <Progress value={progress} className="w-full" />
-          </div>
-
-          <div className="text-center text-sm text-muted-foreground">
-            <p>Analyzing solar potential for:</p>
-            <p className="font-medium">{address}</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (error) {
-    return (
-      <Card className="w-full">
-        <CardContent className="pt-6">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-          <Button onClick={runSmartAnalysis} className="w-full mt-4 bg-transparent" variant="outline">
-            Retry Analysis
-          </Button>
+        <CardContent className="space-y-4">
+          <Progress value={analysisProgress} className="w-full" />
+          <div className="text-center text-sm text-muted-foreground">{analysisProgress}% Complete</div>
         </CardContent>
       </Card>
     )
@@ -194,186 +136,244 @@ const SmartSolarAnalysis = ({
             <Sun className="h-5 w-5" />
             Smart Solar Analysis
           </CardTitle>
+          <CardDescription>Get a comprehensive analysis of your solar potential</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="text-center space-y-4">
-            <p className="text-muted-foreground">Ready to analyze solar potential for:</p>
-            <div className="flex items-center justify-center gap-2 text-sm">
-              <MapPin className="h-4 w-4" />
-              <span className="font-medium">{address}</span>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <strong>Address:</strong> {address}
             </div>
-            <Button onClick={runSmartAnalysis} className="w-full">
-              Start Smart Analysis
-            </Button>
+            <div>
+              <strong>System Size:</strong> {systemSize} kW
+            </div>
+            <div>
+              <strong>Monthly Bill:</strong> ${monthlyBill}
+            </div>
+            <div>
+              <strong>Roof Area:</strong> {roofArea} sq ft
+            </div>
           </div>
+          <Button onClick={runAnalysis} className="w-full">
+            Start Analysis
+          </Button>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Analysis Complete Header */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-2 text-green-600 mb-2">
-            <CheckCircle className="h-5 w-5" />
-            <span className="font-medium">Analysis Complete</span>
-          </div>
-          <p className="text-sm text-muted-foreground">Smart analysis completed for {address}</p>
-        </CardContent>
-      </Card>
-
-      {/* Solar Potential */}
+    <div className="w-full space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sun className="h-5 w-5" />
-            Solar Potential
+            Solar Analysis Results
           </CardTitle>
+          <CardDescription>Comprehensive analysis for {address}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Annual Sun Hours</p>
-              <p className="text-2xl font-bold">{results.solarPotential.annualSunHours.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Solar Irradiance</p>
-              <p className="text-2xl font-bold">{results.solarPotential.solarIrradiance} kWh/m²/day</p>
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Roof Suitability</p>
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
-              {results.solarPotential.roofSuitability}
-            </Badge>
-          </div>
-
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Shading Analysis</p>
-            <ul className="text-sm space-y-1">
-              {results.solarPotential.shadingFactors.map((factor, index) => (
-                <li key={index} className="flex items-center gap-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
-                  {factor}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </CardContent>
       </Card>
 
-      {/* System Recommendation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            System Recommendation
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Recommended Size</p>
-              <p className="text-2xl font-bold">{results.systemRecommendation.recommendedSize} kW</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Panel Count</p>
-              <p className="text-2xl font-bold">{results.systemRecommendation.panelCount} panels</p>
-            </div>
-          </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="financial">Financial</TabsTrigger>
+          <TabsTrigger value="technical">Technical</TabsTrigger>
+          <TabsTrigger value="environmental">Environmental</TabsTrigger>
+        </TabsList>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Estimated Cost</p>
-              <p className="text-2xl font-bold">${results.systemRecommendation.estimatedCost.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Payback Period</p>
-              <p className="text-2xl font-bold">{results.systemRecommendation.paybackPeriod} years</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  Annual Production
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{results.energyProduction.annual.toLocaleString()} kWh</div>
+                <p className="text-xs text-muted-foreground">
+                  {Math.round(results.energyProduction.monthly)} kWh/month
+                </p>
+              </CardContent>
+            </Card>
 
-      {/* Financial Projection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Financial Projection
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Annual Savings</p>
-              <p className="text-2xl font-bold text-green-600">
-                ${Math.round(results.financialProjection.annualSavings).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">20-Year Savings</p>
-              <p className="text-2xl font-bold text-green-600">
-                ${Math.round(results.financialProjection.twentyYearSavings).toLocaleString()}
-              </p>
-            </div>
-          </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  20-Year Savings
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${results.financial.savings20Year.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">{results.financial.paybackPeriod} year payback</p>
+              </CardContent>
+            </Card>
 
-          <div>
-            <p className="text-sm text-muted-foreground">Return on Investment</p>
-            <p className="text-2xl font-bold text-green-600">{results.financialProjection.roi}%</p>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Leaf className="h-4 w-4" />
+                  CO₂ Offset
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{results.environmental.co2Offset.toLocaleString()} lbs</div>
+                <p className="text-xs text-muted-foreground">Per year</p>
+              </CardContent>
+            </Card>
           </div>
+        </TabsContent>
 
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Available Incentives</p>
-            <div className="space-y-1">
-              {results.financialProjection.incentives.map((incentive, index) => (
-                <Badge key={index} variant="outline" className="mr-2">
-                  {incentive}
-                </Badge>
-              ))}
-            </div>
+        <TabsContent value="financial" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Investment Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span>System Cost:</span>
+                  <span className="font-semibold">${results.financial.systemCost.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-green-600">
+                  <span>Federal Incentives:</span>
+                  <span className="font-semibold">-${results.financial.incentives.toLocaleString()}</span>
+                </div>
+                <div className="border-t pt-2 flex justify-between font-bold">
+                  <span>Net Investment:</span>
+                  <span>${results.financial.netCost.toLocaleString()}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Return on Investment</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span>Payback Period:</span>
+                  <span className="font-semibold">{results.financial.paybackPeriod} years</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Annual ROI:</span>
+                  <span className="font-semibold">{results.financial.roi}%</span>
+                </div>
+                <div className="flex justify-between text-green-600 font-bold">
+                  <span>20-Year Savings:</span>
+                  <span>${results.financial.savings20Year.toLocaleString()}</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      {/* Environmental Impact */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Environmental Impact
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Annual CO₂ Offset</p>
-              <p className="text-2xl font-bold text-green-600">
-                {results.environmentalImpact.co2Offset.toLocaleString()} lbs
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Trees Equivalent</p>
-              <p className="text-2xl font-bold text-green-600">{results.environmentalImpact.treesEquivalent} trees</p>
-            </div>
+        <TabsContent value="technical" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">System Specifications</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span>Panel Count:</span>
+                  <span className="font-semibold">{results.technical.panelCount} panels</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>System Size:</span>
+                  <span className="font-semibold">{systemSize} kW</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Inverter Size:</span>
+                  <span className="font-semibold">{results.technical.inverterSize} kW</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Panel Efficiency:</span>
+                  <span className="font-semibold">{results.technical.efficiency}%</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Performance Metrics</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span>Daily Production:</span>
+                  <span className="font-semibold">{Math.round(results.energyProduction.daily)} kWh</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Monthly Production:</span>
+                  <span className="font-semibold">{Math.round(results.energyProduction.monthly)} kWh</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Annual Degradation:</span>
+                  <span className="font-semibold">{results.technical.degradation}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Roof Utilization:</span>
+                  <span className="font-semibold">
+                    {Math.round(((results.technical.panelCount * 20) / roofArea) * 100)}%
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
+        </TabsContent>
 
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              Your solar system would offset the equivalent of planting {results.environmentalImpact.treesEquivalent}{" "}
-              trees annually.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+        <TabsContent value="environmental" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">CO₂ Reduction</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {results.environmental.co2Offset.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground">lbs per year</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Trees Planted</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{results.environmental.treesEquivalent}</div>
+                <p className="text-xs text-muted-foreground">equivalent per year</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Cars Off Road</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{results.environmental.carsOffRoad}</div>
+                <p className="text-xs text-muted-foreground">equivalent per year</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      <div className="flex gap-2">
+        <Button className="flex-1">
+          <Download className="h-4 w-4 mr-2" />
+          Download Report
+        </Button>
+        <Button variant="outline" className="flex-1 bg-transparent">
+          <Share2 className="h-4 w-4 mr-2" />
+          Share Results
+        </Button>
+      </div>
     </div>
   )
 }
 
-// Named export for compatibility
-export { SmartSolarAnalysis }
+export default SmartSolarAnalysisComponent
+export { SmartSolarAnalysisComponent as SmartSolarAnalysis }
