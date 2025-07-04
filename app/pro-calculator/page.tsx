@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { useAuth } from "@/hooks/use-auth"
 import { AddressAutocomplete } from "@/components/address-autocomplete"
 import { toast } from "sonner"
 import {
@@ -38,6 +37,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import { createClient } from "@/lib/supabase"
 
 interface CalculationStep {
   id: number
@@ -150,8 +150,10 @@ const shadingOptions = [
 ]
 
 export default function ProCalculatorPage() {
-  const { user, loading } = useAuth()
   const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [supabaseAvailable, setSupabaseAvailable] = useState(false)
 
   const [currentStep, setCurrentStep] = useState(1)
   const [calculating, setCalculating] = useState(false)
@@ -216,6 +218,32 @@ export default function ProCalculatorPage() {
     customerPhone: "",
     wantsPDF: false,
   })
+
+  // Initialize auth state
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const supabase = createClient()
+        if (supabase) {
+          setSupabaseAvailable(true)
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+          setUser(session?.user || null)
+        } else {
+          setSupabaseAvailable(false)
+          console.warn("Supabase not configured - running in demo mode")
+        }
+      } catch (error) {
+        console.error("Error initializing auth:", error)
+        setSupabaseAvailable(false)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    initializeAuth()
+  }, [])
 
   const updateFormData = (field: keyof FormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -521,6 +549,18 @@ export default function ProCalculatorPage() {
       </div>
 
       <div className="container mx-auto px-6 py-8 max-w-5xl">
+        {!supabaseAvailable && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center gap-2 text-yellow-800">
+              <Sun className="h-5 w-5" />
+              <span className="font-medium">Demo Mode</span>
+            </div>
+            <p className="text-sm text-yellow-700 mt-1">
+              Running in demo mode. Some features may be limited without full configuration.
+            </p>
+          </div>
+        )}
+
         <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
           <CardHeader className="text-center pb-6 bg-gradient-to-r from-purple-600/5 to-blue-600/5">
             <div className="flex items-center justify-center gap-4 mb-4">
@@ -653,7 +693,8 @@ export default function ProCalculatorPage() {
                                 <Image
                                   src={
                                     formData.streetViewImageUrl ||
-                                    "/placeholder.svg?height=400&width=600&text=Street+View"
+                                    "/placeholder.svg?height=400&width=600&text=Street+View" ||
+                                    "/placeholder.svg"
                                   }
                                   alt="Street view showing potential obstructions and shading sources"
                                   width={600}
@@ -1272,7 +1313,8 @@ export default function ProCalculatorPage() {
                         <Image
                           src={
                             formData.aerialImageUrl ||
-                            "/placeholder.svg?height=400&width=600&text=Aerial+View+with+Solar+Layout"
+                            "/placeholder.svg?height=400&width=600&text=Aerial+View+with+Solar+Layout" ||
+                            "/placeholder.svg"
                           }
                           alt="Aerial view with proposed solar panel layout"
                           width={600}
