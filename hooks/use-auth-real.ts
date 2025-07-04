@@ -1,99 +1,85 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, createContext } from "react"
 import { createClient } from "@/lib/supabase-client"
 import type { User } from "@supabase/supabase-js"
 
-interface AuthState {
+interface AuthContextType {
   user: User | null
   loading: boolean
-  subscription: "free" | "pro" | null
-  isAuthenticated: boolean
+  signIn: (email: string, password: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string) => Promise<{ error: any }>
+  signOut: () => Promise<void>
+  resetPassword: (email: string) => Promise<{ error: any }>
 }
 
-export function useAuthReal(): AuthState {
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+export function useAuthReal(): AuthContextType {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [subscription, setSubscription] = useState<"free" | "pro" | null>(null)
-
   const supabase = createClient()
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
-
-        if (error) {
-          console.error("Error getting session:", error)
-          setUser(null)
-          setSubscription(null)
-        } else if (session?.user) {
-          setUser(session.user)
-          await fetchUserSubscription(session.user.id)
-        } else {
-          setUser(null)
-          setSubscription(null)
-        }
-      } catch (error) {
-        console.error("Error in getInitialSession:", error)
-        setUser(null)
-        setSubscription(null)
-      } finally {
-        setLoading(false)
-      }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setUser(session?.user ?? null)
+      setLoading(false)
     }
 
     getInitialSession()
 
     // Listen for auth changes
     const {
-      data: { subscription: authSubscription },
+      data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.email)
-
-      if (session?.user) {
-        setUser(session.user)
-        await fetchUserSubscription(session.user.id)
-      } else {
-        setUser(null)
-        setSubscription(null)
-      }
-
+      setUser(session?.user ?? null)
       setLoading(false)
     })
 
-    return () => {
-      authSubscription?.unsubscribe()
-    }
-  }, [])
+    return () => subscription.unsubscribe()
+  }, [supabase.auth])
 
-  const fetchUserSubscription = async (userId: string) => {
-    try {
-      const { data, error } = await supabase.from("users").select("subscription_type").eq("id", userId).single()
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { error }
+  }
 
-      if (error) {
-        console.error("Error fetching user subscription:", error)
-        setSubscription("free") // Default to free on error
-      } else {
-        setSubscription(data?.subscription_type || "free")
-      }
-    } catch (error) {
-      console.error("Error in fetchUserSubscription:", error)
-      setSubscription("free") // Default to free on error
-    }
+  const signUp = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    })
+    return { error }
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email)
+    return { error }
   }
 
   return {
     user,
     loading,
-    subscription,
-    isAuthenticated: !!user,
+    signIn,
+    signUp,
+    signOut,
+    resetPassword,
   }
 }
 
-// Export alias for compatibility
+// Alias export for compatibility
 export const useAuth = useAuthReal
+
+// Default export
+export default useAuthReal

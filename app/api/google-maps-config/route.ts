@@ -16,10 +16,10 @@ export async function GET() {
       apiKey: apiKey,
     })
   } catch (error) {
-    console.error("Error checking Google Maps config:", error)
+    console.error("Google Maps config error:", error)
     return NextResponse.json({
       configured: false,
-      error: "Failed to check Google Maps configuration",
+      error: "Failed to load Google Maps configuration",
     })
   }
 }

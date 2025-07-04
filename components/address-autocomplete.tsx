@@ -1,36 +1,39 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MapPin, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface AddressAutocompleteProps {
-  onAddressSelect: (address: string, coordinates?: { lat: number; lng: number }) => void
+  onAddressSelect: (address: string, lat?: number, lng?: number) => void
   placeholder?: string
   label?: string
-  required?: boolean
+  value?: string
 }
 
-interface GoogleMapsConfig {
-  configured: boolean
-  apiKey?: string
-  error?: string
+declare global {
+  interface Window {
+    google: any
+    initMap: () => void
+  }
 }
 
 export function AddressAutocomplete({
   onAddressSelect,
   placeholder = "Enter your address",
-  label = "Property Address",
-  required = false,
+  label = "Address",
+  value = "",
 }: AddressAutocompleteProps) {
-  const [address, setAddress] = useState("")
+  const [inputValue, setInputValue] = useState(value)
   const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false)
   const [googleMapsError, setGoogleMapsError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
-  const autocompleteRef = useRef<any | null>(null)
+  const autocompleteRef = useRef<any>(null)
 
   useEffect(() => {
     initializeGoogleMaps()
@@ -40,20 +43,20 @@ export function AddressAutocomplete({
     try {
       setIsLoading(true)
 
-      // Check if Google Maps is configured
-      const configResponse = await fetch("/api/google-maps-config")
-      const config: GoogleMapsConfig = await configResponse.json()
-
-      if (!config.configured) {
-        setGoogleMapsError(config.error || "Google Maps API not configured")
+      // Check if Google Maps is already loaded
+      if (window.google && window.google.maps) {
+        setupAutocomplete()
+        setIsGoogleMapsLoaded(true)
         setIsLoading(false)
         return
       }
 
-      // Check if Google Maps is already loaded
-      if (window.google && window.google.maps && window.google.maps.places) {
-        initializeAutocomplete()
-        setIsGoogleMapsLoaded(true)
+      // Fetch Google Maps configuration
+      const response = await fetch("/api/google-maps-config")
+      const config = await response.json()
+
+      if (!config.configured) {
+        setGoogleMapsError(config.error || "Google Maps API not configured")
         setIsLoading(false)
         return
       }
@@ -65,7 +68,7 @@ export function AddressAutocomplete({
       script.defer = true
 
       script.onload = () => {
-        initializeAutocomplete()
+        setupAutocomplete()
         setIsGoogleMapsLoaded(true)
         setIsLoading(false)
       }
@@ -83,48 +86,49 @@ export function AddressAutocomplete({
     }
   }
 
-  const initializeAutocomplete = () => {
+  const setupAutocomplete = () => {
     if (!inputRef.current || !window.google) return
 
-    try {
-      autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
-        types: ["address"],
-        componentRestrictions: { country: "us" },
-      })
+    autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
+      types: ["address"],
+      componentRestrictions: { country: "us" },
+    })
 
-      autocompleteRef.current.addListener("place_changed", () => {
-        const place = autocompleteRef.current?.getPlace()
-        if (place && place.formatted_address) {
-          const coordinates = place.geometry?.location
-            ? {
-                lat: place.geometry.location.lat(),
-                lng: place.geometry.location.lng(),
-              }
-            : undefined
+    autocompleteRef.current.addListener("place_changed", () => {
+      const place = autocompleteRef.current.getPlace()
 
-          setAddress(place.formatted_address)
-          onAddressSelect(place.formatted_address, coordinates)
-        }
-      })
-    } catch (error) {
-      console.error("Error setting up autocomplete:", error)
-      setGoogleMapsError("Failed to setup address autocomplete")
-    }
+      if (place.formatted_address) {
+        const lat = place.geometry?.location?.lat()
+        const lng = place.geometry?.location?.lng()
+
+        setInputValue(place.formatted_address)
+        onAddressSelect(place.formatted_address, lat, lng)
+      }
+    })
   }
 
-  const handleManualInput = (value: string) => {
-    setAddress(value)
+  const handleManualInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const address = e.target.value
+    setInputValue(address)
+
     // For manual input, we don't have coordinates
-    onAddressSelect(value)
+    onAddressSelect(address)
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      onAddressSelect(inputValue)
+    }
   }
 
   if (isLoading) {
     return (
       <div className="space-y-2">
         <Label htmlFor="address">{label}</Label>
-        <div className="flex items-center space-x-2">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-          <span className="text-sm text-gray-500">Loading address search...</span>
+        <div className="relative">
+          <Input id="address" placeholder="Loading address autocomplete..." disabled className="pl-10" />
+          <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
         </div>
       </div>
     )
@@ -132,9 +136,7 @@ export function AddressAutocomplete({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="address">
-        {label} {required && <span className="text-red-500">*</span>}
-      </Label>
+      <Label htmlFor="address">{label}</Label>
 
       {googleMapsError && (
         <Alert>
@@ -144,25 +146,23 @@ export function AddressAutocomplete({
       )}
 
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
         <Input
           ref={inputRef}
           id="address"
           type="text"
-          placeholder={placeholder}
-          value={address}
-          onChange={(e) => handleManualInput(e.target.value)}
+          placeholder={isGoogleMapsLoaded ? placeholder : "Enter your address manually"}
+          value={inputValue}
+          onChange={handleManualInput}
+          onKeyPress={handleKeyPress}
           className="pl-10"
-          required={required}
         />
+        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
       </div>
 
-      {!isGoogleMapsLoaded && !googleMapsError && (
-        <p className="text-xs text-gray-500">Address autocomplete is loading...</p>
-      )}
-
-      {googleMapsError && (
-        <p className="text-xs text-gray-500">Manual address entry mode - please type your complete address</p>
+      {!isGoogleMapsLoaded && (
+        <p className="text-sm text-gray-600">
+          Address autocomplete is not available. Please enter your full address manually.
+        </p>
       )}
     </div>
   )

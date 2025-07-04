@@ -1,12 +1,14 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { CheckCircle, Shield, Download, MapPin, Calculator, BarChart3, FileText, Clock, DollarSign } from "lucide-react"
-import { useAuth } from "@/hooks/use-auth"
+import { useAuth } from "@/hooks/use-auth-real"
 import Link from "next/link"
 
 export default function SingleReportPurchasePage() {
@@ -30,7 +32,7 @@ export default function SingleReportPurchasePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          priceId: "price_1RdGtXD80D06ku9UWRTdDUHh",
+          priceId: process.env.NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID,
           mode: "payment",
           successUrl: `${window.location.origin}/success?session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: window.location.href,
