@@ -2,34 +2,22 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    // Only return the API key if it exists (server-side only)
     const apiKey = process.env.GOOGLE_MAPS_API_KEY
 
     if (!apiKey) {
-      return NextResponse.json(
-        {
-          configured: false,
-          message: "Google Maps API key not configured",
-        },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: "Google Maps API not configured" }, { status: 500 })
     }
 
-    // Return configuration for client-side Google Maps
+    // Return configuration for Google Maps
     return NextResponse.json({
-      configured: true,
-      apiKey: apiKey, // This is safe because it's server-side
-      libraries: ["places", "geometry", "drawing"],
-      message: "Google Maps configuration loaded",
+      apiKey,
+      libraries: ["places", "geometry"],
+      version: "weekly",
+      region: "US",
+      language: "en",
     })
   } catch (error) {
-    console.error("Google Maps config error:", error)
-    return NextResponse.json(
-      {
-        configured: false,
-        message: "Failed to load Google Maps configuration",
-      },
-      { status: 500 },
-    )
+    console.error("Error getting Google Maps config:", error)
+    return NextResponse.json({ error: "Failed to get Google Maps configuration" }, { status: 500 })
   }
 }

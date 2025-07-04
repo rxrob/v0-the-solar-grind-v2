@@ -1,103 +1,45 @@
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  const startTime = Date.now()
-
   try {
     const apiKey = process.env.NREL_API_KEY
 
-    if (!apiKey) {
-      return NextResponse.json({
-        name: "NREL Solar API",
-        category: "Solar Data",
-        endpoint: "/api/status/nrel",
-        critical: true,
-        status: "error",
-        message: "NREL API key not configured",
-        response_time: Date.now() - startTime,
-        details: {
-          error: "NREL_API_KEY environment variable not set",
-        },
-        timestamp: new Date().toISOString(),
-        http_status: 500,
-      })
+    const status = {
+      configured: !!apiKey,
+      apiKey: apiKey ? "Set" : "Missing",
+      lastChecked: new Date().toISOString(),
     }
 
-    // Test with Denver, CO coordinates
-    const lat = 39.7392
-    const lng = -104.9903
-    const url = `https://developer.nrel.gov/api/solar/solar_resource/v1.json?api_key=${apiKey}&lat=${lat}&lon=${lng}`
+    // Test API key if available
+    if (apiKey) {
+      try {
+        const testResponse = await fetch(
+          `https://developer.nrel.gov/api/pvwatts/v6.json?api_key=${apiKey}&lat=40&lon=-105&system_capacity=4&azimuth=180&tilt=40&array_type=1&module_type=1&losses=10`,
+        )
+        const testData = await testResponse.json()
 
-    const response = await fetch(url)
-    const data = await response.json()
-    const responseTime = Date.now() - startTime
-
-    if (!response.ok) {
-      return NextResponse.json({
-        name: "NREL Solar API",
-        category: "Solar Data",
-        endpoint: "/api/status/nrel",
-        critical: true,
-        status: "error",
-        message: `API request failed: ${response.status}`,
-        response_time: responseTime,
-        details: {
-          http_status: response.status,
-          error: data.error || "Unknown error",
-        },
-        timestamp: new Date().toISOString(),
-        http_status: response.status,
-      })
+        status.apiTest = {
+          success: !testData.errors,
+          error: testData.errors ? testData.errors[0] : null,
+        }
+      } catch (error) {
+        status.apiTest = {
+          success: false,
+          error: "Failed to test API key",
+        }
+      }
     }
 
-    if (data.errors && data.errors.length > 0) {
-      return NextResponse.json({
-        name: "NREL Solar API",
-        category: "Solar Data",
-        endpoint: "/api/status/nrel",
-        critical: true,
-        status: "error",
-        message: `NREL API error: ${data.errors[0]}`,
-        response_time: responseTime,
-        details: {
-          errors: data.errors,
-        },
-        timestamp: new Date().toISOString(),
-        http_status: 400,
-      })
-    }
-
-    const avgGhi = data.outputs?.avg_ghi?.annual
-
-    return NextResponse.json({
-      name: "NREL Solar API",
-      category: "Solar Data",
-      endpoint: "/api/status/nrel",
-      critical: true,
-      status: "healthy",
-      message: "Solar resource data API working correctly",
-      response_time: responseTime,
-      details: {
-        test_location: "Denver, CO",
-        coordinates: `${lat}, ${lng}`,
-        annual_ghi: avgGhi ? `${avgGhi} kWh/m²/day` : null,
-        data_available: !!data.outputs,
-      },
-      timestamp: new Date().toISOString(),
-      http_status: 200,
-    })
+    return NextResponse.json(status)
   } catch (error) {
-    return NextResponse.json({
-      name: "NREL Solar API",
-      category: "Solar Data",
-      endpoint: "/api/status/nrel",
-      critical: true,
-      status: "error",
-      message: `Request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      response_time: Date.now() - startTime,
-      details: { error: error instanceof Error ? error.message : "Unknown error" },
-      timestamp: new Date().toISOString(),
-      http_status: 500,
-    })
+    console.error("Error checking NREL status:", error)
+    return NextResponse.json(
+      {
+        configured: false,
+        error: "Failed to check NREL status",
+        lastChecked: new Date().toISOString(),
+      },
+      { status: 500 },
+    )
   }
 }

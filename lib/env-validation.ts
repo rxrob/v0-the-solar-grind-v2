@@ -210,3 +210,34 @@ export function getServerConfig() {
     resendApiKey: config.resendApiKey,
   }
 }
+
+// Individual service checks
+export const isSupabaseConfigured = () => {
+  const config = getEnvironmentConfig()
+  return !!(config.supabaseUrl && config.supabaseAnonKey && config.supabaseServiceKey)
+}
+
+export const isStripeConfigured = () => {
+  const config = getEnvironmentConfig()
+  return !!(config.stripePublishableKey && config.stripeSecretKey)
+}
+
+export const isGoogleMapsConfigured = () => {
+  const config = getEnvironmentConfig()
+  return !!config.googleMapsApiKey
+}
+
+export const isNRELConfigured = () => {
+  const config = getEnvironmentConfig()
+  return !!config.nrelApiKey
+}
+
+export const isRecaptchaConfigured = () => {
+  const config = getEnvironmentConfig()
+  return !!(config.recaptchaSiteKey && config.recaptchaSecretKey)
+}
+
+export const isResendConfigured = () => {
+  const config = getEnvironmentConfig()
+  return !!config.resendApiKey
+}

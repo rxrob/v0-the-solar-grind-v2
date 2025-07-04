@@ -1,18 +1,16 @@
-import { NextResponse } from "next/server"
-import { getServerConfig } from "@/lib/env-validation"
+import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    const config = getServerConfig()
+    const siteKey = process.env.RECAPTCHA_SITE_KEY
 
-    // Only return the site key (public key) to the client
-    if (!config.recaptchaSiteKey) {
-      return NextResponse.json({ error: "reCAPTCHA not configured" }, { status: 503 })
+    if (!siteKey) {
+      return NextResponse.json({ error: "reCAPTCHA not configured" }, { status: 500 })
     }
 
     return NextResponse.json({
-      siteKey: config.recaptchaSiteKey,
-      configured: true,
+      siteKey,
+      enabled: true,
     })
   } catch (error) {
     console.error("Error getting reCAPTCHA config:", error)
@@ -20,61 +18,51 @@ export async function GET() {
   }
 }
 
-// Verify reCAPTCHA token (server-side only)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { token } = await request.json()
 
     if (!token) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "No reCAPTCHA token provided",
-        },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: "reCAPTCHA token is required" }, { status: 400 })
     }
 
-    const config = getServerConfig()
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY
 
-    if (!config.recaptchaSecretKey) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "reCAPTCHA is not properly configured",
-        },
-        { status: 500 },
-      )
+    if (!secretKey) {
+      return NextResponse.json({ error: "reCAPTCHA not configured" }, { status: 500 })
     }
 
-    const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+    // Verify the reCAPTCHA token with Google
+    const verifyResponse = await fetch("https://www.google.com/recaptcha/api/siteverify", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
-        secret: config.recaptchaSecretKey!,
+        secret: secretKey,
         response: token,
       }),
     })
 
-    const data = await response.json()
+    const verifyData = await verifyResponse.json()
+
+    if (!verifyData.success) {
+      return NextResponse.json(
+        {
+          error: "reCAPTCHA verification failed",
+          details: verifyData["error-codes"] || [],
+        },
+        { status: 400 },
+      )
+    }
 
     return NextResponse.json({
-      success: data.success,
-      score: data.score,
-      action: data.action,
-      timestamp: data.challenge_ts,
-      errors: data["error-codes"] || [],
+      success: true,
+      score: verifyData.score || null,
+      action: verifyData.action || null,
     })
   } catch (error) {
-    console.error("reCAPTCHA verification error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to verify reCAPTCHA token",
-      },
-      { status: 500 },
-    )
+    console.error("Error verifying reCAPTCHA:", error)
+    return NextResponse.json({ error: "Failed to verify reCAPTCHA" }, { status: 500 })
   }
 }

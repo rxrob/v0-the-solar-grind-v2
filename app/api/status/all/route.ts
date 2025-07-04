@@ -77,31 +77,37 @@ async function checkService(
 export async function GET(request: Request) {
   try {
     const { origin } = new URL(request.url)
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || origin
 
     // Define services to check
     const servicesToCheck = [
-      { name: "Supabase Database", category: "Database", endpoint: `${origin}/api/status/supabase`, critical: true },
+      { name: "Supabase Database", category: "Database", endpoint: `${baseUrl}/api/status/supabase`, critical: true },
       {
         name: "Google Maps",
         category: "Google Services",
-        endpoint: `${origin}/api/status/google-maps`,
+        endpoint: `${baseUrl}/api/status/google-maps`,
         critical: true,
       },
       {
         name: "Google Geocoding",
         category: "Google Services",
-        endpoint: `${origin}/api/status/google-geocoding`,
+        endpoint: `${baseUrl}/api/status/google-geocoding`,
         critical: true,
       },
       {
         name: "Google Elevation",
         category: "Google Services",
-        endpoint: `${origin}/api/status/google-elevation`,
+        endpoint: `${baseUrl}/api/status/google-elevation`,
         critical: true,
       },
-      { name: "NREL Solar Data", category: "Solar Data", endpoint: `${origin}/api/status/nrel`, critical: true },
-      { name: "Stripe Payments", category: "Payments", endpoint: `${origin}/api/status/stripe`, critical: true },
-      { name: "reCAPTCHA Security", category: "Security", endpoint: `${origin}/api/status/recaptcha`, critical: false },
+      { name: "NREL Solar Data", category: "Solar Data", endpoint: `${baseUrl}/api/status/nrel`, critical: true },
+      { name: "Stripe Payments", category: "Payments", endpoint: `${baseUrl}/api/status/stripe`, critical: true },
+      {
+        name: "reCAPTCHA Security",
+        category: "Security",
+        endpoint: `${baseUrl}/api/status/recaptcha`,
+        critical: false,
+      },
     ]
 
     const startTime = Date.now()
@@ -208,7 +214,7 @@ export async function GET(request: Request) {
       services,
       recommendations,
       timestamp: new Date().toISOString(),
-      base_url: origin,
+      base_url: baseUrl,
       total_check_time: totalCheckTime,
     }
 

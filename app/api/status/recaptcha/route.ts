@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server"
-import { getServerConfig } from "@/lib/env-validation"
 
 export async function GET() {
   try {
-    const config = getServerConfig()
+    const siteKey = process.env.RECAPTCHA_SITE_KEY
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY
 
     const status = {
-      configured: !!(config.recaptchaSiteKey && config.recaptchaSecretKey),
-      siteKeyConfigured: !!config.recaptchaSiteKey,
-      secretKeyConfigured: !!config.recaptchaSecretKey,
-      service: "reCAPTCHA",
-      timestamp: new Date().toISOString(),
+      configured: !!(siteKey && secretKey),
+      siteKey: siteKey ? "Set" : "Missing",
+      secretKey: secretKey ? "Set" : "Missing",
+      endpoint: "/api/recaptcha-config",
+      lastChecked: new Date().toISOString(),
     }
 
     return NextResponse.json(status)
@@ -20,8 +20,7 @@ export async function GET() {
       {
         configured: false,
         error: "Failed to check reCAPTCHA status",
-        service: "reCAPTCHA",
-        timestamp: new Date().toISOString(),
+        lastChecked: new Date().toISOString(),
       },
       { status: 500 },
     )
