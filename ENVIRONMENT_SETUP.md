@@ -1,18 +1,18 @@
 # Environment Setup Guide
 
-This guide explains how to set up all the required environment variables for the Solar Analysis application.
+This guide explains how to set up all the required environment variables for The Solar Grind V2 application.
 
 ## Security Architecture
 
 This application follows a **server-side first** security model:
 
-- **Server-side only**: All API keys that could be abused (Google Maps, NREL, reCAPTCHA)
-- **Client-side safe**: Only public keys and configuration that's safe to expose
-- **Secure delivery**: Sensitive configuration delivered via secure API endpoints
+- **Client-side variables**: Only safe, public keys (prefixed with `NEXT_PUBLIC_`)
+- **Server-side variables**: All sensitive API keys and secrets
+- **Secure delivery**: Configuration delivered via API endpoints when needed
 
 ## Required Environment Variables
 
-### 1. Supabase Database & Authentication
+### 1. Supabase (Database & Authentication)
 
 \`\`\`bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -20,39 +20,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=eyJ...your-service-role-key
 \`\`\`
 
-**Setup:**
+**Setup Instructions:**
 1. Create a Supabase project at [supabase.com](https://supabase.com)
 2. Go to Settings > API
-3. Copy the Project URL and anon key (safe for client)
-4. Copy the service_role key (server-side only)
+3. Copy the Project URL and anon key (these are safe for client-side)
+4. Copy the service_role key (keep this server-side only)
 
-### 2. Google APIs (Server-side only)
-
-\`\`\`bash
-GOOGLE_MAPS_API_KEY=AIza...your-maps-key
-GOOGLE_GEOCODING_API_KEY=AIza...your-geocoding-key
-GOOGLE_ELEVATION_API_KEY=AIza...your-elevation-key
-\`\`\`
-
-**Setup:**
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select existing
-3. Enable APIs: Maps JavaScript API, Geocoding API, Elevation API
-4. Create API keys with appropriate restrictions
-5. **Important**: These keys are server-side only for security
-
-### 3. NREL Solar Data API
-
-\`\`\`bash
-NREL_API_KEY=your-nrel-api-key
-\`\`\`
-
-**Setup:**
-1. Register at [NREL Developer Network](https://developer.nrel.gov/signup/)
-2. Get your API key for PVWatts and Solar Resource APIs
-3. Server-side only to prevent quota abuse
-
-### 4. Stripe Payment Processing
+### 2. Stripe (Payment Processing)
 
 \`\`\`bash
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
@@ -62,99 +36,179 @@ NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID=price_...
 NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID=price_...
 \`\`\`
 
-**Setup:**
-1. Create account at [Stripe](https://stripe.com)
-2. Get publishable key (safe for client) and secret key (server-side)
-3. Create products and get price IDs
-4. Set up webhook endpoint for subscription events
+**Setup Instructions:**
+1. Create a Stripe account at [stripe.com](https://stripe.com)
+2. Get publishable key from Dashboard > Developers > API keys (safe for client-side)
+3. Get secret key from the same location (keep server-side only)
+4. Set up webhook endpoint for `/api/webhooks` and get webhook secret
+5. Create products and get their price IDs
 
-### 5. reCAPTCHA (Server-side only)
+### 3. Google APIs (Server-side Only)
+
+\`\`\`bash
+GOOGLE_MAPS_API_KEY=AIza...your-maps-key
+GOOGLE_GEOCODING_API_KEY=AIza...your-geocoding-key
+GOOGLE_ELEVATION_API_KEY=AIza...your-elevation-key
+GOOGLE_STREET_VIEW_API_KEY=AIza...your-street-view-key
+\`\`\`
+
+**Setup Instructions:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a new project or select existing
+3. Enable the following APIs:
+   - Maps JavaScript API
+   - Geocoding API
+   - Elevation API
+   - Street View Static API
+4. Create API keys with appropriate restrictions
+5. **Important**: These keys are server-side only for security
+
+### 4. NREL API (Solar Data)
+
+\`\`\`bash
+NREL_API_KEY=your-nrel-api-key
+\`\`\`
+
+**Setup Instructions:**
+1. Register at [developer.nrel.gov](https://developer.nrel.gov)
+2. Request an API key for PVWatts and Solar Resource APIs
+3. Keep this key server-side only
+
+### 5. reCAPTCHA (Spam Protection)
 
 \`\`\`bash
 RECAPTCHA_SITE_KEY=6Le...your-site-key
 RECAPTCHA_SECRET_KEY=6Le...your-secret-key
 \`\`\`
 
-**Setup:**
-1. Go to [Google reCAPTCHA](https://www.google.com/recaptcha/admin)
-2. Register your site for reCAPTCHA v2
-3. **Important**: Both keys are server-side only
-4. Client gets site key via `/api/recaptcha-config`
+**Setup Instructions:**
+1. Go to [Google reCAPTCHA](https://www.google.com/recaptcha)
+2. Register your site for reCAPTCHA v3
+3. Get both site key and secret key
+4. **Important**: Both keys are server-side only for enhanced security
 
-### 6. Email Service
+### 6. Resend (Email Service)
 
 \`\`\`bash
 RESEND_API_KEY=re_...your-resend-key
 \`\`\`
 
-**Setup:**
-1. Create account at [Resend](https://resend.com)
-2. Get API key for transactional emails
-3. Server-side only for security
+**Setup Instructions:**
+1. Create account at [resend.com](https://resend.com)
+2. Generate API key from dashboard
+3. Verify your domain for email sending
 
 ### 7. Application Configuration
 
 \`\`\`bash
 NEXT_PUBLIC_BASE_URL=https://yourdomain.com
+NEXT_PUBLIC_AXIOM_INGEST_ENDPOINT=https://api.axiom.co/v1/datasets/your-dataset/ingest
 \`\`\`
-
-**Setup:**
-- Set to your production domain
-- Used for OAuth redirects and email links
 
 ## Security Best Practices
 
-### ✅ Safe for Client (NEXT_PUBLIC_)
-- Supabase URL and anon key
-- Stripe publishable key
-- Stripe price IDs
-- Base URL
+### Client vs Server Variables
 
-### 🔒 Server-side Only
+**✅ Safe for Client (NEXT_PUBLIC_)**:
+- Supabase URL and anon key (designed to be public)
+- Stripe publishable key (designed to be public)
+- Base URL and public configuration
+- Stripe price IDs (product identifiers)
+
+**🔒 Server-side Only**:
 - All Google API keys
-- NREL API key
-- reCAPTCHA keys
-- Stripe secret key
 - Supabase service role key
-- Email API keys
+- Stripe secret key and webhook secret
+- reCAPTCHA site and secret keys
+- NREL API key
+- Resend API key
 
-### 🛡️ Secure Delivery
-- reCAPTCHA site key: `/api/recaptcha-config`
-- Google Maps config: `/api/google-maps-config`
-- Service status: `/api/status/*`
+### API Key Security
 
-## Development Setup
+1. **Google Maps**: Delivered securely via `/api/google-maps-config`
+2. **reCAPTCHA**: Site key delivered via `/api/recaptcha-config`
+3. **Restrictions**: Set up API key restrictions in Google Cloud Console
+4. **Monitoring**: Monitor API usage and set up alerts
 
-1. Copy `.env.local.example` to `.env.local`
-2. Fill in your actual API keys
-3. Never commit `.env.local` to version control
-4. Use different keys for development and production
+### Environment File Security
 
-## Production Deployment
+\`\`\`bash
+# Add to .gitignore
+.env.local
+.env*.local
 
-1. Set environment variables in your hosting platform
-2. Use production API keys and URLs
-3. Enable proper CORS and domain restrictions
-4. Monitor API usage and quotas
+# Never commit these files
+.env.production
+.env.development
+\`\`\`
+
+## Deployment
+
+### Vercel Deployment
+
+1. Add all environment variables in Vercel dashboard
+2. Separate preview and production environments
+3. Use different API keys for different environments
+
+### Environment Validation
+
+The application includes built-in environment validation:
+
+\`\`\`typescript
+import { validateEnvironment } from '@/lib/env-validation'
+
+const validation = validateEnvironment()
+if (!validation.isValid) {
+  console.error('Environment validation failed:', validation.errors)
+}
+\`\`\`
 
 ## Troubleshooting
 
-### Check Configuration Status
-Visit `/api-status` to see which services are properly configured.
-
 ### Common Issues
-- **Google Maps not loading**: Check GOOGLE_MAPS_API_KEY is set server-side
-- **reCAPTCHA not working**: Verify both RECAPTCHA keys are set
-- **Payments failing**: Check Stripe keys and webhook configuration
-- **Database errors**: Verify Supabase keys and RLS policies
+
+1. **Supabase Connection**: Check URL format and key validity
+2. **Google APIs**: Verify API is enabled and key has correct permissions
+3. **Stripe Webhooks**: Ensure webhook endpoint is accessible
+4. **reCAPTCHA**: Verify domain is registered for the keys
+
+### Status Endpoints
+
+Check service status via API endpoints:
+- `/api/status/supabase` - Supabase connection
+- `/api/status/stripe` - Stripe configuration
+- `/api/status/google-maps` - Google Maps API
+- `/api/status/nrel` - NREL API
+- `/api/status/recaptcha` - reCAPTCHA configuration
 
 ### Environment Validation
-The app includes built-in environment validation that will warn about missing configuration.
+
+Use the validation utilities:
+
+\`\`\`typescript
+import { getServiceStatus } from '@/lib/env-validation'
+
+const status = getServiceStatus()
+console.log('Service status:', status)
+\`\`\`
+
+## Development vs Production
+
+### Development
+- Use test keys for Stripe
+- Use localhost for base URL
+- Enable debug logging
+
+### Production
+- Use live keys for Stripe
+- Use production domain for base URL
+- Disable debug logging
+- Set up monitoring and alerts
 
 ## Support
 
-If you encounter issues with environment setup:
-1. Check the `/api-status` endpoint
-2. Review browser console for client-side errors
-3. Check server logs for API key issues
-4. Verify all keys are for the correct environment (test vs production)
+If you encounter issues:
+1. Check the status endpoints
+2. Validate your environment variables
+3. Review the console for error messages
+4. Check API quotas and limits
