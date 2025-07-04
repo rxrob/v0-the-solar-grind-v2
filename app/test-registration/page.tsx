@@ -2,50 +2,57 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { signUpReal } from "@/app/actions/auth-real"
 
-export default function TestRegistration() {
+interface TestResult {
+  success: boolean
+  message: string
+  details?: any
+  error?: string
+  timestamp: string
+}
+
+export default function TestRegistrationPage() {
   const [email, setEmail] = useState("test@example.com")
   const [password, setPassword] = useState("testpassword123")
+  const [fullName, setFullName] = useState("Test User")
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
-  const [debugInfo, setDebugInfo] = useState<any>(null)
-  const [connectionTest, setConnectionTest] = useState<any>(null)
+  const [results, setResults] = useState<{
+    config?: TestResult
+    connection?: TestResult
+    registration?: TestResult
+  }>({})
 
-  const testRegistration = async () => {
-    setLoading(true)
-    setResult(null)
-
-    try {
-      console.log("🧪 Testing registration with:", { email, password: "***" })
-      const response = await signUpReal(email, password)
-      console.log("🧪 Registration response:", response)
-      setResult(response)
-    } catch (error) {
-      console.error("🧪 Registration test error:", error)
-      setResult({
-        success: false,
-        message: "Test failed with error",
-        error: error.message,
-        debug: error,
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const debugConfiguration = async () => {
+  const testConfiguration = async () => {
     setLoading(true)
     try {
       const response = await fetch("/api/debug-supabase-config")
-      const data = await response.json()
-      setDebugInfo(data)
+      const result = await response.json()
+
+      setResults((prev) => ({
+        ...prev,
+        config: {
+          ...result,
+          timestamp: new Date().toISOString(),
+        },
+      }))
     } catch (error) {
-      setDebugInfo({ error: error.message })
+      setResults((prev) => ({
+        ...prev,
+        config: {
+          success: false,
+          message: "Failed to test configuration",
+          error: error instanceof Error ? error.message : "Unknown error",
+          timestamp: new Date().toISOString(),
+        },
+      }))
     } finally {
       setLoading(false)
     }
@@ -55,215 +62,257 @@ export default function TestRegistration() {
     setLoading(true)
     try {
       const response = await fetch("/api/test-supabase-connection")
-      const data = await response.json()
-      setConnectionTest(data)
+      const result = await response.json()
+
+      setResults((prev) => ({
+        ...prev,
+        connection: {
+          ...result,
+          timestamp: new Date().toISOString(),
+        },
+      }))
     } catch (error) {
-      setConnectionTest({ error: error.message })
+      setResults((prev) => ({
+        ...prev,
+        connection: {
+          success: false,
+          message: "Failed to test connection",
+          error: error instanceof Error ? error.message : "Unknown error",
+          timestamp: new Date().toISOString(),
+        },
+      }))
     } finally {
       setLoading(false)
     }
   }
 
-  return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>🧪 Registration Test Suite</CardTitle>
-            <CardDescription>Test user registration and debug Supabase configuration issues</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button onClick={debugConfiguration} disabled={loading} variant="outline">
-                Debug Configuration
-              </Button>
-              <Button onClick={testConnection} disabled={loading} variant="outline">
-                Test Connection
-              </Button>
-              <Button onClick={testRegistration} disabled={loading} variant="default">
-                Test Registration
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+  const testRegistration = async () => {
+    if (!email || !password) {
+      alert("Please enter email and password")
+      return
+    }
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Registration Form</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="test@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-              />
-            </div>
-            <Button onClick={testRegistration} disabled={loading || !email || !password} className="w-full">
-              {loading ? "Testing..." : "Test Registration"}
-            </Button>
-          </CardContent>
-        </Card>
+    setLoading(true)
+    try {
+      console.log("🧪 Testing registration with:", { email, fullName })
 
-        {debugInfo && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                🔍 Configuration Debug
-                <Badge variant={debugInfo.config?.hasUrl && debugInfo.config?.hasKey ? "default" : "destructive"}>
-                  {debugInfo.config?.hasUrl && debugInfo.config?.hasKey ? "Config OK" : "Config Issues"}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <strong>Supabase URL:</strong> {debugInfo.config?.hasUrl ? "✅" : "❌"}
-                    <br />
-                    <code className="text-xs bg-gray-100 p-1 rounded">{debugInfo.config?.urlPreview}</code>
-                  </div>
-                  <div>
-                    <strong>API Key:</strong> {debugInfo.config?.hasKey ? "✅" : "❌"}
-                    <br />
-                    <code className="text-xs bg-gray-100 p-1 rounded">{debugInfo.config?.keyPreview}</code>
-                  </div>
-                </div>
+      const result = await signUpReal(email, password, fullName)
 
-                {debugInfo.connectivityTest && (
-                  <div>
-                    <strong>Connectivity Test:</strong>
-                    <Badge variant={debugInfo.connectivityTest.success ? "default" : "destructive"} className="ml-2">
-                      {debugInfo.connectivityTest.success ? "Success" : "Failed"}
-                    </Badge>
-                    <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto">
-                      {JSON.stringify(debugInfo.connectivityTest, null, 2)}
-                    </pre>
-                  </div>
-                )}
+      console.log("📊 Registration result:", result)
 
-                {debugInfo.authTest && (
-                  <div>
-                    <strong>Auth Test:</strong>
-                    <Badge variant={debugInfo.authTest.success ? "default" : "destructive"} className="ml-2">
-                      {debugInfo.authTest.success ? "Success" : "Failed"}
-                    </Badge>
-                    <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto">
-                      {JSON.stringify(debugInfo.authTest, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+      setResults((prev) => ({
+        ...prev,
+        registration: {
+          ...result,
+          timestamp: new Date().toISOString(),
+        },
+      }))
+    } catch (error) {
+      console.error("❌ Registration test error:", error)
+      setResults((prev) => ({
+        ...prev,
+        registration: {
+          success: false,
+          message: "Registration test failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+          timestamp: new Date().toISOString(),
+        },
+      }))
+    } finally {
+      setLoading(false)
+    }
+  }
 
-        {connectionTest && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                🔗 Connection Test Results
-                <Badge variant={connectionTest.success ? "default" : "destructive"}>
-                  {connectionTest.success ? "All Tests Passed" : "Some Tests Failed"}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="text-sm">
-                  <strong>Summary:</strong> {connectionTest.summary?.successful}/{connectionTest.summary?.total} tests
-                  passed
-                </div>
+  const clearResults = () => {
+    setResults({})
+  }
 
-                {connectionTest.tests?.map((test: any, index: number) => (
-                  <div key={index} className="border rounded p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <strong>{test.name}</strong>
-                      <Badge variant={test.success ? "default" : "destructive"}>{test.success ? "Pass" : "Fail"}</Badge>
-                      {test.status && <Badge variant="outline">{test.status}</Badge>}
-                    </div>
-                    {test.url && <div className="text-xs text-gray-600 mb-1">URL: {test.url}</div>}
-                    {test.responsePreview && (
-                      <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto">{test.responsePreview}</pre>
-                    )}
-                    {test.error && (
-                      <div className="text-xs text-red-600 bg-red-50 p-2 rounded">Error: {test.error}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
+  const ResultCard = ({ title, result }: { title: string; result?: TestResult }) => (
+    <Card className="mb-4">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {title}
+          {result && (
+            <Badge variant={result.success ? "default" : "destructive"}>{result.success ? "✅ Pass" : "❌ Fail"}</Badge>
+          )}
+        </CardTitle>
         {result && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                📝 Registration Test Result
-                <Badge variant={result.success ? "default" : "destructive"}>
-                  {result.success ? "Success" : "Failed"}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Alert className={result.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
-                <AlertDescription>
-                  <strong>Message:</strong> {result.message}
-                  {result.error && (
-                    <div className="mt-2">
-                      <strong>Error Code:</strong> {result.error}
-                    </div>
-                  )}
-                </AlertDescription>
-              </Alert>
-
-              {result.debug && (
-                <div className="mt-4">
-                  <strong>Debug Information:</strong>
-                  <pre className="text-xs bg-gray-100 p-3 rounded mt-2 overflow-auto">
-                    {JSON.stringify(result.debug, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <CardDescription>
+            {result.timestamp && `Tested at: ${new Date(result.timestamp).toLocaleString()}`}
+          </CardDescription>
         )}
+      </CardHeader>
+      {result && (
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <Label className="font-semibold">Message:</Label>
+              <p className={result.success ? "text-green-600" : "text-red-600"}>{result.message}</p>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>💡 Troubleshooting Tips</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div>
-              • <strong>Invalid JSON Response:</strong> Usually means wrong Supabase URL or the project doesn't exist
-            </div>
-            <div>
-              • <strong>401 Unauthorized:</strong> Check your API key is correct and has the right permissions
-            </div>
-            <div>
-              • <strong>404 Not Found:</strong> Verify your Supabase project URL is correct
-            </div>
-            <div>
-              • <strong>CORS Errors:</strong> Make sure your domain is added to Supabase allowed origins
-            </div>
-            <div>
-              • <strong>Connection Failed:</strong> Check if Supabase is accessible from your deployment environment
-            </div>
-          </CardContent>
-        </Card>
+            {result.error && (
+              <div>
+                <Label className="font-semibold text-red-600">Error:</Label>
+                <Textarea value={result.error} readOnly className="mt-1 font-mono text-sm" rows={3} />
+              </div>
+            )}
+
+            {result.details && (
+              <div>
+                <Label className="font-semibold">Details:</Label>
+                <Textarea
+                  value={JSON.stringify(result.details, null, 2)}
+                  readOnly
+                  className="mt-1 font-mono text-sm"
+                  rows={8}
+                />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  )
+
+  return (
+    <div className="container mx-auto py-8 px-4 max-w-4xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Supabase Registration Test Suite</h1>
+        <p className="text-muted-foreground">
+          This page helps debug Supabase authentication issues by testing configuration, connectivity, and registration
+          flow step by step.
+        </p>
       </div>
+
+      {/* Test Controls */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Test Controls</CardTitle>
+          <CardDescription>Run tests in order: Configuration → Connection → Registration</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <Button onClick={testConfiguration} disabled={loading} variant="outline">
+              {loading ? "Testing..." : "1. Test Configuration"}
+            </Button>
+            <Button onClick={testConnection} disabled={loading} variant="outline">
+              {loading ? "Testing..." : "2. Test Connection"}
+            </Button>
+            <Button onClick={testRegistration} disabled={loading} variant="outline">
+              {loading ? "Testing..." : "3. Test Registration"}
+            </Button>
+            <Button onClick={clearResults} disabled={loading} variant="secondary">
+              Clear Results
+            </Button>
+          </div>
+
+          <Separator className="my-6" />
+
+          {/* Registration Form */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Registration Test Data</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="test@example.com"
+                />
+              </div>
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="testpassword123"
+                />
+              </div>
+              <div>
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Test User"
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Test Results */}
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold">Test Results</h2>
+
+        <ResultCard title="1. Configuration Test" result={results.config} />
+        <ResultCard title="2. Connection Test" result={results.connection} />
+        <ResultCard title="3. Registration Test" result={results.registration} />
+      </div>
+
+      {/* Help Section */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Troubleshooting Guide</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 text-sm">
+            <Alert>
+              <AlertDescription>
+                <strong>Important:</strong> Run tests in order. Each test builds on the previous one to help identify
+                the exact source of any issues.
+              </AlertDescription>
+            </Alert>
+
+            <div>
+              <h4 className="font-semibold">Configuration Test Failures:</h4>
+              <ul className="list-disc list-inside ml-4 space-y-1">
+                <li>Check that NEXT_PUBLIC_SUPABASE_URL is set correctly</li>
+                <li>Verify SUPABASE_SERVICE_ROLE_KEY is the service role key, not anon key</li>
+                <li>Ensure your Supabase project is active and not paused</li>
+                <li>Verify URL format: https://your-project.supabase.co</li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-semibold">Connection Test Failures:</h4>
+              <ul className="list-disc list-inside ml-4 space-y-1">
+                <li>Check your internet connection</li>
+                <li>Verify the Supabase URL format (should end with .supabase.co)</li>
+                <li>Check if your Supabase project exists and is accessible</li>
+                <li>Verify API keys are not expired or revoked</li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-semibold">Registration Test Failures:</h4>
+              <ul className="list-disc list-inside ml-4 space-y-1">
+                <li>Check if email confirmations are required in Supabase Auth settings</li>
+                <li>Verify your auth policies allow user registration</li>
+                <li>Check if the email domain is allowed in your Supabase settings</li>
+                <li>Ensure password meets minimum requirements</li>
+                <li>Check for duplicate email addresses</li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-semibold">Common JSON Parsing Errors:</h4>
+              <ul className="list-disc list-inside ml-4 space-y-1">
+                <li>Wrong Supabase URL (returns HTML error page instead of JSON)</li>
+                <li>Invalid API key (returns authentication error page)</li>
+                <li>Project paused or deleted (returns Supabase error page)</li>
+                <li>Network issues (returns ISP or proxy error pages)</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

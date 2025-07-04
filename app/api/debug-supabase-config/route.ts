@@ -4,99 +4,144 @@ export async function GET() {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    const config = {
+    console.log("🔍 Debug: Checking Supabase configuration...")
+
+    // Check environment variables
+    const envCheck = {
       hasUrl: !!supabaseUrl,
-      hasKey: !!supabaseAnonKey,
-      urlFormat: supabaseUrl ? (supabaseUrl.includes("supabase.co") ? "Valid" : "Invalid") : "Missing",
-      urlPreview: supabaseUrl ? `${supabaseUrl.substring(0, 50)}...` : "MISSING",
-      keyPreview: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 30)}...` : "MISSING",
-      keyLength: supabaseAnonKey ? supabaseAnonKey.length : 0,
+      hasAnonKey: !!supabaseAnonKey,
+      hasServiceKey: !!supabaseServiceKey,
+      urlFormat: supabaseUrl ? (supabaseUrl.includes("supabase.co") ? "valid" : "invalid") : "missing",
+      urlLength: supabaseUrl?.length || 0,
+      anonKeyLength: supabaseAnonKey?.length || 0,
+      serviceKeyLength: supabaseServiceKey?.length || 0,
     }
 
-    // Test connectivity if we have both values
-    let connectivityTest = null
-    if (supabaseUrl && supabaseAnonKey) {
-      try {
-        console.log("Testing connectivity to:", supabaseUrl)
+    console.log("📊 Environment check:", envCheck)
 
-        const testResponse = await fetch(`${supabaseUrl}/rest/v1/`, {
-          method: "GET",
-          headers: {
-            apikey: supabaseAnonKey,
-            Authorization: `Bearer ${supabaseAnonKey}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        const responseText = await testResponse.text()
-
-        connectivityTest = {
-          status: testResponse.status,
-          statusText: testResponse.statusText,
-          contentType: testResponse.headers.get("content-type"),
-          responsePreview: responseText.substring(0, 200),
-          isJson: testResponse.headers.get("content-type")?.includes("application/json"),
-          success: testResponse.ok,
-        }
-
-        console.log("Connectivity test result:", connectivityTest)
-      } catch (error) {
-        connectivityTest = {
-          error: error.message,
-          success: false,
-        }
-      }
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json({
+        success: false,
+        message: "Missing required environment variables",
+        envCheck,
+        tests: [],
+      })
     }
 
-    // Test auth endpoint specifically
-    let authTest = null
-    if (supabaseUrl && supabaseAnonKey) {
-      try {
-        const authUrl = `${supabaseUrl}/auth/v1/settings`
-        console.log("Testing auth endpoint:", authUrl)
+    // Test different endpoints
+    const tests = []
 
-        const authResponse = await fetch(authUrl, {
-          method: "GET",
-          headers: {
-            apikey: supabaseAnonKey,
-            Authorization: `Bearer ${supabaseAnonKey}`,
-          },
-        })
+    // Test 1: Basic REST API health check
+    try {
+      console.log("🧪 Test 1: REST API health check")
+      const restResponse = await fetch(`${supabaseUrl}/rest/v1/`, {
+        method: "GET",
+        headers: {
+          apikey: supabaseServiceKey,
+          Authorization: `Bearer ${supabaseServiceKey}`,
+        },
+      })
 
-        const authResponseText = await authResponse.text()
+      const restText = await restResponse.text()
+      console.log("📤 REST API Response:", restResponse.status, restText.substring(0, 200))
 
-        authTest = {
-          status: authResponse.status,
-          statusText: authResponse.statusText,
-          contentType: authResponse.headers.get("content-type"),
-          responsePreview: authResponseText.substring(0, 200),
-          success: authResponse.ok,
-        }
-
-        console.log("Auth test result:", authTest)
-      } catch (error) {
-        authTest = {
-          error: error.message,
-          success: false,
-        }
-      }
+      tests.push({
+        name: "REST API Health Check",
+        success: restResponse.ok,
+        status: restResponse.status,
+        contentType: restResponse.headers.get("content-type"),
+        response: restText.substring(0, 500),
+      })
+    } catch (error) {
+      console.error("❌ REST API test failed:", error)
+      tests.push({
+        name: "REST API Health Check",
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
     }
+
+    // Test 2: Auth API health check
+    try {
+      console.log("🧪 Test 2: Auth API health check")
+      const authResponse = await fetch(`${supabaseUrl}/auth/v1/health`, {
+        method: "GET",
+        headers: {
+          apikey: supabaseServiceKey,
+        },
+      })
+
+      const authText = await authResponse.text()
+      console.log("📤 Auth API Response:", authResponse.status, authText.substring(0, 200))
+
+      tests.push({
+        name: "Auth API Health Check",
+        success: authResponse.ok,
+        status: authResponse.status,
+        contentType: authResponse.headers.get("content-type"),
+        response: authText.substring(0, 500),
+      })
+    } catch (error) {
+      console.error("❌ Auth API test failed:", error)
+      tests.push({
+        name: "Auth API Health Check",
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
+
+    // Test 3: Test signup endpoint (without actually signing up)
+    try {
+      console.log("🧪 Test 3: Signup endpoint test")
+      const signupResponse = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseServiceKey,
+        },
+        body: JSON.stringify({
+          email: "test@example.com",
+          password: "invalid-test-password-that-should-fail",
+        }),
+      })
+
+      const signupText = await signupResponse.text()
+      console.log("📤 Signup API Response:", signupResponse.status, signupText.substring(0, 200))
+
+      tests.push({
+        name: "Signup Endpoint Test",
+        success: signupResponse.status !== 500, // Any response other than 500 is good
+        status: signupResponse.status,
+        contentType: signupResponse.headers.get("content-type"),
+        response: signupText.substring(0, 500),
+        note: "This test uses invalid credentials and should fail gracefully",
+      })
+    } catch (error) {
+      console.error("❌ Signup endpoint test failed:", error)
+      tests.push({
+        name: "Signup Endpoint Test",
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
+
+    const allTestsPassed = tests.every((test) => test.success)
 
     return NextResponse.json({
-      config,
-      connectivityTest,
-      authTest,
+      success: allTestsPassed,
+      message: allTestsPassed ? "All Supabase tests passed" : "Some Supabase tests failed",
+      envCheck,
+      tests,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error("Debug endpoint error:", error)
-    return NextResponse.json(
-      {
-        error: error.message,
-        stack: error.stack,
-      },
-      { status: 500 },
-    )
+    console.error("❌ Debug configuration error:", error)
+    return NextResponse.json({
+      success: false,
+      message: "Failed to debug Supabase configuration",
+      error: error instanceof Error ? error.message : "Unknown error",
+    })
   }
 }
