@@ -1,375 +1,139 @@
 import { createClient as createSupabaseClientBase } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
-import { cookies } from "next/headers"
 
-// Environment validation
-function getSupabaseConfig() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-  return {
-    url: supabaseUrl,
-    anonKey: supabaseAnonKey,
-    serviceKey: supabaseServiceKey,
-    isClientConfigured: !!(supabaseUrl && supabaseAnonKey),
-    isServerConfigured: !!(supabaseUrl && supabaseServiceKey),
+// Check if Supabase is available
+export const isSupabaseAvailable = (): boolean => {
+  return !!(supabaseUrl && supabaseAnonKey)
+}
+
+// Create client with default configuration
+export const createClient = () => {
+  if (!isSupabaseAvailable()) {
+    throw new Error("Supabase configuration is missing")
   }
+  return createSupabaseClientBase<Database>(supabaseUrl, supabaseAnonKey)
 }
 
-// REQUIRED EXPORT: isSupabaseAvailable
-export function isSupabaseAvailable(): boolean {
-  const config = getSupabaseConfig()
-  return config.isClientConfigured
-}
-
-// REQUIRED EXPORT: createClient
-export function createClient() {
-  const config = getSupabaseConfig()
-
-  if (!config.isClientConfigured) {
-    console.warn("Supabase not configured")
-    return null
-  }
-
-  return createSupabaseClientBase<Database>(config.url!, config.anonKey!)
-}
-
-// REQUIRED EXPORT: createSupabaseClient
-export function createSupabaseClient(url: string, key: string) {
+// THE MISSING EXPORT - Create client with custom parameters
+export const createSupabaseClient = (url: string, key: string) => {
   return createSupabaseClientBase<Database>(url, key)
 }
 
-// REQUIRED EXPORT: createServerSupabaseClient
-export async function createServerSupabaseClient() {
-  const config = getSupabaseConfig()
+// Admin client for server operations
+export const supabaseAdmin = createSupabaseClientBase<Database>(supabaseUrl, supabaseServiceRoleKey)
 
-  if (!config.isClientConfigured) {
-    return null
+// Server-side client with service role
+export const createServerSupabaseClient = () => {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error("Supabase server configuration is missing")
   }
-
-  const cookieStore = await cookies()
-
-  return createSupabaseClientBase<Database>(config.url!, config.anonKey!, {
-    auth: {
-      getSession: async () => {
-        const sessionCookie = cookieStore.get("supabase-auth-token")
-        return sessionCookie ? JSON.parse(sessionCookie.value) : null
-      },
-      setSession: async (session) => {
-        if (session) {
-          cookieStore.set("supabase-auth-token", JSON.stringify(session))
-        } else {
-          cookieStore.delete("supabase-auth-token")
-        }
-      },
-    },
-  })
+  return createSupabaseClientBase<Database>(supabaseUrl, supabaseServiceRoleKey)
 }
 
-// Single client instance for the entire app
-export const supabaseClient = (() => {
-  const config = getSupabaseConfig()
-
-  if (!config.isClientConfigured) {
-    console.warn("Supabase not configured - client will be null")
-    return null
-  }
-
-  return createSupabaseClientBase<Database>(config.url!, config.anonKey!)
-})()
-
-// Function to get the client (for consistency with other patterns)
-export function getSupabaseClient() {
-  return supabaseClient
-}
-
-// REQUIRED EXPORT: supabaseAdmin
-export const supabaseAdmin = (() => {
-  const config = getSupabaseConfig()
-
-  if (!config.isServerConfigured) {
-    console.warn("Supabase server not configured - admin client will be null")
-    return null
-  }
-
-  return createSupabaseClientBase<Database>(config.url!, config.serviceKey!)
-})()
-
-// Auth utilities
-export async function signIn(email: string, password: string) {
-  const client = getSupabaseClient()
-  if (!client) throw new Error("Supabase not configured")
-
-  const { data, error } = await client.auth.signInWithPassword({
+// Authentication functions
+export const signIn = async (email: string, password: string) => {
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
-
-  if (error) throw error
-  return data
+  return { data, error }
 }
 
-export async function signUp(email: string, password: string, fullName?: string) {
-  const client = getSupabaseClient()
-  if (!client) throw new Error("Supabase not configured")
-
-  const { data, error } = await client.auth.signUp({
+export const signUp = async (email: string, password: string) => {
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: {
-      data: {
-        full_name: fullName,
-      },
-    },
   })
-
-  if (error) throw error
-  return data
+  return { data, error }
 }
 
-export async function signOut() {
-  const client = getSupabaseClient()
-  if (!client) throw new Error("Supabase not configured")
-
-  const { error } = await client.auth.signOut()
-  if (error) throw error
+export const signOut = async () => {
+  const supabase = createClient()
+  const { error } = await supabase.auth.signOut()
+  return { error }
 }
 
-export async function getCurrentUser() {
-  const client = getSupabaseClient()
-  if (!client) return null
-
+export const getCurrentUser = async () => {
+  const supabase = createClient()
   const {
     data: { user },
     error,
-  } = await client.auth.getUser()
-  if (error) {
-    console.error("Error getting current user:", error)
-    return null
-  }
-
-  return user
+  } = await supabase.auth.getUser()
+  return { user, error }
 }
 
-export async function getSession() {
-  const client = getSupabaseClient()
-  if (!client) return null
-
-  const {
-    data: { session },
-    error,
-  } = await client.auth.getSession()
-  if (error) {
-    console.error("Error getting session:", error)
-    return null
-  }
-
-  return session
+export const resetPassword = async (email: string) => {
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email)
+  return { data, error }
 }
 
-export async function resetPassword(email: string) {
-  const client = getSupabaseClient()
-  if (!client) throw new Error("Supabase not configured")
-
-  const { data, error } = await client.auth.resetPasswordForEmail(email)
-  if (error) throw error
-  return data
+export const updatePassword = async (password: string) => {
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.updateUser({ password })
+  return { data, error }
 }
 
-export async function updatePassword(password: string) {
-  const client = getSupabaseClient()
-  if (!client) throw new Error("Supabase not configured")
-
-  const { data, error } = await client.auth.updateUser({ password })
-  if (error) throw error
-  return data
+// Database functions
+export const getUserProfile = async (userId: string) => {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("users").select("*").eq("id", userId).single()
+  return { data, error }
 }
 
-// Database utilities
-export async function getUserProfile(userId: string) {
-  try {
-    if (!supabaseAdmin) return null
-
-    const { data, error } = await supabaseAdmin.from("users").select("*").eq("id", userId).single()
-
-    if (error) {
-      console.error("Error getting user profile:", error)
-      return null
-    }
-
-    return data
-  } catch (error) {
-    console.error("Failed to get user profile:", error)
-    return null
-  }
+export const updateUserProfile = async (userId: string, updates: any) => {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("users").update(updates).eq("id", userId).select().single()
+  return { data, error }
 }
 
-// REQUIRED EXPORT: updateUserProfile
-export async function updateUserProfile(
-  userId: string,
-  updates: Partial<Database["public"]["Tables"]["users"]["Update"]>,
-) {
-  try {
-    if (!supabaseAdmin) return null
-
-    const { data, error } = await supabaseAdmin
-      .from("users")
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId)
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error updating user profile:", error)
-      return null
-    }
-
-    return data
-  } catch (error) {
-    console.error("Failed to update user profile:", error)
-    return null
-  }
+export const createUserProject = async (projectData: any) => {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("user_projects").insert(projectData).select().single()
+  return { data, error }
 }
 
-export async function getUserProjects(userId: string) {
-  try {
-    if (!supabaseAdmin) return []
-
-    const { data, error } = await supabaseAdmin
-      .from("user_projects")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-
-    if (error) {
-      console.error("Error getting user projects:", error)
-      return []
-    }
-
-    return data || []
-  } catch (error) {
-    console.error("Failed to get user projects:", error)
-    return []
-  }
+export const getUserProjects = async (userId: string) => {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("user_projects")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+  return { data, error }
 }
 
-export async function createUserProject(
-  userId: string,
-  projectData: Omit<
-    Database["public"]["Tables"]["user_projects"]["Insert"],
-    "user_id" | "id" | "created_at" | "updated_at"
-  >,
-) {
-  try {
-    if (!supabaseAdmin) return null
-
-    const { data, error } = await supabaseAdmin
-      .from("user_projects")
-      .insert({
-        user_id: userId,
-        ...projectData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error creating user project:", error)
-      return null
-    }
-
-    return data
-  } catch (error) {
-    console.error("Failed to create user project:", error)
-    return null
-  }
+export const saveSolarCalculation = async (calculationData: any) => {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("solar_calculations").insert(calculationData).select().single()
+  return { data, error }
 }
 
-export async function getUserCalculations(userId: string) {
-  try {
-    if (!supabaseAdmin) return []
-
-    const { data, error } = await supabaseAdmin
-      .from("solar_calculations")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-
-    if (error) {
-      console.error("Error getting user calculations:", error)
-      return []
-    }
-
-    return data || []
-  } catch (error) {
-    console.error("Failed to get user calculations:", error)
-    return []
-  }
+export const getUserCalculations = async (userId: string) => {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("solar_calculations")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+  return { data, error }
 }
 
-export async function saveSolarCalculation(
-  userId: string,
-  calculationData: Omit<Database["public"]["Tables"]["solar_calculations"]["Insert"], "user_id" | "id" | "created_at">,
-) {
-  try {
-    if (!supabaseAdmin) return null
-
-    const { data, error } = await supabaseAdmin
-      .from("solar_calculations")
-      .insert({
-        user_id: userId,
-        ...calculationData,
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error saving solar calculation:", error)
-      return null
-    }
-
-    return data
-  } catch (error) {
-    console.error("Failed to save solar calculation:", error)
-    return null
-  }
-}
-
-// Configuration check utilities
-export function getSupabaseStatus() {
-  const config = getSupabaseConfig()
-
+// Configuration utilities
+export const getSupabaseConfig = () => {
   return {
-    configured: config.isClientConfigured && config.isServerConfigured,
-    clientConfigured: config.isClientConfigured,
-    serverConfigured: config.isServerConfigured,
-    url: config.url ? "Set" : "Missing",
-    anonKey: config.anonKey ? "Set" : "Missing",
-    serviceKey: config.serviceKey ? "Set" : "Missing",
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
+    isAvailable: isSupabaseAvailable(),
   }
 }
 
-// Export types for use in other files
-export type SupabaseClient = typeof supabaseClient
-export type User = Database["public"]["Tables"]["users"]["Row"]
-export type UserProject = Database["public"]["Tables"]["user_projects"]["Row"]
-export type SolarCalculation = Database["public"]["Tables"]["solar_calculations"]["Row"]
-
-// Main supabase export
-export const supabase = (() => {
-  const config = getSupabaseConfig()
-
-  if (!config.isClientConfigured) {
-    return null
-  }
-
-  return createSupabaseClientBase<Database>(config.url!, config.anonKey!)
-})()
-
-export default supabase
+// Type exports
+export type { Database }
