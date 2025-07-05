@@ -1,66 +1,58 @@
 import { NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
 export async function GET() {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return NextResponse.json({
-        success: false,
-        message: "Missing Supabase environment variables",
-        details: {
-          hasUrl: !!supabaseUrl,
-          hasServiceKey: !!supabaseServiceKey,
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Supabase configuration missing",
+          details: {
+            hasUrl: !!supabaseUrl,
+            hasKey: !!supabaseAnonKey,
+          },
         },
-      })
+        { status: 500 },
+      )
     }
 
-    console.log("🔄 Testing Supabase connection...")
-    console.log("🔗 URL:", supabaseUrl)
+    const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-    // Test basic connectivity
-    const response = await fetch(`${supabaseUrl}/rest/v1/`, {
-      method: "GET",
-      headers: {
-        apikey: supabaseServiceKey,
-        Authorization: `Bearer ${supabaseServiceKey}`,
-      },
-    })
+    // Test the connection by trying to get the current user
+    const { data, error } = await supabase.auth.getUser()
 
-    const responseText = await response.text()
-    console.log("📤 Response status:", response.status)
-    console.log("📤 Response headers:", Object.fromEntries(response.headers.entries()))
-    console.log("📤 Response text:", responseText.substring(0, 500))
-
-    if (!response.ok) {
-      return NextResponse.json({
-        success: false,
-        message: `Supabase connection failed with status ${response.status}`,
-        details: {
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          response: responseText.substring(0, 1000),
+    if (error && error.message !== "Auth session missing!") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Supabase connection failed",
+          details: error.message,
         },
-      })
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
       success: true,
       message: "Supabase connection successful",
       details: {
-        status: response.status,
-        headers: Object.fromEntries(response.headers.entries()),
-        response: responseText.substring(0, 500),
+        connected: true,
+        hasUser: !!data.user,
+        timestamp: new Date().toISOString(),
       },
     })
   } catch (error) {
-    console.error("❌ Connection test error:", error)
-    return NextResponse.json({
-      success: false,
-      message: "Connection test failed",
-      error: error instanceof Error ? error.message : "Unknown error",
-    })
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Connection test failed",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

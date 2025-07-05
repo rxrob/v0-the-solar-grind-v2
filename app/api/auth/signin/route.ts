@@ -1,16 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { signUpReal } from "@/app/actions/auth-real"
+import { signInWithEmailReal } from "@/app/actions/auth-real"
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password, fullName } = body
+    const { email, password } = body
 
-    if (!email || !password || !fullName) {
-      return NextResponse.json({ success: false, error: "All fields are required" }, { status: 400 })
+    if (!email || !password) {
+      return NextResponse.json({ success: false, error: "Email and password are required" }, { status: 400 })
     }
 
-    const result = await signUpReal(email, password, fullName)
+    const result = await signInWithEmailReal(email, password)
 
     if (result.success) {
       return NextResponse.json({
@@ -19,10 +19,10 @@ export async function POST(request: NextRequest) {
         user: result.user,
       })
     } else {
-      return NextResponse.json({ success: false, error: result.error }, { status: 400 })
+      return NextResponse.json({ success: false, error: result.error }, { status: 401 })
     }
   } catch (error) {
-    console.error("Signup API error:", error)
+    console.error("Signin API error:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }

@@ -1,168 +1,136 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { MapPin, AlertCircle } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { MapPin, Loader2 } from "lucide-react"
 
-interface AddressAutocompleteProps {
-  onAddressSelect: (address: string, lat?: number, lng?: number) => void
-  placeholder?: string
-  label?: string
-  value?: string
+interface AddressSuggestion {
+  place_id: string
+  description: string
+  structured_formatting: {
+    main_text: string
+    secondary_text: string
+  }
 }
 
-declare global {
-  interface Window {
-    google: any
-    initMap: () => void
-  }
+interface AddressAutocompleteProps {
+  onAddressSelect: (address: string, placeId: string) => void
+  placeholder?: string
+  className?: string
 }
 
 export function AddressAutocomplete({
   onAddressSelect,
-  placeholder = "Enter your address",
-  label = "Address",
-  value = "",
+  placeholder = "Enter address...",
+  className,
 }: AddressAutocompleteProps) {
-  const [inputValue, setInputValue] = useState(value)
-  const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false)
-  const [googleMapsError, setGoogleMapsError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [query, setQuery] = useState("")
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([])
+  const [loading, setLoading] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const debounceRef = useRef<NodeJS.Timeout>()
   const inputRef = useRef<HTMLInputElement>(null)
-  const autocompleteRef = useRef<any>(null)
 
   useEffect(() => {
-    initializeGoogleMaps()
-  }, [])
-
-  const initializeGoogleMaps = async () => {
-    try {
-      setIsLoading(true)
-
-      // Check if Google Maps is already loaded
-      if (window.google && window.google.maps) {
-        setupAutocomplete()
-        setIsGoogleMapsLoaded(true)
-        setIsLoading(false)
-        return
-      }
-
-      // Fetch Google Maps configuration
-      const response = await fetch("/api/google-maps-config")
-      const config = await response.json()
-
-      if (!config.configured) {
-        setGoogleMapsError(config.error || "Google Maps API not configured")
-        setIsLoading(false)
-        return
-      }
-
-      // Load Google Maps script
-      const script = document.createElement("script")
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${config.apiKey}&libraries=places`
-      script.async = true
-      script.defer = true
-
-      script.onload = () => {
-        setupAutocomplete()
-        setIsGoogleMapsLoaded(true)
-        setIsLoading(false)
-      }
-
-      script.onerror = () => {
-        setGoogleMapsError("Failed to load Google Maps")
-        setIsLoading(false)
-      }
-
-      document.head.appendChild(script)
-    } catch (error) {
-      console.error("Error initializing Google Maps:", error)
-      setGoogleMapsError("Failed to initialize Google Maps")
-      setIsLoading(false)
+    if (query.length < 3) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
     }
-  }
 
-  const setupAutocomplete = () => {
-    if (!inputRef.current || !window.google) return
-
-    autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
-      types: ["address"],
-      componentRestrictions: { country: "us" },
-    })
-
-    autocompleteRef.current.addListener("place_changed", () => {
-      const place = autocompleteRef.current.getPlace()
-
-      if (place.formatted_address) {
-        const lat = place.geometry?.location?.lat()
-        const lng = place.geometry?.location?.lng()
-
-        setInputValue(place.formatted_address)
-        onAddressSelect(place.formatted_address, lat, lng)
-      }
-    })
-  }
-
-  const handleManualInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const address = e.target.value
-    setInputValue(address)
-
-    // For manual input, we don't have coordinates
-    onAddressSelect(address)
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault()
-      onAddressSelect(inputValue)
+    // Clear previous debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
     }
+
+    // Debounce the search
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const response = await fetch(`/api/places?input=${encodeURIComponent(query)}`)
+        const data = await response.json()
+
+        if (data.success && data.predictions) {
+          setSuggestions(data.predictions)
+          setShowSuggestions(true)
+        } else {
+          setSuggestions([])
+          setShowSuggestions(false)
+        }
+      } catch (error) {
+        console.error("Error fetching address suggestions:", error)
+        setSuggestions([])
+        setShowSuggestions(false)
+      } finally {
+        setLoading(false)
+      }
+    }, 300)
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [query])
+
+  const handleSuggestionClick = (suggestion: AddressSuggestion) => {
+    setQuery(suggestion.description)
+    setShowSuggestions(false)
+    onAddressSelect(suggestion.description, suggestion.place_id)
   }
 
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        <Label htmlFor="address">{label}</Label>
-        <div className="relative">
-          <Input id="address" placeholder="Loading address autocomplete..." disabled className="pl-10" />
-          <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        </div>
-      </div>
-    )
+  const handleInputBlur = () => {
+    // Delay hiding suggestions to allow for clicks
+    setTimeout(() => setShowSuggestions(false), 200)
   }
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor="address">{label}</Label>
-
-      {googleMapsError && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{googleMapsError}. You can still enter your address manually below.</AlertDescription>
-        </Alert>
-      )}
-
+    <div className={`relative ${className}`}>
       <div className="relative">
         <Input
           ref={inputRef}
-          id="address"
           type="text"
-          placeholder={isGoogleMapsLoaded ? placeholder : "Enter your address manually"}
-          value={inputValue}
-          onChange={handleManualInput}
-          onKeyPress={handleKeyPress}
-          className="pl-10"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+          onBlur={handleInputBlur}
+          placeholder={placeholder}
+          className="pr-10"
         />
-        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+          ) : (
+            <MapPin className="h-4 w-4 text-gray-400" />
+          )}
+        </div>
       </div>
 
-      {!isGoogleMapsLoaded && (
-        <p className="text-sm text-gray-600">
-          Address autocomplete is not available. Please enter your full address manually.
-        </p>
+      {showSuggestions && suggestions.length > 0 && (
+        <Card className="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto">
+          <CardContent className="p-0">
+            {suggestions.map((suggestion) => (
+              <Button
+                key={suggestion.place_id}
+                variant="ghost"
+                className="w-full justify-start text-left h-auto p-3 rounded-none border-b last:border-b-0"
+                onClick={() => handleSuggestionClick(suggestion)}
+              >
+                <div className="flex items-start space-x-2">
+                  <MapPin className="h-4 w-4 mt-0.5 text-gray-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{suggestion.structured_formatting.main_text}</div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {suggestion.structured_formatting.secondary_text}
+                    </div>
+                  </div>
+                </div>
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
       )}
     </div>
   )
