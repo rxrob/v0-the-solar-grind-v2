@@ -2,24 +2,22 @@ import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 
 export async function createServerClient() {
-  const cookieStore = await cookies()
+  const cookieStore = cookies()
 
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
-      storage: {
-        getItem: (key: string) => {
-          return cookieStore.get(key)?.value
-        },
-        setItem: (key: string, value: string) => {
-          cookieStore.set({ name: key, value })
-        },
-        removeItem: (key: string) => {
-          cookieStore.set({ name: key, value: "", expires: new Date(0) })
-        },
-      },
+      autoRefreshToken: false,
+      persistSession: false,
     },
   })
 }
 
-// Export createClient for compatibility
+// Export createClient for backward compatibility
 export { createClient }
