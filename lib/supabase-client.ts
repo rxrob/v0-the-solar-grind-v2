@@ -20,34 +20,5 @@ export function createClient() {
   return supabaseClient
 }
 
-// Test client connection
-export async function testClientConnection() {
-  try {
-    const supabase = createClient()
-    const { data, error } = await supabase.from("users").select("count").limit(1)
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-        details: "Failed to query users table",
-      }
-    }
-
-    return {
-      success: true,
-      message: "Client connection successful",
-      data,
-    }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-      details: "Client connection failed",
-    }
-  }
-}
-
-// Legacy exports
+// Legacy export for backward compatibility
 export const supabase = createClient()
-export default createClient

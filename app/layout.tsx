@@ -10,12 +10,23 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: {
-    default: "MySolarAI - Smart Solar Analysis Platform",
+    default: "MySolarAI - Professional Solar Analysis Platform",
     template: "%s | MySolarAI",
   },
   description:
-    "AI-powered solar analysis platform for professionals and homeowners. Get detailed solar calculations, cost analysis, and professional reports.",
-  keywords: ["solar", "solar panels", "solar calculator", "renewable energy", "solar analysis", "AI", "solar reports"],
+    "Advanced solar analysis platform with AI-powered calculations, professional reports, and comprehensive property assessments. Get accurate solar potential analysis with NREL data integration.",
+  keywords: [
+    "solar analysis",
+    "solar calculator",
+    "NREL PVWatts",
+    "solar reports",
+    "renewable energy",
+    "solar installation",
+    "photovoltaic analysis",
+    "solar ROI calculator",
+    "professional solar tools",
+    "solar energy assessment",
+  ],
   authors: [{ name: "MySolarAI Team" }],
   creator: "MySolarAI",
   publisher: "MySolarAI",
@@ -24,7 +35,7 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://mysolarai.com"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://mysolarai.vercel.app"),
   alternates: {
     canonical: "/",
   },
@@ -32,24 +43,25 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "/",
-    title: "MySolarAI - Smart Solar Analysis Platform",
+    title: "MySolarAI - Professional Solar Analysis Platform",
     description:
-      "AI-powered solar analysis platform for professionals and homeowners. Get detailed solar calculations, cost analysis, and professional reports.",
+      "Advanced solar analysis platform with AI-powered calculations, professional reports, and comprehensive property assessments.",
     siteName: "MySolarAI",
     images: [
       {
         url: "/images/og-image.png",
         width: 1200,
         height: 630,
-        alt: "MySolarAI - Smart Solar Analysis Platform",
+        alt: "MySolarAI - Professional Solar Analysis Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "MySolarAI - Smart Solar Analysis Platform",
-    description: "AI-powered solar analysis platform for professionals and homeowners.",
-    images: ["/images/og-image.png"],
+    title: "MySolarAI - Professional Solar Analysis Platform",
+    description:
+      "Advanced solar analysis platform with AI-powered calculations, professional reports, and comprehensive property assessments.",
+    images: ["/images/twitter-image.png"],
     creator: "@mysolarai",
   },
   robots: {
@@ -65,8 +77,52 @@ export const metadata: Metadata = {
   },
   verification: {
     google: "your-google-verification-code",
+    yandex: "your-yandex-verification-code",
   },
-    generator: 'v0.dev'
+  category: "technology",
+  classification: "Solar Energy Analysis Software",
+  referrer: "origin-when-cross-origin",
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    other: [
+      {
+        rel: "mask-icon",
+        url: "/safari-pinned-tab.svg",
+        color: "#5bbad5",
+      },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "MySolarAI",
+  },
+  applicationName: "MySolarAI",
+  generator: "Next.js",
+  abstract: "Professional solar analysis platform with advanced calculations and reporting capabilities.",
+  archives: [],
+  assets: [],
+  bookmarks: [],
+  other: {
+    "msapplication-TileColor": "#da532c",
+    "msapplication-config": "/browserconfig.xml",
+  },
 }
 
 export default function RootLayout({
@@ -77,12 +133,19 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-        <link rel="manifest" href="/site.webmanifest" />
-        <meta name="theme-color" content="#ffffff" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://api.nrel.gov" />
+        <link rel="dns-prefetch" href="https://maps.googleapis.com" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta httpEquiv="x-ua-compatible" content="ie=edge" />
+        <meta name="HandheldFriendly" content="true" />
+        <meta name="MobileOptimized" content="320" />
+        <meta name="screen-orientation" content="portrait" />
+        <meta name="x-apple-disable-message-reformatting" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -90,22 +153,29 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
               name: "MySolarAI",
-              description: "AI-powered solar analysis platform for professionals and homeowners",
-              url: "https://mysolarai.com",
+              description:
+                "Professional solar analysis platform with AI-powered calculations and comprehensive reporting.",
+              url: process.env.NEXT_PUBLIC_BASE_URL || "https://mysolarai.vercel.app",
               applicationCategory: "BusinessApplication",
-              operatingSystem: "Web",
+              operatingSystem: "Web Browser",
               offers: {
                 "@type": "Offer",
                 price: "0",
                 priceCurrency: "USD",
               },
+              creator: {
+                "@type": "Organization",
+                name: "MySolarAI",
+              },
             }),
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.className} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          {children}
+          <div className="relative flex min-h-screen flex-col">
+            <div className="flex-1">{children}</div>
+          </div>
           <Toaster />
           <SonnerToaster />
         </ThemeProvider>

@@ -5,10 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number, currency = "USD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency,
   }).format(amount)
 }
 
@@ -59,15 +59,6 @@ export function throttle<T extends (...args: any[]) => any>(func: T, limit: numb
   }
 }
 
-export function generateId(length = 8): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-  let result = ""
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
-}
-
 export function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(email)
@@ -82,6 +73,31 @@ export function isValidUrl(url: string): boolean {
   }
 }
 
+export function generateId(length = 8): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+  let result = ""
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+export function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
+}
+
+export function camelToKebab(text: string): string {
+  return text.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, "$1-$2").toLowerCase()
+}
+
+export function kebabToCamel(text: string): string {
+  return text.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())
+}
+
 export function getInitials(name: string): string {
   return name
     .split(" ")
@@ -91,19 +107,10 @@ export function getInitials(name: string): string {
     .slice(0, 2)
 }
 
-export function capitalizeFirst(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
-}
-
-export function capitalizeWords(text: string): string {
-  return text
-    .split(" ")
-    .map((word) => capitalizeFirst(word))
-    .join(" ")
-}
-
-export function removeHtmlTags(html: string): string {
-  return html.replace(/<[^>]*>/g, "")
+export function calculateReadingTime(text: string): number {
+  const wordsPerMinute = 200
+  const wordCount = text.split(/\s+/).length
+  return Math.ceil(wordCount / wordsPerMinute)
 }
 
 export function getRelativeTime(date: Date): string {
@@ -111,84 +118,157 @@ export function getRelativeTime(date: Date): string {
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
   if (diffInSeconds < 60) return "just now"
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
-  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`
-  if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} months ago`
-  return `${Math.floor(diffInSeconds / 31536000)} years ago`
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`
+  if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}mo ago`
+  return `${Math.floor(diffInSeconds / 31536000)}y ago`
 }
 
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 Bytes"
-  const k = 1024
   const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  if (bytes === 0) return "0 Bytes"
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i]
 }
 
 export function copyToClipboard(text: string): Promise<void> {
   if (navigator.clipboard) {
     return navigator.clipboard.writeText(text)
-  } else {
-    // Fallback for older browsers
-    const textArea = document.createElement("textarea")
-    textArea.value = text
-    document.body.appendChild(textArea)
-    textArea.focus()
-    textArea.select()
-    try {
-      document.execCommand("copy")
-      return Promise.resolve()
-    } catch (err) {
-      return Promise.reject(err)
-    } finally {
-      document.body.removeChild(textArea)
-    }
   }
+
+  // Fallback for older browsers
+  const textArea = document.createElement("textarea")
+  textArea.value = text
+  textArea.style.position = "fixed"
+  textArea.style.left = "-999999px"
+  textArea.style.top = "-999999px"
+  document.body.appendChild(textArea)
+  textArea.focus()
+  textArea.select()
+
+  return new Promise((resolve, reject) => {
+    if (document.execCommand("copy")) {
+      resolve()
+    } else {
+      reject(new Error("Failed to copy text"))
+    }
+    document.body.removeChild(textArea)
+  })
 }
 
-export function downloadFile(data: string, filename: string, type = "text/plain"): void {
-  const blob = new Blob([data], { type })
-  const url = window.URL.createObjectURL(blob)
+export function downloadFile(data: string | Blob, filename: string, type = "text/plain"): void {
+  const blob = typeof data === "string" ? new Blob([data], { type }) : data
+  const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.href = url
   link.download = filename
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-  window.URL.revokeObjectURL(url)
+  URL.revokeObjectURL(url)
 }
 
 export function parseQueryString(queryString: string): Record<string, string> {
-  const params: Record<string, string> = {}
-  const urlParams = new URLSearchParams(queryString)
-  for (const [key, value] of urlParams.entries()) {
-    params[key] = value
+  const params = new URLSearchParams(queryString)
+  const result: Record<string, string> = {}
+  for (const [key, value] of params) {
+    result[key] = value
   }
-  return params
+  return result
 }
 
 export function buildQueryString(params: Record<string, string | number | boolean>): string {
-  const urlParams = new URLSearchParams()
+  const searchParams = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null) {
-      urlParams.append(key, String(value))
+      searchParams.append(key, String(value))
     }
   }
-  return urlParams.toString()
+  return searchParams.toString()
 }
 
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+export function isClient(): boolean {
+  return typeof window !== "undefined"
 }
 
-export function retry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
-  return fn().catch((err) => {
-    if (retries > 0) {
-      return sleep(delay).then(() => retry(fn, retries - 1, delay))
+export function isServer(): boolean {
+  return typeof window === "undefined"
+}
+
+export function getBaseUrl(): string {
+  if (isClient()) {
+    return window.location.origin
+  }
+
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  return "http://localhost:3000"
+}
+
+export function safeParseJSON<T>(json: string, fallback: T): T {
+  try {
+    return JSON.parse(json)
+  } catch {
+    return fallback
+  }
+}
+
+export function removeEmptyValues<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: Partial<T> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== null && value !== undefined && value !== "") {
+      result[key as keyof T] = value
     }
-    throw err
-  })
+  }
+  return result
+}
+
+export function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
+  const result = { ...target }
+
+  for (const key in source) {
+    if (source[key] !== undefined) {
+      if (
+        typeof source[key] === "object" &&
+        source[key] !== null &&
+        !Array.isArray(source[key]) &&
+        typeof target[key] === "object" &&
+        target[key] !== null &&
+        !Array.isArray(target[key])
+      ) {
+        result[key] = deepMerge(target[key], source[key] as any)
+      } else {
+        result[key] = source[key] as T[Extract<keyof T, string>]
+      }
+    }
+  }
+
+  return result
+}
+
+export function pick<T extends Record<string, any>, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
+  const result = {} as Pick<T, K>
+  for (const key of keys) {
+    if (key in obj) {
+      result[key] = obj[key]
+    }
+  }
+  return result
+}
+
+export function omit<T extends Record<string, any>, K extends keyof T>(obj: T, keys: K[]): Omit<T, K> {
+  const result = { ...obj }
+  for (const key of keys) {
+    delete result[key]
+  }
+  return result
 }
 
 export function groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
@@ -204,7 +284,19 @@ export function groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
 }
 
 export function unique<T>(array: T[]): T[] {
-  return [...new Set(array)]
+  return Array.from(new Set(array))
+}
+
+export function uniqueBy<T>(array: T[], key: keyof T): T[] {
+  const seen = new Set()
+  return array.filter((item) => {
+    const value = item[key]
+    if (seen.has(value)) {
+      return false
+    }
+    seen.add(value)
+    return true
+  })
 }
 
 export function chunk<T>(array: T[], size: number): T[][] {
@@ -215,65 +307,31 @@ export function chunk<T>(array: T[], size: number): T[][] {
   return chunks
 }
 
-export function flatten<T>(array: T[][]): T[] {
-  return array.reduce((flat, subArray) => flat.concat(subArray), [])
-}
-
-export function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
-  const result = {} as Pick<T, K>
-  keys.forEach((key) => {
-    if (key in obj) {
-      result[key] = obj[key]
-    }
-  })
+export function range(start: number, end: number, step = 1): number[] {
+  const result: number[] = []
+  for (let i = start; i < end; i += step) {
+    result.push(i)
+  }
   return result
 }
 
-export function omit<T, K extends keyof T>(obj: T, keys: K[]): Omit<T, K> {
-  const result = { ...obj }
-  keys.forEach((key) => {
-    delete result[key]
-  })
-  return result
+export function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-export function isEmpty(value: any): boolean {
-  if (value == null) return true
-  if (Array.isArray(value) || typeof value === "string") return value.length === 0
-  if (typeof value === "object") return Object.keys(value).length === 0
-  return false
-}
-
-export function isEqual(a: any, b: any): boolean {
-  if (a === b) return true
-  if (a == null || b == null) return false
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false
-    for (let i = 0; i < a.length; i++) {
-      if (!isEqual(a[i], b[i])) return false
-    }
-    return true
-  }
-  if (typeof a === "object" && typeof b === "object") {
-    const keysA = Object.keys(a)
-    const keysB = Object.keys(b)
-    if (keysA.length !== keysB.length) return false
-    for (const key of keysA) {
-      if (!keysB.includes(key) || !isEqual(a[key], b[key])) return false
-    }
-    return true
-  }
-  return false
+export function randomFloat(min: number, max: number): number {
+  return Math.random() * (max - min) + min
 }
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
 
-export function randomBetween(min: number, max: number): number {
-  return Math.random() * (max - min) + min
+export function lerp(start: number, end: number, factor: number): number {
+  return start + (end - start) * factor
 }
 
 export function roundTo(value: number, decimals: number): number {
-  return Number(Math.round(Number(value + "e" + decimals)) + "e-" + decimals)
+  const factor = Math.pow(10, decimals)
+  return Math.round(value * factor) / factor
 }
