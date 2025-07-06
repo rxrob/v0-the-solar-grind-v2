@@ -2,125 +2,87 @@ import { z } from "zod"
 
 // Client-side environment schema (only NEXT_PUBLIC_ variables)
 const clientEnvSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
-  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
-  NEXT_PUBLIC_RECAPTCHA_SITE_KEY: z.string().optional(),
-  NEXT_PUBLIC_BASE_URL: z.string().url().optional(),
+  supabaseUrl: z.string().url().optional(),
+  supabaseAnonKey: z.string().optional(),
+  recaptchaSiteKey: z.string().optional(),
+  stripePublishableKey: z.string().optional(),
+  baseUrl: z.string().url().optional(),
 })
 
 // Server-side environment schema (all variables)
 const serverEnvSchema = z.object({
-  // Public variables (available on both client and server)
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
-  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
-  NEXT_PUBLIC_RECAPTCHA_SITE_KEY: z.string().optional(),
-  NEXT_PUBLIC_BASE_URL: z.string().url().optional(),
-
-  // Server-only variables
-  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
-  GOOGLE_MAPS_API_KEY: z.string().optional(),
-  GOOGLE_GEOCODING_API_KEY: z.string().optional(),
-  GOOGLE_ELEVATION_API_KEY: z.string().optional(),
-  NREL_API_KEY: z.string().optional(),
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  STRIPE_PRO_MONTHLY_PRICE_ID: z.string().optional(),
-  NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID: z.string().optional(),
-  NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID: z.string().optional(),
-  RESEND_API_KEY: z.string().optional(),
-  RECAPTCHA_SECRET_KEY: z.string().optional(),
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  supabaseUrl: z.string().url().optional(),
+  supabaseAnonKey: z.string().optional(),
+  supabaseServiceKey: z.string().optional(),
+  googleMapsApiKey: z.string().optional(),
+  googleGeocodingApiKey: z.string().optional(),
+  googleElevationApiKey: z.string().optional(),
+  nrelApiKey: z.string().optional(),
+  stripeSecretKey: z.string().optional(),
+  stripeWebhookSecret: z.string().optional(),
+  stripePublishableKey: z.string().optional(),
+  recaptchaSiteKey: z.string().optional(),
+  recaptchaSecretKey: z.string().optional(),
+  resendApiKey: z.string().optional(),
+  baseUrl: z.string().url().optional(),
+  nodeEnv: z.enum(["development", "production", "test"]).optional(),
 })
 
 // Get client-side configuration
 export function getClientConfig() {
   if (typeof window === "undefined") {
-    throw new Error("getClientConfig can only be called on the client side")
+    throw new Error("getClientConfig can only be called on the client")
   }
 
-  const env = {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-    NEXT_PUBLIC_RECAPTCHA_SITE_KEY: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
-    NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
-  }
-
-  const parsed = clientEnvSchema.safeParse(env)
-
-  if (!parsed.success) {
-    console.error("Invalid client environment configuration:", parsed.error.format())
-    return {}
-  }
-
-  return {
-    supabaseUrl: parsed.data.NEXT_PUBLIC_SUPABASE_URL,
-    supabaseAnonKey: parsed.data.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    googleMapsApiKey: parsed.data.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-    stripePublishableKey: parsed.data.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-    recaptchaSiteKey: parsed.data.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
-    baseUrl: parsed.data.NEXT_PUBLIC_BASE_URL,
-  }
+  return clientEnvSchema.parse({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    recaptchaSiteKey: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
+    stripePublishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
+  })
 }
 
 // Get server-side configuration
 export function getServerConfig() {
   if (typeof window !== "undefined") {
-    throw new Error("getServerConfig can only be called on the server side")
+    throw new Error("getServerConfig can only be called on the server")
   }
 
-  const parsed = serverEnvSchema.safeParse(process.env)
-
-  if (!parsed.success) {
-    console.error("Invalid server environment configuration:", parsed.error.format())
-    throw new Error("Invalid server environment configuration")
-  }
-
-  return {
-    // Public variables
-    supabaseUrl: parsed.data.NEXT_PUBLIC_SUPABASE_URL,
-    supabaseAnonKey: parsed.data.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    googleMapsApiKeyPublic: parsed.data.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-    stripePublishableKey: parsed.data.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-    recaptchaSiteKey: parsed.data.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
-    baseUrl: parsed.data.NEXT_PUBLIC_BASE_URL,
-
-    // Server-only variables
-    supabaseServiceKey: parsed.data.SUPABASE_SERVICE_ROLE_KEY,
-    googleMapsApiKey: parsed.data.GOOGLE_MAPS_API_KEY,
-    googleGeocodingApiKey: parsed.data.GOOGLE_GEOCODING_API_KEY,
-    googleElevationApiKey: parsed.data.GOOGLE_ELEVATION_API_KEY,
-    nrelApiKey: parsed.data.NREL_API_KEY,
-    stripeSecretKey: parsed.data.STRIPE_SECRET_KEY,
-    stripeWebhookSecret: parsed.data.STRIPE_WEBHOOK_SECRET,
-    stripeProMonthlyPriceId: parsed.data.STRIPE_PRO_MONTHLY_PRICE_ID,
-    stripeProMonthlyPriceIdPublic: parsed.data.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID,
-    stripeSingleReportPriceId: parsed.data.NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID,
-    resendApiKey: parsed.data.RESEND_API_KEY,
-    recaptchaSecretKey: parsed.data.RECAPTCHA_SECRET_KEY,
-    nodeEnv: parsed.data.NODE_ENV,
-  }
+  return serverEnvSchema.parse({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+    googleGeocodingApiKey: process.env.GOOGLE_GEOCODING_API_KEY,
+    googleElevationApiKey: process.env.GOOGLE_ELEVATION_API_KEY,
+    nrelApiKey: process.env.NREL_API_KEY,
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    stripePublishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+    recaptchaSiteKey: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
+    recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY,
+    resendApiKey: process.env.RESEND_API_KEY,
+    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
+    nodeEnv: process.env.NODE_ENV as "development" | "production" | "test",
+  })
 }
 
-// Check if required environment variables are available
-export function isConfigured() {
+// Validate environment on startup
+export function validateEnvironment() {
   try {
     if (typeof window !== "undefined") {
-      const config = getClientConfig()
-      return !!(config.supabaseUrl && config.supabaseAnonKey)
+      getClientConfig()
+      return { success: true, environment: "client" }
     } else {
-      const config = getServerConfig()
-      return !!(config.supabaseUrl && config.supabaseAnonKey)
+      getServerConfig()
+      return { success: true, environment: "server" }
     }
-  } catch {
-    return false
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      environment: typeof window !== "undefined" ? "client" : "server",
+    }
   }
 }
-
-// Export validated environment for server use
-export const env = typeof window === "undefined" ? getServerConfig() : {}

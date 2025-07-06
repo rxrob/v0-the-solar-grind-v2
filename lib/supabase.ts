@@ -1,96 +1,17 @@
-import { createClient } from "@supabase/supabase-js"
-import { getClientConfig, getServerConfig } from "./env-validation"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
 
-// Type definitions
-export interface Database {
-  public: {
-    Tables: {
-      users: {
-        Row: {
-          id: string
-          email: string
-          subscription_type: "free" | "pro"
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: string
-          email: string
-          subscription_type?: "free" | "pro"
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          email?: string
-          subscription_type?: "free" | "pro"
-          updated_at?: string
-        }
-      }
-      user_projects: {
-        Row: {
-          id: string
-          user_id: string
-          name: string
-          address: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          name: string
-          address: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          name?: string
-          address?: string
-          updated_at?: string
-        }
-      }
-      solar_calculations: {
-        Row: {
-          id: string
-          user_id: string
-          project_id: string | null
-          calculation_data: any
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          project_id?: string | null
-          calculation_data: any
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          project_id?: string | null
-          calculation_data?: any
-        }
-      }
-    }
-  }
-}
+// Environment variables - only public ones accessible on client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Client-side Supabase client
-export function createClientSupabaseClient() {
-  if (typeof window === "undefined") {
-    throw new Error("createClientSupabaseClient can only be called on the client")
+// Create client function - REQUIRED EXPORT
+export function createClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing Supabase environment variables")
   }
 
-  const config = getClientConfig()
-
-  if (!config.supabaseUrl || !config.supabaseAnonKey) {
-    throw new Error("Supabase configuration is missing")
-  }
-
-  return createClient<Database>(config.supabaseUrl, config.supabaseAnonKey, {
+  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
@@ -98,19 +19,17 @@ export function createClientSupabaseClient() {
   })
 }
 
-// Server-side Supabase client
+// Server-side Supabase client - REQUIRED EXPORT
 export function createServerSupabaseClient() {
   if (typeof window !== "undefined") {
     throw new Error("createServerSupabaseClient can only be called on the server")
   }
 
-  const config = getServerConfig()
-
-  if (!config.supabaseUrl || !config.supabaseAnonKey) {
-    throw new Error("Supabase configuration is missing")
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing Supabase environment variables")
   }
 
-  return createClient<Database>(config.supabaseUrl, config.supabaseAnonKey, {
+  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -119,18 +38,18 @@ export function createServerSupabaseClient() {
 }
 
 // Admin Supabase client (server-only)
-export function createAdminSupabaseClient() {
+export function createServiceSupabaseClient() {
   if (typeof window !== "undefined") {
-    throw new Error("createAdminSupabaseClient can only be called on the server")
+    throw new Error("createServiceSupabaseClient can only be called on the server")
   }
 
-  const config = getServerConfig()
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-  if (!config.supabaseUrl || !config.supabaseServiceKey) {
-    throw new Error("Supabase admin configuration is missing")
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase admin environment variables")
   }
 
-  return createClient<Database>(config.supabaseUrl, config.supabaseServiceKey, {
+  return createSupabaseClient<Database>(supabaseUrl, supabaseServiceKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -138,84 +57,26 @@ export function createAdminSupabaseClient() {
   })
 }
 
+// Default Supabase client instance
+export const supabase = createClient()
+
 // Check if Supabase is available
 export function isSupabaseAvailable(): boolean {
-  try {
-    if (typeof window !== "undefined") {
-      const config = getClientConfig()
-      return !!(config.supabaseUrl && config.supabaseAnonKey)
-    } else {
-      const config = getServerConfig()
-      return !!(config.supabaseUrl && config.supabaseAnonKey)
-    }
-  } catch {
-    return false
-  }
+  return !!(supabaseUrl && supabaseAnonKey)
 }
 
 // Get Supabase configuration status
 export function getSupabaseConfig() {
-  if (typeof window !== "undefined") {
-    // Client-side
-    const config = getClientConfig()
-    return {
-      isAvailable: !!(config.supabaseUrl && config.supabaseAnonKey),
-      url: !!config.supabaseUrl,
-      anonKey: !!config.supabaseAnonKey,
-      serviceKey: false, // Never expose service key status on client
-      connectionStatus: "client-ready",
-    }
-  } else {
-    // Server-side
-    const config = getServerConfig()
-    return {
-      isAvailable: !!(config.supabaseUrl && config.supabaseAnonKey),
-      url: !!config.supabaseUrl,
-      anonKey: !!config.supabaseAnonKey,
-      serviceKey: !!config.supabaseServiceKey,
-      connectionStatus: "server-ready",
-    }
+  return {
+    isAvailable: isSupabaseAvailable(),
+    url: !!supabaseUrl,
+    anonKey: !!supabaseAnonKey,
+    connectionStatus: isSupabaseAvailable() ? "ready" : "missing-config",
   }
 }
 
-// Test connection (server-only)
-export async function testConnection() {
-  if (typeof window !== "undefined") {
-    throw new Error("testConnection can only be called on the server")
-  }
-
-  try {
-    const supabase = createServerSupabaseClient()
-    const { data, error } = await supabase.from("users").select("count").limit(1)
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-        canQuery: false,
-      }
-    }
-
-    return {
-      success: true,
-      canQuery: true,
-      message: "Connection successful",
-    }
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message || "Unknown error",
-      canQuery: false,
-    }
-  }
-}
-
-// Authentication functions (client-side)
+// Authentication functions
 export async function signUp(email: string, password: string) {
-  if (typeof window === "undefined") {
-    throw new Error("signUp can only be called on the client")
-  }
-
   // Input validation
   if (!email || !email.includes("@")) {
     throw new Error("Valid email is required")
@@ -224,18 +85,14 @@ export async function signUp(email: string, password: string) {
     throw new Error("Password must be at least 6 characters")
   }
 
-  const supabase = createClientSupabaseClient()
-  return await supabase.auth.signUp({
+  const client = createClient()
+  return await client.auth.signUp({
     email: email.toLowerCase().trim(),
     password,
   })
 }
 
 export async function signIn(email: string, password: string) {
-  if (typeof window === "undefined") {
-    throw new Error("signIn can only be called on the client")
-  }
-
   // Input validation
   if (!email || !email.includes("@")) {
     throw new Error("Valid email is required")
@@ -244,47 +101,190 @@ export async function signIn(email: string, password: string) {
     throw new Error("Password is required")
   }
 
-  const supabase = createClientSupabaseClient()
-  return await supabase.auth.signInWithPassword({
+  const client = createClient()
+  return await client.auth.signInWithPassword({
     email: email.toLowerCase().trim(),
     password,
   })
 }
 
 export async function signOut() {
-  if (typeof window === "undefined") {
-    throw new Error("signOut can only be called on the client")
-  }
-
-  const supabase = createClientSupabaseClient()
-  return await supabase.auth.signOut()
+  const client = createClient()
+  return await client.auth.signOut()
 }
 
 export async function getCurrentUser() {
-  if (typeof window === "undefined") {
-    throw new Error("getCurrentUser can only be called on the client")
-  }
-
-  const supabase = createClientSupabaseClient()
+  const client = createClient()
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await client.auth.getUser()
   return user
 }
 
 export async function resetPassword(email: string) {
-  if (typeof window === "undefined") {
-    throw new Error("resetPassword can only be called on the client")
-  }
-
   // Input validation
   if (!email || !email.includes("@")) {
     throw new Error("Valid email is required")
   }
 
-  const supabase = createClientSupabaseClient()
-  return await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim())
+  const client = createClient()
+  return await client.auth.resetPasswordForEmail(email.toLowerCase().trim())
 }
+
+export const updatePassword = async (password: string) => {
+  // Input validation
+  if (!password || password.length < 6) {
+    throw new Error("Password must be at least 6 characters")
+  }
+
+  const client = createClient()
+  try {
+    const { data, error } = await client.auth.updateUser({ password })
+    return { data, error }
+  } catch (err: any) {
+    console.error("Update password error:", err)
+    return { data: null, error: { message: `Network error: ${err.message || "Connection failed"}` } }
+  }
+}
+
+// Database functions
+export async function getUserProfile(userId: string) {
+  if (!userId) {
+    throw new Error("User ID is required")
+  }
+
+  const client = createClient()
+  return await client.from("users").select("*").eq("id", userId).single()
+}
+
+export async function updateUserProfile(userId: string, updates: any) {
+  if (!userId) {
+    throw new Error("User ID is required")
+  }
+  if (!updates || typeof updates !== "object") {
+    throw new Error("Valid updates object is required")
+  }
+
+  const client = createClient()
+  return await client
+    .from("users")
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+}
+
+export async function createUserProfile(userId: string, profileData: any) {
+  const client = createClient()
+  try {
+    const { data, error } = await client
+      .from("users")
+      .insert({
+        id: userId,
+        ...profileData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+    return { data, error }
+  } catch (err: any) {
+    console.error("Create user profile error:", err)
+    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
+  }
+}
+
+export const createUserProject = async (projectData: any) => {
+  const client = createClient()
+  try {
+    const { data, error } = await client
+      .from("user_projects")
+      .insert({
+        ...projectData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+    return { data, error }
+  } catch (err: any) {
+    console.error("Create user project error:", err)
+    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
+  }
+}
+
+export const getUserProjects = async (userId: string) => {
+  const client = createClient()
+  try {
+    const { data, error } = await client
+      .from("user_projects")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+    return { data, error }
+  } catch (err: any) {
+    console.error("Get user projects error:", err)
+    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
+  }
+}
+
+export const saveSolarCalculation = async (calculationData: any) => {
+  const client = createClient()
+  try {
+    const { data, error } = await client
+      .from("solar_calculations")
+      .insert({
+        ...calculationData,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+    return { data, error }
+  } catch (err: any) {
+    console.error("Save solar calculation error:", err)
+    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
+  }
+}
+
+export const getUserCalculations = async (userId: string) => {
+  const client = createClient()
+  try {
+    const { data, error } = await client
+      .from("solar_calculations")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+    return { data, error }
+  } catch (err: any) {
+    console.error("Get user calculations error:", err)
+    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
+  }
+}
+
+// Test connection function
+export async function testConnection() {
+  try {
+    const client = createClient()
+    const { data, error } = await client.from("users").select("count").limit(1)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, message: "Connection successful" }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
+
+// Legacy exports for backward compatibility
+export { createClient as createSupabaseClient }
+export { createClient as createBrowserClient }
+export { createServerSupabaseClient as createServerClient }
 
 // Type exports
 export type { Database }

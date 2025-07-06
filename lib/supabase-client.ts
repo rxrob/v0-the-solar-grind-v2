@@ -1,54 +1,35 @@
-import { createClientSupabaseClient } from "./supabase"
+import { createClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
 
-// Singleton pattern for client-side Supabase client
-let supabaseClient: ReturnType<typeof createClientSupabaseClient> | null = null
+// Client-side Supabase singleton
+let supabaseClient: ReturnType<typeof createClient<Database>> | null = null
 
 export function getSupabaseClient() {
-  if (typeof window === "undefined") {
-    throw new Error("getSupabaseClient can only be called on the client side")
-  }
-
   if (!supabaseClient) {
-    supabaseClient = createClientSupabaseClient()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Missing Supabase environment variables")
+    }
+
+    supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    })
   }
 
   return supabaseClient
 }
 
-// Export the singleton instance - REQUIRED EXPORT
+// Default export
 export const supabase = getSupabaseClient()
 
-// Check if Supabase is available
-export function isSupabaseAvailable(): boolean {
-  try {
-    return !!getSupabaseClient()
-  } catch {
-    return false
-  }
-}
-
-// Get client status
-export function getClientStatus() {
-  try {
-    const client = getSupabaseClient()
-    return {
-      configured: true,
-      client: "Initialized",
-      ready: true,
-    }
-  } catch (error: any) {
-    return {
-      configured: false,
-      client: "Not initialized",
-      ready: false,
-      error: error.message,
-    }
-  }
-}
-
-// Default export
-export default getSupabaseClient
-
-// Legacy exports for backward compatibility
+// Named exports
 export { getSupabaseClient as createClient }
 export { getSupabaseClient as createSupabaseClient }
+
+// Type exports
+export type { Database }
