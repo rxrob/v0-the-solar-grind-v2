@@ -1,49 +1,54 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverActions: {
-      allowedOrigins: ["localhost:3000", "*.vercel.app"],
-    },
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
   },
   images: {
-    domains: [
-      'maps.googleapis.com',
-      'maps.google.com',
-      'streetviewpixels-pa.googleapis.com',
-      'lh3.googleusercontent.com'
-    ],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'maps.googleapis.com',
+        port: '',
         pathname: '/maps/api/streetview/**',
       },
       {
         protocol: 'https',
-        hostname: 'maps.google.com',
-        pathname: '/**',
+        hostname: 'maps.googleapis.com',
+        port: '',
+        pathname: '/maps/api/staticmap/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'streetviewpixels-pa.googleapis.com',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
-        pathname: '/**',
-      }
     ],
-    unoptimized: true,
   },
-  env: {
-    CUSTOM_KEY: process.env.CUSTOM_KEY,
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+    ]
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  eslint: {
+    ignoreDuringBuilds: false,
   },
 }
 

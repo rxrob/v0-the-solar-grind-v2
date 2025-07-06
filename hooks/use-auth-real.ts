@@ -1,95 +1,128 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase-client"
 import type { User } from "@supabase/supabase-js"
 
 interface UserProfile {
   id: string
   email: string
-  full_name: string
   subscription_type: "free" | "pro"
-  calculations_used: number
-  reports_used: number
-  stripe_customer_id?: string
   created_at: string
   updated_at: string
 }
 
-interface UserPermissions {
-  canAccessPro: boolean
-  canGenerateReports: boolean
-  calculationsRemaining: number
-  reportsRemaining: number
-  subscriptionType: "free" | "pro"
-  calculationsUsed: number
-  reportsUsed: number
+interface AuthState {
+  user: User | null
+  profile: UserProfile | null
+  loading: boolean
+  error: string | null
 }
 
-export function useAuthReal() {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [permissions, setPermissions] = useState<UserPermissions | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+interface AuthActions {
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string; message?: string }>
+  signOut: () => Promise<{ success: boolean; error?: string }>
+  updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>
+  clearError: () => void
+  refreshProfile: () => Promise<void>
+}
+
+export function useAuthReal(): AuthState &
+  AuthActions & {
+    isAuthenticated: boolean
+    isPro: boolean
+  } {
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    profile: null,
+    loading: true,
+    error: null,
+  })
 
   const supabase = createClient()
 
-  // Load user profile and permissions
-  const loadUserData = async (userId: string) => {
-    try {
-      const { data: profileData, error: profileError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", userId)
-        .single()
+  // Clear error function
+  const clearError = useCallback(() => {
+    setState((prev) => ({ ...prev, error: null }))
+  }, [])
 
-      if (profileError) {
-        console.error("Error loading user profile:", profileError)
-        setError(profileError.message)
-        return
+  // Load user profile
+  const loadProfile = useCallback(
+    async (userId: string) => {
+      try {
+        const { data: profile, error } = await supabase.from("users").select("*").eq("id", userId).single()
+
+        if (error) {
+          console.error("Profile load error:", error)
+          return null
+        }
+
+        return profile as UserProfile
+      } catch (error) {
+        console.error("Profile load error:", error)
+        return null
       }
+    },
+    [supabase],
+  )
 
-      setProfile(profileData)
+  // Refresh profile
+  const refreshProfile = useCallback(async () => {
+    if (!state.user) return
 
-      // Calculate permissions
-      const isPro = profileData.subscription_type === "pro"
-      const calculationsUsed = profileData.calculations_used || 0
-      const reportsUsed = profileData.reports_used || 0
-
-      setPermissions({
-        canAccessPro: isPro,
-        canGenerateReports: isPro || reportsUsed < 1,
-        calculationsRemaining: isPro ? -1 : Math.max(0, 5 - calculationsUsed),
-        reportsRemaining: isPro ? -1 : Math.max(0, 1 - reportsUsed),
-        subscriptionType: profileData.subscription_type,
-        calculationsUsed,
-        reportsUsed,
-      })
-    } catch (error) {
-      console.error("Error loading user data:", error)
-      setError("Failed to load user data")
-    }
-  }
+    const profile = await loadProfile(state.user.id)
+    setState((prev) => ({ ...prev, profile }))
+  }, [state.user, loadProfile])
 
   // Initialize auth state
   useEffect(() => {
+    let mounted = true
+
     const initializeAuth = async () => {
       try {
         const {
-          data: { user: initialUser },
-        } = await supabase.auth.getUser()
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
 
-        setUser(initialUser)
-
-        if (initialUser) {
-          await loadUserData(initialUser.id)
+        if (error) {
+          console.error("Session error:", error)
+          if (mounted) {
+            setState((prev) => ({ ...prev, error: error.message, loading: false }))
+          }
+          return
         }
-      } catch (error) {
-        console.error("Error initializing auth:", error)
-        setError("Failed to initialize authentication")
-      } finally {
-        setLoading(false)
+
+        if (session?.user) {
+          const profile = await loadProfile(session.user.id)
+          if (mounted) {
+            setState({
+              user: session.user,
+              profile,
+              loading: false,
+              error: null,
+            })
+          }
+        } else {
+          if (mounted) {
+            setState({
+              user: null,
+              profile: null,
+              loading: false,
+              error: null,
+            })
+          }
+        }
+      } catch (error: any) {
+        console.error("Auth initialization error:", error)
+        if (mounted) {
+          setState((prev) => ({
+            ...prev,
+            error: error.message || "Authentication error",
+            loading: false,
+          }))
+        }
       }
     }
 
@@ -99,36 +132,188 @@ export function useAuthReal() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null)
+      if (!mounted) return
 
-      if (session?.user) {
-        await loadUserData(session.user.id)
-      } else {
-        setProfile(null)
-        setPermissions(null)
+      console.log("Auth state changed:", event)
+
+      if (event === "SIGNED_IN" && session?.user) {
+        const profile = await loadProfile(session.user.id)
+        setState({
+          user: session.user,
+          profile,
+          loading: false,
+          error: null,
+        })
+      } else if (event === "SIGNED_OUT") {
+        setState({
+          user: null,
+          profile: null,
+          loading: false,
+          error: null,
+        })
+      } else if (event === "TOKEN_REFRESHED" && session?.user) {
+        const profile = await loadProfile(session.user.id)
+        setState((prev) => ({
+          ...prev,
+          user: session.user,
+          profile,
+          error: null,
+        }))
       }
-
-      setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
-  }, [])
-
-  // Refresh user data
-  const refreshUserData = async () => {
-    if (user) {
-      await loadUserData(user.id)
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
     }
-  }
+  }, [supabase, loadProfile])
+
+  // Sign in function
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      try {
+        // Input validation
+        if (!email || !email.includes("@")) {
+          return { success: false, error: "Valid email is required" }
+        }
+        if (!password || password.length < 6) {
+          return { success: false, error: "Password must be at least 6 characters" }
+        }
+
+        setState((prev) => ({ ...prev, loading: true, error: null }))
+
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.toLowerCase().trim(),
+          password,
+        })
+
+        if (error) {
+          setState((prev) => ({ ...prev, error: error.message, loading: false }))
+          return { success: false, error: error.message }
+        }
+
+        return { success: true }
+      } catch (error: any) {
+        const errorMessage = error.message || "Sign in failed"
+        setState((prev) => ({ ...prev, error: errorMessage, loading: false }))
+        return { success: false, error: errorMessage }
+      }
+    },
+    [supabase],
+  )
+
+  // Sign up function
+  const signUp = useCallback(
+    async (email: string, password: string) => {
+      try {
+        // Input validation
+        if (!email || !email.includes("@")) {
+          return { success: false, error: "Valid email is required" }
+        }
+        if (!password || password.length < 6) {
+          return { success: false, error: "Password must be at least 6 characters" }
+        }
+
+        setState((prev) => ({ ...prev, loading: true, error: null }))
+
+        const { error } = await supabase.auth.signUp({
+          email: email.toLowerCase().trim(),
+          password,
+        })
+
+        if (error) {
+          setState((prev) => ({ ...prev, error: error.message, loading: false }))
+          return { success: false, error: error.message }
+        }
+
+        setState((prev) => ({ ...prev, loading: false }))
+        return { success: true, message: "Check your email to confirm your account" }
+      } catch (error: any) {
+        const errorMessage = error.message || "Sign up failed"
+        setState((prev) => ({ ...prev, error: errorMessage, loading: false }))
+        return { success: false, error: errorMessage }
+      }
+    },
+    [supabase],
+  )
+
+  // Sign out function
+  const signOut = useCallback(async () => {
+    try {
+      setState((prev) => ({ ...prev, loading: true, error: null }))
+
+      const { error } = await supabase.auth.signOut()
+
+      if (error) {
+        setState((prev) => ({ ...prev, error: error.message, loading: false }))
+        return { success: false, error: error.message }
+      }
+
+      return { success: true }
+    } catch (error: any) {
+      const errorMessage = error.message || "Sign out failed"
+      setState((prev) => ({ ...prev, error: errorMessage, loading: false }))
+      return { success: false, error: errorMessage }
+    }
+  }, [supabase])
+
+  // Update profile function
+  const updateProfile = useCallback(
+    async (updates: Partial<UserProfile>) => {
+      if (!state.user) {
+        return { success: false, error: "Not authenticated" }
+      }
+
+      try {
+        setState((prev) => ({ ...prev, loading: true, error: null }))
+
+        // Sanitize updates
+        const allowedFields = ["subscription_type"]
+        const sanitizedUpdates = Object.keys(updates)
+          .filter((key) => allowedFields.includes(key))
+          .reduce((obj: any, key) => {
+            obj[key] = updates[key as keyof UserProfile]
+            return obj
+          }, {})
+
+        const { data, error } = await supabase
+          .from("users")
+          .update({
+            ...sanitizedUpdates,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", state.user.id)
+          .select()
+          .single()
+
+        if (error) {
+          setState((prev) => ({ ...prev, error: error.message, loading: false }))
+          return { success: false, error: error.message }
+        }
+
+        setState((prev) => ({ ...prev, profile: data as UserProfile, loading: false }))
+        return { success: true }
+      } catch (error: any) {
+        const errorMessage = error.message || "Profile update failed"
+        setState((prev) => ({ ...prev, error: errorMessage, loading: false }))
+        return { success: false, error: errorMessage }
+      }
+    },
+    [supabase, state.user],
+  )
 
   return {
-    user,
-    profile,
-    permissions,
-    loading,
-    error,
-    refreshUserData,
-    isAuthenticated: !!user,
-    isPro: permissions?.subscriptionType === "pro",
+    ...state,
+    signIn,
+    signUp,
+    signOut,
+    updateProfile,
+    clearError,
+    refreshProfile,
+    isAuthenticated: !!state.user,
+    isPro: state.profile?.subscription_type === "pro",
   }
 }
+
+// Legacy export for backward compatibility
+export const useAuth = useAuthReal

@@ -1,82 +1,271 @@
-import { createBrowserClient } from "@supabase/ssr"
-import { createClient as createSupabaseClientBase } from "@supabase/supabase-js"
-import type { Database } from "@/types/supabase"
+import { createClient } from "@supabase/supabase-js"
+import { getClientConfig, getServerConfig } from "./env-validation"
 
-// Environment variables with proper validation
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-// Create client function - REQUIRED EXPORT
-export function createClient() {
-  return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
+// Type definitions
+export interface Database {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          id: string
+          email: string
+          subscription_type: "free" | "pro"
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          email: string
+          subscription_type?: "free" | "pro"
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          subscription_type?: "free" | "pro"
+          updated_at?: string
+        }
+      }
+      user_projects: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          address: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          address: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          address?: string
+          updated_at?: string
+        }
+      }
+      solar_calculations: {
+        Row: {
+          id: string
+          user_id: string
+          project_id: string | null
+          calculation_data: any
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_id?: string | null
+          calculation_data: any
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          project_id?: string | null
+          calculation_data?: any
+        }
+      }
+    }
+  }
 }
 
-// Create Supabase client function - REQUIRED EXPORT
-export function createSupabaseClient() {
-  return createClient()
+// Client-side Supabase client
+export function createClientSupabaseClient() {
+  if (typeof window === "undefined") {
+    throw new Error("createClientSupabaseClient can only be called on the client")
+  }
+
+  const config = getClientConfig()
+
+  if (!config.supabaseUrl || !config.supabaseAnonKey) {
+    throw new Error("Supabase configuration is missing")
+  }
+
+  return createClient<Database>(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  })
 }
 
-// Check if Supabase is available - REQUIRED EXPORT
+// Server-side Supabase client
+export function createServerSupabaseClient() {
+  if (typeof window !== "undefined") {
+    throw new Error("createServerSupabaseClient can only be called on the server")
+  }
+
+  const config = getServerConfig()
+
+  if (!config.supabaseUrl || !config.supabaseAnonKey) {
+    throw new Error("Supabase configuration is missing")
+  }
+
+  return createClient<Database>(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  })
+}
+
+// Admin Supabase client (server-only)
+export function createAdminSupabaseClient() {
+  if (typeof window !== "undefined") {
+    throw new Error("createAdminSupabaseClient can only be called on the server")
+  }
+
+  const config = getServerConfig()
+
+  if (!config.supabaseUrl || !config.supabaseServiceKey) {
+    throw new Error("Supabase admin configuration is missing")
+  }
+
+  return createClient<Database>(config.supabaseUrl, config.supabaseServiceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  })
+}
+
+// Check if Supabase is available
 export function isSupabaseAvailable(): boolean {
   try {
-    return !!(supabaseUrl && supabaseAnonKey)
+    if (typeof window !== "undefined") {
+      const config = getClientConfig()
+      return !!(config.supabaseUrl && config.supabaseAnonKey)
+    } else {
+      const config = getServerConfig()
+      return !!(config.supabaseUrl && config.supabaseAnonKey)
+    }
   } catch {
     return false
   }
 }
 
-// Server-side client with service role - REQUIRED EXPORT
-export const createServerSupabaseClient = () => {
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    console.warn("Supabase server not configured")
-    return null
-  }
-
-  try {
-    return createSupabaseClientBase<Database>(supabaseUrl, supabaseServiceRoleKey)
-  } catch (error) {
-    console.error("Failed to create server Supabase client:", error)
-    return null
+// Get Supabase configuration status
+export function getSupabaseConfig() {
+  if (typeof window !== "undefined") {
+    // Client-side
+    const config = getClientConfig()
+    return {
+      isAvailable: !!(config.supabaseUrl && config.supabaseAnonKey),
+      url: !!config.supabaseUrl,
+      anonKey: !!config.supabaseAnonKey,
+      serviceKey: false, // Never expose service key status on client
+      connectionStatus: "client-ready",
+    }
+  } else {
+    // Server-side
+    const config = getServerConfig()
+    return {
+      isAvailable: !!(config.supabaseUrl && config.supabaseAnonKey),
+      url: !!config.supabaseUrl,
+      anonKey: !!config.supabaseAnonKey,
+      serviceKey: !!config.supabaseServiceKey,
+      connectionStatus: "server-ready",
+    }
   }
 }
 
-// Legacy export - singleton client
-export const supabase = createClient()
-
-// Admin client for server operations
-export const supabaseAdmin = (() => {
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    console.warn("Supabase admin not configured")
-    return null
+// Test connection (server-only)
+export async function testConnection() {
+  if (typeof window !== "undefined") {
+    throw new Error("testConnection can only be called on the server")
   }
 
   try {
-    return createSupabaseClientBase<Database>(supabaseUrl, supabaseServiceRoleKey)
-  } catch (error) {
-    console.error("Failed to create Supabase admin client:", error)
-    return null
-  }
-})()
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase.from("users").select("count").limit(1)
 
-// Authentication functions
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+        canQuery: false,
+      }
+    }
+
+    return {
+      success: true,
+      canQuery: true,
+      message: "Connection successful",
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || "Unknown error",
+      canQuery: false,
+    }
+  }
+}
+
+// Authentication functions (client-side)
 export async function signUp(email: string, password: string) {
-  const supabase = createClient()
-  return await supabase.auth.signUp({ email, password })
+  if (typeof window === "undefined") {
+    throw new Error("signUp can only be called on the client")
+  }
+
+  // Input validation
+  if (!email || !email.includes("@")) {
+    throw new Error("Valid email is required")
+  }
+  if (!password || password.length < 6) {
+    throw new Error("Password must be at least 6 characters")
+  }
+
+  const supabase = createClientSupabaseClient()
+  return await supabase.auth.signUp({
+    email: email.toLowerCase().trim(),
+    password,
+  })
 }
 
 export async function signIn(email: string, password: string) {
-  const supabase = createClient()
-  return await supabase.auth.signInWithPassword({ email, password })
+  if (typeof window === "undefined") {
+    throw new Error("signIn can only be called on the client")
+  }
+
+  // Input validation
+  if (!email || !email.includes("@")) {
+    throw new Error("Valid email is required")
+  }
+  if (!password) {
+    throw new Error("Password is required")
+  }
+
+  const supabase = createClientSupabaseClient()
+  return await supabase.auth.signInWithPassword({
+    email: email.toLowerCase().trim(),
+    password,
+  })
 }
 
 export async function signOut() {
-  const supabase = createClient()
+  if (typeof window === "undefined") {
+    throw new Error("signOut can only be called on the client")
+  }
+
+  const supabase = createClientSupabaseClient()
   return await supabase.auth.signOut()
 }
 
 export async function getCurrentUser() {
-  const supabase = createClient()
+  if (typeof window === "undefined") {
+    throw new Error("getCurrentUser can only be called on the client")
+  }
+
+  const supabase = createClientSupabaseClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -84,151 +273,18 @@ export async function getCurrentUser() {
 }
 
 export async function resetPassword(email: string) {
-  const supabase = createClient()
-  return await supabase.auth.resetPasswordForEmail(email)
-}
-
-export const updatePassword = async (password: string) => {
-  const supabase = createClient()
-  try {
-    const { data, error } = await supabase.auth.updateUser({ password })
-    return { data, error }
-  } catch (err: any) {
-    console.error("Update password error:", err)
-    return { data: null, error: { message: `Network error: ${err.message || "Connection failed"}` } }
+  if (typeof window === "undefined") {
+    throw new Error("resetPassword can only be called on the client")
   }
-}
 
-// Database functions
-export async function getUserProfile(userId: string) {
-  const supabase = createClient()
-  return await supabase.from("users").select("*").eq("id", userId).single()
-}
-
-export async function updateUserProfile(userId: string, updates: any) {
-  const supabase = createClient()
-  return await supabase.from("users").update(updates).eq("id", userId)
-}
-
-export async function createUserProfile(userId: string, profileData: any) {
-  const supabase = createClient()
-  try {
-    const { data, error } = await supabase
-      .from("users")
-      .insert({
-        id: userId,
-        ...profileData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-    return { data, error }
-  } catch (err: any) {
-    console.error("Create user profile error:", err)
-    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
+  // Input validation
+  if (!email || !email.includes("@")) {
+    throw new Error("Valid email is required")
   }
-}
 
-export const createUserProject = async (projectData: any) => {
-  const supabase = createClient()
-  try {
-    const { data, error } = await supabase
-      .from("user_projects")
-      .insert({
-        ...projectData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-    return { data, error }
-  } catch (err: any) {
-    console.error("Create user project error:", err)
-    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
-  }
-}
-
-export const getUserProjects = async (userId: string) => {
-  const supabase = createClient()
-  try {
-    const { data, error } = await supabase
-      .from("user_projects")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-    return { data, error }
-  } catch (err: any) {
-    console.error("Get user projects error:", err)
-    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
-  }
-}
-
-export const saveSolarCalculation = async (calculationData: any) => {
-  const supabase = createClient()
-  try {
-    const { data, error } = await supabase
-      .from("solar_calculations")
-      .insert({
-        ...calculationData,
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-    return { data, error }
-  } catch (err: any) {
-    console.error("Save solar calculation error:", err)
-    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
-  }
-}
-
-export const getUserCalculations = async (userId: string) => {
-  const supabase = createClient()
-  try {
-    const { data, error } = await supabase
-      .from("solar_calculations")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-    return { data, error }
-  } catch (err: any) {
-    console.error("Get user calculations error:", err)
-    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
-  }
-}
-
-// Configuration utilities
-export function getSupabaseConfig() {
-  return {
-    url: supabaseUrl || "Not configured",
-    anonKey: supabaseAnonKey ? "Configured" : "Not configured",
-    serviceKey: supabaseServiceRoleKey ? "Configured" : "Not configured",
-    isAvailable: isSupabaseAvailable(),
-    connectionStatus: isSupabaseAvailable() ? "Ready" : "Needs configuration",
-  }
-}
-
-// Test connection function
-export async function testConnection() {
-  try {
-    const supabase = createClient()
-    const { data, error } = await supabase.from("users").select("count").limit(1)
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, message: "Connection successful" }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
-  }
+  const supabase = createClientSupabaseClient()
+  return await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim())
 }
 
 // Type exports
 export type { Database }
-
-// Default export
-export default createClient
