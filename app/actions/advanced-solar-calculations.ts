@@ -52,8 +52,8 @@ interface AdvancedSolarResult {
 
 export async function calculateAdvancedSolarSystem(input: AdvancedSolarInput): Promise<AdvancedSolarResult> {
   try {
-    const cookieStore = await cookies()
-    const supabase = createServerComponentClient({ cookies: cookieStore })
+    const cookieStore = cookies()
+    const supabase = createServerComponentClient({ cookies: () => cookieStore })
 
     // Get current user and check subscription
     const {
@@ -313,8 +313,8 @@ function calculateLifetimeSavings(annualSavings: number, years: number, degradat
 
 export async function getAdvancedCalculationHistory() {
   try {
-    const cookieStore = await cookies()
-    const supabase = createServerComponentClient({ cookies: cookieStore })
+    const cookieStore = cookies()
+    const supabase = createServerComponentClient({ cookies: () => cookieStore })
 
     const {
       data: { user },

@@ -33,8 +33,8 @@ interface SolarCalculationResult {
 
 export async function calculateSolarSystem(input: SolarCalculationInput): Promise<SolarCalculationResult> {
   try {
-    const cookieStore = await cookies()
-    const supabase = createServerComponentClient({ cookies: cookieStore })
+    const cookieStore = cookies()
+    const supabase = createServerComponentClient({ cookies: () => cookieStore })
 
     // Get current user
     const {
@@ -139,8 +139,8 @@ export async function calculateSolarSystem(input: SolarCalculationInput): Promis
 
 export async function getSolarCalculationHistory() {
   try {
-    const cookieStore = await cookies()
-    const supabase = createServerComponentClient({ cookies: cookieStore })
+    const cookieStore = cookies()
+    const supabase = createServerComponentClient({ cookies: () => cookieStore })
 
     const {
       data: { user },
@@ -184,8 +184,8 @@ export async function getSolarCalculationHistory() {
 
 export async function deleteSolarCalculation(calculationId: string) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createServerComponentClient({ cookies: cookieStore })
+    const cookieStore = cookies()
+    const supabase = createServerComponentClient({ cookies: () => cookieStore })
 
     const {
       data: { user },
