@@ -155,7 +155,7 @@ export async function signOutReal() {
   }
 }
 
-// Get current user - REQUIRED EXPORT
+// Get current user - REQUIRED EXPORT with fixed return type
 export async function getCurrentUserReal() {
   try {
     const supabase = createServerSupabaseClient()
@@ -167,20 +167,44 @@ export async function getCurrentUserReal() {
 
     if (error) {
       console.error("Get user error:", error.message)
-      return { success: false, error: error.message, user: null }
+      return {
+        success: false,
+        error: error.message,
+        user: null,
+        email: null,
+        profile: null,
+      }
     }
 
     if (user) {
       // Get user profile
       const { data: profile } = await supabase.from("users").select("*").eq("id", user.id).single()
 
-      return { success: true, user: { ...user, profile }, error: null }
+      return {
+        success: true,
+        user: { ...user, profile },
+        error: null,
+        email: user.email,
+        profile,
+      }
     }
 
-    return { success: true, user: null, error: null }
+    return {
+      success: true,
+      user: null,
+      error: null,
+      email: null,
+      profile: null,
+    }
   } catch (error: any) {
     console.error("Get current user error:", error)
-    return { success: false, error: "Failed to get user information", user: null }
+    return {
+      success: false,
+      error: "Failed to get user information",
+      user: null,
+      email: null,
+      profile: null,
+    }
   }
 }
 
