@@ -53,9 +53,9 @@ export async function testServerConnection() {
       return { success: false, error: error.message }
     }
 
-    return { success: true, data }
+    return { success: true, message: "Supabase connection successful" }
   } catch (error) {
     console.error("Supabase connection test error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+    return { success: false, error: "Failed to connect to Supabase" }
   }
 }

@@ -7,27 +7,23 @@ import { trackUsage, checkUsageLimit } from "./usage-tracking"
 interface BasicSolarInput {
   monthlyBill: number
   roofArea: number
-  sunHours: number
   location: string
-  electricityRate?: number
+  sunHours: number
 }
 
 interface BasicSolarResult {
   systemSize: number
-  panelsNeeded: number
   estimatedCost: number
   annualSavings: number
   paybackPeriod: number
   co2Reduction: number
+  panelsNeeded: number
   monthlyProduction: number
-  roofUtilization: number
+  success: boolean
+  message?: string
 }
 
-export async function calculateBasicSolar(input: BasicSolarInput): Promise<{
-  success: boolean
-  data?: BasicSolarResult
-  error?: string
-}> {
+export async function calculateBasicSolar(input: BasicSolarInput): Promise<BasicSolarResult> {
   try {
     const supabase = await createClient()
     const cookieStore = await cookies()
@@ -39,104 +35,135 @@ export async function calculateBasicSolar(input: BasicSolarInput): Promise<{
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "Authentication required" }
+      return {
+        systemSize: 0,
+        estimatedCost: 0,
+        annualSavings: 0,
+        paybackPeriod: 0,
+        co2Reduction: 0,
+        panelsNeeded: 0,
+        monthlyProduction: 0,
+        success: false,
+        message: "Authentication required",
+      }
     }
 
     // Check usage limits for free users
     const usageCheck = await checkUsageLimit(user.id)
-    if (!usageCheck.success) {
-      return { success: false, error: usageCheck.error }
+    if (!usageCheck.canCalculate) {
+      return {
+        systemSize: 0,
+        estimatedCost: 0,
+        annualSavings: 0,
+        paybackPeriod: 0,
+        co2Reduction: 0,
+        panelsNeeded: 0,
+        monthlyProduction: 0,
+        success: false,
+        message: usageCheck.message,
+      }
     }
 
     // Basic solar calculations
-    const electricityRate = input.electricityRate || 0.12 // Default $0.12/kWh
-    const annualConsumption = (input.monthlyBill / electricityRate) * 12 // kWh per year
-    const dailyConsumption = annualConsumption / 365
+    const avgElectricityRate = 0.13 // $0.13 per kWh average
+    const monthlyUsage = input.monthlyBill / avgElectricityRate
+    const annualUsage = monthlyUsage * 12
 
-    // System sizing (accounting for system efficiency ~85%)
-    const systemSize = dailyConsumption / input.sunHours / 0.85 // kW
+    // System sizing (accounting for efficiency losses)
+    const systemEfficiency = 0.85 // 85% system efficiency
+    const systemSize = annualUsage / (input.sunHours * 365 * systemEfficiency) / 1000 // kW
 
-    // Panel calculations (assuming 400W panels)
-    const panelWattage = 0.4 // kW per panel
-    const panelsNeeded = Math.ceil(systemSize / panelWattage)
+    // Panel calculations
+    const panelWattage = 400 // 400W panels
+    const panelsNeeded = Math.ceil((systemSize * 1000) / panelWattage)
 
-    // Cost estimation ($2.50-3.50 per watt installed)
-    const costPerWatt = 3.0
+    // Cost calculations
+    const costPerWatt = 3.5 // $3.50 per watt installed
     const estimatedCost = systemSize * 1000 * costPerWatt
 
-    // Savings calculation
-    const annualProduction = systemSize * input.sunHours * 365 * 0.85 // kWh
-    const annualSavings = annualProduction * electricityRate
+    // Federal tax credit (30%)
+    const federalTaxCredit = estimatedCost * 0.3
+    const netCost = estimatedCost - federalTaxCredit
+
+    // Savings calculations
+    const annualProduction = systemSize * input.sunHours * 365 * systemEfficiency
+    const annualSavings = annualProduction * avgElectricityRate
     const monthlyProduction = annualProduction / 12
 
     // Payback period
-    const paybackPeriod = estimatedCost / annualSavings
+    const paybackPeriod = netCost / annualSavings
 
-    // Environmental impact (0.92 lbs CO2 per kWh)
-    const co2Reduction = annualProduction * 0.92 // lbs CO2 per year
-
-    // Roof utilization (assuming 20 sq ft per panel)
-    const panelArea = panelsNeeded * 20
-    const roofUtilization = (panelArea / input.roofArea) * 100
+    // CO2 reduction (0.92 lbs CO2 per kWh)
+    const co2Reduction = annualProduction * 0.92
 
     const result: BasicSolarResult = {
       systemSize: Math.round(systemSize * 100) / 100,
-      panelsNeeded,
       estimatedCost: Math.round(estimatedCost),
       annualSavings: Math.round(annualSavings),
       paybackPeriod: Math.round(paybackPeriod * 10) / 10,
       co2Reduction: Math.round(co2Reduction),
+      panelsNeeded,
       monthlyProduction: Math.round(monthlyProduction),
-      roofUtilization: Math.round(roofUtilization * 10) / 10,
+      success: true,
     }
 
     // Save calculation to database
-    const { error: saveError } = await supabase.from("solar_calculations").insert({
-      user_id: user.id,
-      calculation_type: "basic",
-      input_data: input,
-      result_data: result,
-      created_at: new Date().toISOString(),
-    })
+    try {
+      const { error: saveError } = await supabase.from("solar_calculations").insert({
+        user_id: user.id,
+        calculation_type: "basic",
+        input_data: input,
+        result_data: result,
+        created_at: new Date().toISOString(),
+      })
 
-    if (saveError) {
+      if (saveError) {
+        console.error("Error saving calculation:", saveError)
+      }
+    } catch (saveError) {
       console.error("Error saving calculation:", saveError)
     }
 
     // Track usage
     await trackUsage(user.id, "basic_calculation")
 
-    return { success: true, data: result }
+    return result
   } catch (error) {
     console.error("Basic solar calculation error:", error)
     return {
+      systemSize: 0,
+      estimatedCost: 0,
+      annualSavings: 0,
+      paybackPeriod: 0,
+      co2Reduction: 0,
+      panelsNeeded: 0,
+      monthlyProduction: 0,
       success: false,
-      error: error instanceof Error ? error.message : "Calculation failed",
+      message: "Calculation failed. Please try again.",
     }
   }
 }
 
-export async function getUserCalculations(userId: string) {
+export async function saveBasicCalculation(userId: string, input: BasicSolarInput, result: BasicSolarResult) {
   try {
     const supabase = await createClient()
 
-    const { data, error } = await supabase
-      .from("solar_calculations")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(10)
+    const { error } = await supabase.from("solar_calculations").insert({
+      user_id: userId,
+      calculation_type: "basic",
+      input_data: input,
+      result_data: result,
+      created_at: new Date().toISOString(),
+    })
 
     if (error) {
+      console.error("Error saving basic calculation:", error)
       return { success: false, error: error.message }
     }
 
-    return { success: true, data }
+    return { success: true }
   } catch (error) {
-    console.error("Get user calculations error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch calculations",
-    }
+    console.error("Save basic calculation error:", error)
+    return { success: false, error: "Failed to save calculation" }
   }
 }
