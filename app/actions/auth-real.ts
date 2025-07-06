@@ -32,10 +32,10 @@ export async function signInAction(formData: FormData): Promise<AuthResult> {
             return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set(name, value, options)
           },
           remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options })
+            cookieStore.set(name, "", options)
           },
         },
       },
@@ -93,10 +93,10 @@ export async function signUpAction(formData: FormData): Promise<AuthResult> {
             return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set(name, value, options)
           },
           remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options })
+            cookieStore.set(name, "", options)
           },
         },
       },
@@ -168,10 +168,10 @@ export async function signOutAction(): Promise<AuthResult> {
             return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set(name, value, options)
           },
           remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options })
+            cookieStore.set(name, "", options)
           },
         },
       },
@@ -321,10 +321,10 @@ export async function updatePasswordAction(formData: FormData): Promise<AuthResu
             return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set(name, value, options)
           },
           remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options })
+            cookieStore.set(name, "", options)
           },
         },
       },
@@ -353,7 +353,7 @@ export async function updatePasswordAction(formData: FormData): Promise<AuthResu
   }
 }
 
-// Add these export aliases at the end of the file
+// Export aliases for backward compatibility
 export const signOut = signOutAction
 export const resetPassword = resetPasswordAction
 export const updatePassword = updatePasswordAction

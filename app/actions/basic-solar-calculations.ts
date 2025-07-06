@@ -65,7 +65,7 @@ export async function calculateBasicSolarSystem(input: BasicSolarInput): Promise
 
 export async function saveBasicCalculation(userId: string, input: BasicSolarInput, result: BasicSolarResult) {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -75,10 +75,10 @@ export async function saveBasicCalculation(userId: string, input: BasicSolarInpu
             return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set(name, value, options)
           },
           remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options })
+            cookieStore.set(name, "", options)
           },
         },
       },
@@ -106,7 +106,7 @@ export async function saveBasicCalculation(userId: string, input: BasicSolarInpu
 
 export async function getUserBasicCalculations(userId: string) {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

@@ -15,10 +15,10 @@ export async function signInWithEmail(email: string, password: string) {
           return cookieStore.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options })
+          cookieStore.set(name, value, options)
         },
         remove(name: string, options: any) {
-          cookieStore.set({ name, value: "", ...options })
+          cookieStore.set(name, "", options)
         },
       },
     },
@@ -47,10 +47,10 @@ export async function signUpWithEmail(email: string, password: string, fullName?
           return cookieStore.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options })
+          cookieStore.set(name, value, options)
         },
         remove(name: string, options: any) {
-          cookieStore.set({ name, value: "", ...options })
+          cookieStore.set(name, "", options)
         },
       },
     },
@@ -104,10 +104,10 @@ export async function signOut() {
           return cookieStore.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options })
+          cookieStore.set(name, value, options)
         },
         remove(name: string, options: any) {
-          cookieStore.set({ name, value: "", ...options })
+          cookieStore.set(name, "", options)
         },
       },
     },
@@ -190,10 +190,10 @@ export async function updatePassword(password: string) {
           return cookieStore.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options })
+          cookieStore.set(name, value, options)
         },
         remove(name: string, options: any) {
-          cookieStore.set({ name, value: "", ...options })
+          cookieStore.set(name, "", options)
         },
       },
     },
@@ -210,5 +210,5 @@ export async function updatePassword(password: string) {
   return { success: true }
 }
 
-// Add this export alias at the end of the file
+// Export alias for backward compatibility
 export const getCurrentUser = getUser

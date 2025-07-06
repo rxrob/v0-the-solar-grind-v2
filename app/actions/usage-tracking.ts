@@ -13,7 +13,7 @@ interface UsageTrackingResult {
 
 export async function trackCalculationUsage(userId: string, calculationType: string): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -23,10 +23,10 @@ export async function trackCalculationUsage(userId: string, calculationType: str
             return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set(name, value, options)
           },
           remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options })
+            cookieStore.set(name, "", options)
           },
         },
       },
@@ -94,7 +94,7 @@ export async function trackCalculationUsage(userId: string, calculationType: str
 
 export async function getUserUsageStats(userId: string): Promise<UsageTrackingResult & { userData?: any }> {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -133,7 +133,7 @@ export async function getUserUsageStats(userId: string): Promise<UsageTrackingRe
 
 export async function resetMonthlyUsage(userId: string): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -143,10 +143,10 @@ export async function resetMonthlyUsage(userId: string): Promise<UsageTrackingRe
             return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set(name, value, options)
           },
           remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options })
+            cookieStore.set(name, "", options)
           },
         },
       },
@@ -173,7 +173,7 @@ export async function resetMonthlyUsage(userId: string): Promise<UsageTrackingRe
 
 export async function upgradeToProTrial(userId: string): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -183,10 +183,10 @@ export async function upgradeToProTrial(userId: string): Promise<UsageTrackingRe
             return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set(name, value, options)
           },
           remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options })
+            cookieStore.set(name, "", options)
           },
         },
       },
