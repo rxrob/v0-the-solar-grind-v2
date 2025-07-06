@@ -31,45 +31,43 @@ export async function getServerUser() {
     } = await supabase.auth.getUser()
 
     if (error) {
-      console.error("Error getting user:", error)
-      return { user: null, error: error.message }
+      console.error("Error getting server user:", error)
+      return null
     }
 
-    return { user, error: null }
+    return user
   } catch (error) {
-    console.error("Server user fetch error:", error)
-    return {
-      user: null,
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
+    console.error("Server user error:", error)
+    return null
   }
 }
 
-export async function getUserSubscriptionStatus(userId: string) {
+export async function getServerUserWithProfile() {
   try {
     const supabase = await createServerSupabaseClient()
-    const { data, error } = await supabase
-      .from("users")
-      .select("subscription_status, subscription_type, trial_ends_at")
-      .eq("id", userId)
-      .single()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    if (error) {
-      console.error("Error getting subscription status:", error)
-      return {
-        subscription_status: "free",
-        subscription_type: "free",
-        trial_ends_at: null,
-      }
+    if (authError || !user) {
+      return null
     }
 
-    return data
-  } catch (error) {
-    console.error("Subscription status fetch error:", error)
+    // Get user profile from our users table
+    const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
+
+    if (profileError) {
+      console.error("Error getting user profile:", profileError)
+      return user
+    }
+
     return {
-      subscription_status: "free",
-      subscription_type: "free",
-      trial_ends_at: null,
+      ...user,
+      ...profile,
     }
+  } catch (error) {
+    console.error("Server user with profile error:", error)
+    return null
   }
 }

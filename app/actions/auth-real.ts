@@ -4,6 +4,13 @@ import { createClient } from "@/lib/supabase-server"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
+interface AuthResult {
+  success: boolean
+  error?: string
+  user?: any
+  message?: string
+}
+
 export async function signUp(formData: FormData) {
   const supabase = await createClient()
 
@@ -70,6 +77,62 @@ export async function getCurrentUser() {
   }
 }
 
+export async function resetPassword(email: string): Promise<AuthResult> {
+  try {
+    const supabase = await createClient()
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
+    })
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+      }
+    }
+
+    return {
+      success: true,
+      message: "Password reset email sent",
+    }
+  } catch (error) {
+    console.error("Reset password error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to send reset email",
+    }
+  }
+}
+
+export async function updatePassword(password: string): Promise<AuthResult> {
+  try {
+    const supabase = await createClient()
+
+    const { error } = await supabase.auth.updateUser({
+      password,
+    })
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+      }
+    }
+
+    return {
+      success: true,
+      message: "Password updated successfully",
+    }
+  } catch (error) {
+    console.error("Update password error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update password",
+    }
+  }
+}
+
 export async function updateUserProfile(formData: FormData) {
   try {
     const supabase = await createClient()
@@ -107,3 +170,5 @@ export async function updateUserProfile(formData: FormData) {
     }
   }
 }
+
+// Export the functions that are imported in other files

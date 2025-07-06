@@ -25,7 +25,7 @@ export async function createClient() {
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies()
 
-  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -53,12 +53,9 @@ export async function testServerConnection() {
       return { success: false, error: error.message }
     }
 
-    return { success: true, message: "Connection successful" }
+    return { success: true, message: "Supabase connection successful" }
   } catch (error) {
     console.error("Supabase connection test error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
+    return { success: false, error: "Failed to connect to Supabase" }
   }
 }
