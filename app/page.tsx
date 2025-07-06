@@ -2,66 +2,81 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Sun, Calculator, FileText, Zap, Shield, Users } from "lucide-react"
+import {
+  Calculator,
+  Sun,
+  DollarSign,
+  TrendingUp,
+  MapPin,
+  Zap,
+  CheckCircle,
+  ArrowRight,
+  BarChart3,
+  Shield,
+  Clock,
+} from "lucide-react"
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
-      {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Sun className="h-8 w-8 text-orange-500" />
-            <span className="text-2xl font-bold text-gray-900">SolarGrind</span>
-          </div>
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">
-              Features
-            </Link>
-            <Link href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors">
-              Pricing
-            </Link>
-            <Link href="/calculator" className="text-gray-600 hover:text-gray-900 transition-colors">
-              Calculator
-            </Link>
-          </nav>
-          <div className="flex items-center space-x-4">
-            <Link href="/login">
-              <Button variant="ghost">Sign In</Button>
-            </Link>
-            <Link href="/signup">
-              <Button>Get Started</Button>
-            </Link>
+      {/* Navigation */}
+      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-2">
+              <Sun className="h-8 w-8 text-orange-500" />
+              <span className="text-xl font-bold text-gray-900">MySolarAI</span>
+            </div>
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">
+                Features
+              </Link>
+              <Link href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors">
+                Pricing
+              </Link>
+              <Link href="#about" className="text-gray-600 hover:text-gray-900 transition-colors">
+                About
+              </Link>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Link href="/login">
+                <Button variant="ghost">Sign In</Button>
+              </Link>
+              <Link href="/signup">
+                <Button>Get Started</Button>
+              </Link>
+            </div>
           </div>
         </div>
-      </header>
+      </nav>
 
       {/* Hero Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto text-center">
-          <Badge variant="secondary" className="mb-4">
-            🚀 Advanced Solar Analysis Platform
-          </Badge>
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Maximize Your Solar
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-yellow-500">
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto text-center">
+          <Badge className="mb-4 bg-green-100 text-green-800 hover:bg-green-200">🌟 AI-Powered Solar Analysis</Badge>
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            Discover Your Solar
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-green-600">
               {" "}
-              Investment
+              Potential
             </span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Professional-grade solar analysis tools powered by NREL data, Google Maps integration, and advanced terrain
-            modeling. Get accurate solar potential assessments for any property.
+            Get instant, accurate solar calculations for any property. Our AI-powered platform analyzes terrain, weather
+            patterns, and energy usage to provide comprehensive solar assessments.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/calculator">
-              <Button size="lg" className="text-lg px-8 py-3">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-orange-500 to-green-600 hover:from-orange-600 hover:to-green-700"
+              >
                 <Calculator className="mr-2 h-5 w-5" />
                 Try Free Calculator
               </Button>
             </Link>
             <Link href="/pro-calculator">
-              <Button size="lg" variant="outline" className="text-lg px-8 py-3 bg-transparent">
+              <Button size="lg" variant="outline">
                 <Zap className="mr-2 h-5 w-5" />
                 Pro Analysis
               </Button>
@@ -71,157 +86,155 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-4 bg-white">
-        <div className="container mx-auto">
+      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Professional Solar Analysis Tools</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Powerful Solar Analysis Tools</h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Everything you need to analyze solar potential with precision and confidence
+              Everything you need to make informed solar energy decisions
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="border-2 hover:border-orange-200 transition-colors">
+            <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <Sun className="h-12 w-12 text-orange-500 mb-4" />
-                <CardTitle>NREL Data Integration</CardTitle>
-                <CardDescription>
-                  Access official solar irradiance data from the National Renewable Energy Laboratory
-                </CardDescription>
+                <CardTitle>Solar Potential Analysis</CardTitle>
+                <CardDescription>Advanced calculations using NREL data and terrain analysis</CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2">
+                <ul className="space-y-2 text-sm text-gray-600">
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Real solar irradiance data
+                    Real-time weather data
                   </li>
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Historical weather patterns
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    PVWatts integration
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 hover:border-blue-200 transition-colors">
-              <CardHeader>
-                <Calculator className="h-12 w-12 text-blue-500 mb-4" />
-                <CardTitle>Advanced Calculations</CardTitle>
-                <CardDescription>Sophisticated algorithms for accurate solar potential assessment</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Terrain analysis
+                    Terrain elevation analysis
                   </li>
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
                     Shading calculations
                   </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <DollarSign className="h-12 w-12 text-green-500 mb-4" />
+                <CardTitle>Financial Projections</CardTitle>
+                <CardDescription>Detailed cost-benefit analysis and ROI calculations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-gray-600">
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    System optimization
+                    Installation cost estimates
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    Energy savings projections
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    Payback period analysis
                   </li>
                 </ul>
               </CardContent>
             </Card>
 
-            <Card className="border-2 hover:border-green-200 transition-colors">
+            <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
-                <FileText className="h-12 w-12 text-green-500 mb-4" />
+                <BarChart3 className="h-12 w-12 text-blue-500 mb-4" />
                 <CardTitle>Professional Reports</CardTitle>
-                <CardDescription>Generate comprehensive PDF reports for clients and stakeholders</CardDescription>
+                <CardDescription>Comprehensive PDF reports for clients and stakeholders</CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2">
+                <ul className="space-y-2 text-sm text-gray-600">
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Detailed analysis
+                    Detailed analysis charts
                   </li>
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Visual charts & graphs
+                    Property imagery
                   </li>
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Branded PDF export
+                    Custom branding
                   </li>
                 </ul>
               </CardContent>
             </Card>
 
-            <Card className="border-2 hover:border-purple-200 transition-colors">
+            <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
-                <Shield className="h-12 w-12 text-purple-500 mb-4" />
-                <CardTitle>Enterprise Security</CardTitle>
-                <CardDescription>Bank-grade security with encrypted data and secure API access</CardDescription>
+                <MapPin className="h-12 w-12 text-red-500 mb-4" />
+                <CardTitle>Location Intelligence</CardTitle>
+                <CardDescription>Precise geographic analysis for optimal placement</CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2">
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    GPS coordinates
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    Roof orientation analysis
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    Local regulations
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <Clock className="h-12 w-12 text-purple-500 mb-4" />
+                <CardTitle>Real-Time Data</CardTitle>
+                <CardDescription>Live weather and energy market information</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    Current weather conditions
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    Energy price tracking
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                    Market trends
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <Shield className="h-12 w-12 text-indigo-500 mb-4" />
+                <CardTitle>Enterprise Security</CardTitle>
+                <CardDescription>Bank-level security for your data and calculations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-gray-600">
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
                     Encrypted data storage
                   </li>
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Secure API endpoints
+                    Secure API access
                   </li>
                   <li className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
                     GDPR compliant
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 hover:border-red-200 transition-colors">
-              <CardHeader>
-                <Zap className="h-12 w-12 text-red-500 mb-4" />
-                <CardTitle>Real-time Analysis</CardTitle>
-                <CardDescription>Get instant results with our optimized calculation engine</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Sub-second calculations
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Live data updates
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Interactive visualizations
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 hover:border-indigo-200 transition-colors">
-              <CardHeader>
-                <Users className="h-12 w-12 text-indigo-500 mb-4" />
-                <CardTitle>Team Collaboration</CardTitle>
-                <CardDescription>Share projects and collaborate with team members seamlessly</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Project sharing
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Team workspaces
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Access controls
                   </li>
                 </ul>
               </CardContent>
@@ -231,42 +244,42 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 bg-gray-50">
-        <div className="container mx-auto">
+      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Choose Your Plan</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Start free, upgrade when you need more advanced features
-            </p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">Choose the plan that fits your needs</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {/* Free Plan */}
-            <Card className="border-2">
-              <CardHeader className="text-center">
+            <Card className="relative">
+              <CardHeader>
                 <CardTitle className="text-2xl">Free</CardTitle>
-                <div className="text-4xl font-bold text-gray-900 mt-4">$0</div>
-                <CardDescription>Perfect for getting started</CardDescription>
+                <CardDescription>Perfect for homeowners</CardDescription>
+                <div className="text-3xl font-bold">
+                  $0<span className="text-lg font-normal">/month</span>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <ul className="space-y-3">
+              <CardContent>
+                <ul className="space-y-3 mb-6">
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    Basic solar calculator
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Basic solar calculations
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />5 calculations per month
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Energy savings estimates
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    Basic reports
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Simple reports
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    Community support
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />5 calculations/month
                   </li>
                 </ul>
-                <Link href="/signup" className="block">
+                <Link href="/signup">
                   <Button className="w-full bg-transparent" variant="outline">
                     Get Started Free
                   </Button>
@@ -275,79 +288,87 @@ export default function HomePage() {
             </Card>
 
             {/* Pro Plan */}
-            <Card className="border-2 border-orange-200 relative">
-              <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-orange-500">Most Popular</Badge>
-              <CardHeader className="text-center">
+            <Card className="relative border-2 border-orange-500">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                <Badge className="bg-orange-500 text-white">Most Popular</Badge>
+              </div>
+              <CardHeader>
                 <CardTitle className="text-2xl">Pro</CardTitle>
-                <div className="text-4xl font-bold text-gray-900 mt-4">$29</div>
-                <CardDescription>per month</CardDescription>
+                <CardDescription>For solar professionals</CardDescription>
+                <div className="text-3xl font-bold">
+                  $29<span className="text-lg font-normal">/month</span>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <ul className="space-y-3">
+              <CardContent>
+                <ul className="space-y-3 mb-6">
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
                     Advanced solar analysis
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    Unlimited calculations
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Terrain & shading analysis
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    NREL data integration
-                  </li>
-                  <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
                     Professional PDF reports
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    Terrain analysis
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Unlimited calculations
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Client management
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
                     Priority support
                   </li>
                 </ul>
-                <Link href="/pricing" className="block">
-                  <Button className="w-full">Start Pro Trial</Button>
+                <Link href="/pricing">
+                  <Button className="w-full bg-orange-500 hover:bg-orange-600">Start Pro Trial</Button>
                 </Link>
               </CardContent>
             </Card>
 
-            {/* Enterprise Plan */}
-            <Card className="border-2">
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Enterprise</CardTitle>
-                <div className="text-4xl font-bold text-gray-900 mt-4">Custom</div>
-                <CardDescription>For large organizations</CardDescription>
+            {/* Single Report */}
+            <Card className="relative">
+              <CardHeader>
+                <CardTitle className="text-2xl">Single Report</CardTitle>
+                <CardDescription>One-time professional analysis</CardDescription>
+                <div className="text-3xl font-bold">
+                  $9<span className="text-lg font-normal">/report</span>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <ul className="space-y-3">
+              <CardContent>
+                <ul className="space-y-3 mb-6">
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    Everything in Pro
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Complete solar analysis
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    Custom integrations
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Professional PDF report
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    White-label options
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Property imagery
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    Dedicated support
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    Financial projections
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                    SLA guarantees
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                    No subscription required
                   </li>
                 </ul>
-                <Button className="w-full bg-transparent" variant="outline">
-                  Contact Sales
-                </Button>
+                <Link href="/pro-calculator">
+                  <Button className="w-full bg-transparent" variant="outline">
+                    Buy Single Report
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>
@@ -355,26 +376,28 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-orange-500 to-yellow-500">
-        <div className="container mx-auto text-center">
-          <h2 className="text-4xl font-bold text-white mb-6">Ready to Optimize Your Solar Projects?</h2>
-          <p className="text-xl text-orange-100 mb-8 max-w-2xl mx-auto">
-            Join thousands of solar professionals using SolarGrind for accurate, professional solar analysis and
-            reporting.
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-orange-500 to-green-600">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Ready to Go Solar?</h2>
+          <p className="text-xl text-orange-100 mb-8">
+            Join thousands of homeowners and professionals who trust MySolarAI for accurate solar analysis.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup">
-              <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
-                Start Free Trial
+            <Link href="/calculator">
+              <Button size="lg" className="bg-white text-orange-600 hover:bg-gray-100">
+                <Calculator className="mr-2 h-5 w-5" />
+                Start Free Analysis
               </Button>
             </Link>
-            <Link href="/calculator">
+            <Link href="/pro-calculator">
               <Button
                 size="lg"
                 variant="outline"
-                className="text-lg px-8 py-3 text-white border-white hover:bg-white hover:text-orange-500 bg-transparent"
+                className="border-white text-white hover:bg-white hover:text-orange-600 bg-transparent"
               >
-                Try Calculator
+                <TrendingUp className="mr-2 h-5 w-5" />
+                Try Pro Features
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
           </div>
@@ -382,32 +405,27 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-4">
-        <div className="container mx-auto">
+      <footer className="bg-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <Sun className="h-6 w-6 text-orange-500" />
-                <span className="text-xl font-bold">SolarGrind</span>
+                <Sun className="h-8 w-8 text-orange-500" />
+                <span className="text-xl font-bold">MySolarAI</span>
               </div>
-              <p className="text-gray-400">Professional solar analysis tools for the modern energy industry.</p>
+              <p className="text-gray-400">AI-powered solar analysis for smarter energy decisions.</p>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-gray-400">
                 <li>
                   <Link href="/calculator" className="hover:text-white transition-colors">
-                    Calculator
+                    Free Calculator
                   </Link>
                 </li>
                 <li>
                   <Link href="/pro-calculator" className="hover:text-white transition-colors">
                     Pro Analysis
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/reports" className="hover:text-white transition-colors">
-                    Reports
                   </Link>
                 </li>
                 <li>
@@ -431,13 +449,8 @@ export default function HomePage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/blog" className="hover:text-white transition-colors">
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/careers" className="hover:text-white transition-colors">
-                    Careers
+                  <Link href="/privacy" className="hover:text-white transition-colors">
+                    Privacy
                   </Link>
                 </li>
               </ul>
@@ -460,16 +473,11 @@ export default function HomePage() {
                     API
                   </Link>
                 </li>
-                <li>
-                  <Link href="/status" className="hover:text-white transition-colors">
-                    Status
-                  </Link>
-                </li>
               </ul>
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 SolarGrind. All rights reserved.</p>
+            <p>&copy; 2024 MySolarAI. All rights reserved.</p>
           </div>
         </div>
       </footer>

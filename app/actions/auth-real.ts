@@ -167,20 +167,20 @@ export async function getCurrentUserReal() {
 
     if (error) {
       console.error("Get user error:", error.message)
-      return { success: false, error: error.message }
+      return { success: false, error: error.message, user: null }
     }
 
     if (user) {
       // Get user profile
       const { data: profile } = await supabase.from("users").select("*").eq("id", user.id).single()
 
-      return { success: true, user: { ...user, profile } }
+      return { success: true, user: { ...user, profile }, error: null }
     }
 
-    return { success: true, user: null }
+    return { success: true, user: null, error: null }
   } catch (error: any) {
     console.error("Get current user error:", error)
-    return { success: false, error: "Failed to get user information" }
+    return { success: false, error: "Failed to get user information", user: null }
   }
 }
 
