@@ -1,6 +1,6 @@
 "use server"
 
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { createPagesServerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 
 interface UsageTrackingResult {
@@ -9,11 +9,12 @@ interface UsageTrackingResult {
   data?: any
 }
 
-export async function trackCalculationUsage(calculationType: "basic" | "advanced"): Promise<UsageTrackingResult> {
+export async function trackUsage(action: string, details?: Record<string, any>): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const cookieStore = await cookies()
+    const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
+    // Get current user
     const {
       data: { user },
       error: userError,
@@ -26,64 +27,24 @@ export async function trackCalculationUsage(calculationType: "basic" | "advanced
       }
     }
 
-    // Get current user data
-    const { data: userData, error: fetchError } = await supabase
-      .from("users")
-      .select("calculations_used, subscription_type, subscription_status")
-      .eq("id", user.id)
-      .single()
+    // Track the usage
+    const { error } = await supabase.from("usage_tracking").insert({
+      user_id: user.id,
+      action,
+      details: details || {},
+      created_at: new Date().toISOString(),
+    })
 
-    if (fetchError) {
-      console.error("Error fetching user data:", fetchError)
+    if (error) {
+      console.error("Error tracking usage:", error)
       return {
         success: false,
-        error: "Error fetching user data",
-      }
-    }
-
-    // Check usage limits
-    const currentUsage = userData?.calculations_used || 0
-    const isProUser = userData?.subscription_type === "pro" && userData?.subscription_status === "active"
-
-    if (!isProUser && calculationType === "advanced") {
-      return {
-        success: false,
-        error: "Pro subscription required for advanced calculations",
-      }
-    }
-
-    if (!isProUser && currentUsage >= 5) {
-      // Free users limited to 5 calculations
-      return {
-        success: false,
-        error: "Free usage limit reached. Upgrade to Pro for unlimited calculations.",
-      }
-    }
-
-    // Increment usage counter
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({
-        calculations_used: currentUsage + 1,
-        last_calculation_at: new Date().toISOString(),
-      })
-      .eq("id", user.id)
-
-    if (updateError) {
-      console.error("Error updating usage:", updateError)
-      return {
-        success: false,
-        error: "Error updating usage counter",
+        error: error.message,
       }
     }
 
     return {
       success: true,
-      data: {
-        calculationsUsed: currentUsage + 1,
-        isProUser,
-        remainingCalculations: isProUser ? "unlimited" : Math.max(0, 5 - (currentUsage + 1)),
-      },
     }
   } catch (error) {
     console.error("Usage tracking error:", error)
@@ -96,9 +57,10 @@ export async function trackCalculationUsage(calculationType: "basic" | "advanced
 
 export async function getUserUsageStats(): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const cookieStore = await cookies()
+    const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
+    // Get current user
     const {
       data: { user },
       error: userError,
@@ -111,46 +73,34 @@ export async function getUserUsageStats(): Promise<UsageTrackingResult> {
       }
     }
 
-    // Get user usage data
-    const { data: userData, error: fetchError } = await supabase
-      .from("users")
-      .select("calculations_used, subscription_type, subscription_status, last_calculation_at, created_at")
-      .eq("id", user.id)
-      .single()
+    // Get usage statistics
+    const { data, error } = await supabase
+      .from("usage_tracking")
+      .select("action, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(100)
 
-    if (fetchError) {
-      console.error("Error fetching user usage stats:", fetchError)
+    if (error) {
+      console.error("Error fetching usage stats:", error)
       return {
         success: false,
-        error: "Error fetching usage statistics",
+        error: error.message,
       }
     }
 
-    // Get calculation history count
-    const { count: totalCalculations, error: countError } = await supabase
-      .from("solar_calculations")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-
-    if (countError) {
-      console.error("Error counting calculations:", countError)
-    }
-
-    const isProUser = userData?.subscription_type === "pro" && userData?.subscription_status === "active"
-    const calculationsUsed = userData?.calculations_used || 0
-    const remainingCalculations = isProUser ? "unlimited" : Math.max(0, 5 - calculationsUsed)
+    // Process the data to get counts by action
+    const actionCounts = data.reduce((acc: Record<string, number>, item) => {
+      acc[item.action] = (acc[item.action] || 0) + 1
+      return acc
+    }, {})
 
     return {
       success: true,
       data: {
-        calculationsUsed,
-        totalCalculations: totalCalculations || 0,
-        remainingCalculations,
-        isProUser,
-        subscriptionType: userData?.subscription_type || "free",
-        subscriptionStatus: userData?.subscription_status || "inactive",
-        lastCalculationAt: userData?.last_calculation_at,
-        memberSince: userData?.created_at,
+        totalActions: data.length,
+        actionCounts,
+        recentActions: data.slice(0, 10),
       },
     }
   } catch (error) {
@@ -162,49 +112,16 @@ export async function getUserUsageStats(): Promise<UsageTrackingResult> {
   }
 }
 
-export async function resetMonthlyUsage(): Promise<UsageTrackingResult> {
+export async function checkUsageLimit(
+  action: string,
+  limit: number,
+  timeframe: "day" | "week" | "month" = "month",
+): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const cookieStore = await cookies()
+    const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
-    // This would typically be called by a cron job or scheduled function
-    // Reset calculations_used for all free users at the beginning of each month
-    const { error } = await supabase
-      .from("users")
-      .update({
-        calculations_used: 0,
-        usage_reset_at: new Date().toISOString(),
-      })
-      .eq("subscription_type", "free")
-
-    if (error) {
-      console.error("Error resetting monthly usage:", error)
-      return {
-        success: false,
-        error: "Error resetting monthly usage",
-      }
-    }
-
-    return {
-      success: true,
-      data: {
-        message: "Monthly usage reset successfully",
-      },
-    }
-  } catch (error) {
-    console.error("Error resetting monthly usage:", error)
-    return {
-      success: false,
-      error: "An error occurred while resetting monthly usage",
-    }
-  }
-}
-
-export async function trackReportGeneration(reportType: "basic" | "advanced" | "single"): Promise<UsageTrackingResult> {
-  try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-
+    // Get current user
     const {
       data: { user },
       error: userError,
@@ -217,69 +134,111 @@ export async function trackReportGeneration(reportType: "basic" | "advanced" | "
       }
     }
 
-    // Get current user data
-    const { data: userData, error: fetchError } = await supabase
-      .from("users")
-      .select("reports_generated, subscription_type, subscription_status")
-      .eq("id", user.id)
-      .single()
+    // Calculate the date range based on timeframe
+    const now = new Date()
+    let startDate: Date
 
-    if (fetchError) {
-      console.error("Error fetching user data:", fetchError)
+    switch (timeframe) {
+      case "day":
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        break
+      case "week":
+        const dayOfWeek = now.getDay()
+        startDate = new Date(now.getTime() - dayOfWeek * 24 * 60 * 60 * 1000)
+        startDate.setHours(0, 0, 0, 0)
+        break
+      case "month":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        break
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+    }
+
+    // Count usage for the specified action and timeframe
+    const { data, error } = await supabase
+      .from("usage_tracking")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("action", action)
+      .gte("created_at", startDate.toISOString())
+
+    if (error) {
+      console.error("Error checking usage limit:", error)
       return {
         success: false,
-        error: "Error fetching user data",
+        error: error.message,
       }
     }
 
-    const isProUser = userData?.subscription_type === "pro" && userData?.subscription_status === "active"
-    const currentReports = userData?.reports_generated || 0
+    const currentUsage = data.length
+    const hasExceededLimit = currentUsage >= limit
 
-    // Check if user can generate reports
-    if (reportType === "advanced" && !isProUser) {
+    return {
+      success: true,
+      data: {
+        currentUsage,
+        limit,
+        hasExceededLimit,
+        remainingUsage: Math.max(0, limit - currentUsage),
+        timeframe,
+        startDate: startDate.toISOString(),
+      },
+    }
+  } catch (error) {
+    console.error("Error checking usage limit:", error)
+    return {
+      success: false,
+      error: "An error occurred while checking usage limit",
+    }
+  }
+}
+
+export async function resetUserUsage(action?: string): Promise<UsageTrackingResult> {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+
+    // Get current user
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
       return {
         success: false,
-        error: "Pro subscription required for advanced reports",
+        error: "User not authenticated",
       }
     }
 
-    if (reportType === "basic" && !isProUser && currentReports >= 2) {
-      return {
-        success: false,
-        error: "Free users limited to 2 basic reports per month",
-      }
+    // Build the delete query
+    let query = supabase.from("usage_tracking").delete().eq("user_id", user.id)
+
+    if (action) {
+      query = query.eq("action", action)
     }
 
-    // Increment report counter
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({
-        reports_generated: currentReports + 1,
-        last_report_at: new Date().toISOString(),
-      })
-      .eq("id", user.id)
+    const { error } = await query
 
-    if (updateError) {
-      console.error("Error updating report usage:", updateError)
+    if (error) {
+      console.error("Error resetting usage:", error)
       return {
         success: false,
-        error: "Error updating report counter",
+        error: error.message,
       }
     }
 
     return {
       success: true,
       data: {
-        reportsGenerated: currentReports + 1,
-        isProUser,
-        reportType,
+        message: action ? `Usage for action '${action}' has been reset` : "All usage data has been reset",
       },
     }
   } catch (error) {
-    console.error("Report tracking error:", error)
+    console.error("Error resetting usage:", error)
     return {
       success: false,
-      error: "An error occurred while tracking report generation",
+      error: "An error occurred while resetting usage",
     }
   }
 }

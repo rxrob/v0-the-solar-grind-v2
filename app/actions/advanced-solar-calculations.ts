@@ -1,6 +1,6 @@
 "use server"
 
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { createPagesServerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 
 interface AdvancedSolarInput {
@@ -52,8 +52,8 @@ interface AdvancedSolarResult {
 
 export async function calculateAdvancedSolarSystem(input: AdvancedSolarInput): Promise<AdvancedSolarResult> {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const cookieStore = await cookies()
+    const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
     // Get current user and check subscription
     const {
@@ -115,7 +115,7 @@ export async function calculateAdvancedSolarSystem(input: AdvancedSolarInput): P
     const actualSystemSize = (numberOfPanels * panelWattage) / 1000
 
     // Calculate monthly production
-    const monthlyProduction = monthlyIrradiance.map((irradiance) => {
+    const monthlyProduction = monthlyIrradiance.map((irradiance: number) => {
       const daysInMonth = 30.44 // Average days per month
       return actualSystemSize * irradiance * daysInMonth * systemEfficiency
     })
@@ -166,7 +166,7 @@ export async function calculateAdvancedSolarSystem(input: AdvancedSolarInput): P
     const result = {
       systemSize: Math.round(actualSystemSize * 100) / 100,
       annualProduction: Math.round(annualProduction),
-      monthlyProduction: monthlyProduction.map((p) => Math.round(p)),
+      monthlyProduction: monthlyProduction.map((p: number) => Math.round(p)),
       monthlySavings: Math.round(monthlySavings * 100) / 100,
       annualSavings: Math.round(annualSavings * 100) / 100,
       paybackPeriod: Math.round(paybackPeriod * 10) / 10,
@@ -313,8 +313,8 @@ function calculateLifetimeSavings(annualSavings: number, years: number, degradat
 
 export async function getAdvancedCalculationHistory() {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const cookieStore = await cookies()
+    const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
     const {
       data: { user },

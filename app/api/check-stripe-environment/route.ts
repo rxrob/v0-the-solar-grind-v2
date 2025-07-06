@@ -32,7 +32,9 @@ export async function GET() {
     }
 
     // Test Stripe connection
-    const stripe = new Stripe(secretKey)
+    const stripe = new Stripe(secretKey, {
+      apiVersion: "2023-10-16",
+    })
 
     try {
       const account = await stripe.accounts.retrieve()

@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         user: result.user,
+        message: "Login successful",
       })
     } else {
       return NextResponse.json({

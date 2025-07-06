@@ -1,13 +1,13 @@
 "use server"
 
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { createPagesServerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
 export async function signUp(email: string, password: string, fullName?: string) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -53,8 +53,8 @@ export async function signUp(email: string, password: string, fullName?: string)
 }
 
 export async function signInWithEmail(email: string, password: string) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -70,8 +70,8 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 export async function signOut() {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const { error } = await supabase.auth.signOut()
 
@@ -84,8 +84,8 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const {
     data: { user },
@@ -129,8 +129,8 @@ export async function getCurrentUser() {
 }
 
 export async function resetPassword(email: string) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
@@ -144,8 +144,8 @@ export async function resetPassword(email: string) {
 }
 
 export async function updatePassword(password: string) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const { error } = await supabase.auth.updateUser({
     password,
@@ -159,8 +159,8 @@ export async function updatePassword(password: string) {
 }
 
 export async function signInWithGoogle() {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -181,8 +181,8 @@ export async function signInWithGoogle() {
 }
 
 export async function handleAuthCallback(code: string) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
@@ -228,8 +228,8 @@ export async function handleAuthCallback(code: string) {
 }
 
 export async function resendVerificationEmail(email: string) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const { error } = await supabase.auth.resend({
     type: "signup",
@@ -247,8 +247,8 @@ export async function resendVerificationEmail(email: string) {
 }
 
 export async function getUserSubscriptionStatus() {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createPagesServerClient({ cookies: () => cookieStore })
 
   const {
     data: { user },
