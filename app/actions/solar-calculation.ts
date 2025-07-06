@@ -1,177 +1,131 @@
 "use server"
 
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase-server"
+import { revalidatePath } from "next/cache"
 
 interface SolarCalculationInput {
+  address: string
   monthlyBill: number
   roofArea: number
-  location: string
-  latitude?: number
-  longitude?: number
-  electricityRate?: number
-  systemEfficiency?: number
-  panelWattage?: number
+  roofType: string
+  shadingLevel: string
+  electricityRate: number
 }
 
 interface SolarCalculationResult {
-  success: boolean
-  error?: string
-  data?: {
-    systemSize: number
-    annualProduction: number
-    monthlySavings: number
-    annualSavings: number
-    paybackPeriod: number
-    co2Offset: number
-    numberOfPanels: number
-    roofCoverage: number
-    installationCost: number
-    twentyYearSavings: number
-  }
+  systemSizeKw: number
+  panelsNeeded: number
+  annualProductionKwh: number
+  systemCost: number
+  netCost: number
+  annualSavings: number
+  monthlySavings: number
+  roiYears: number
+  co2OffsetTons: number
+  treesEquivalent: number
 }
 
-export async function calculateSolarSystem(input: SolarCalculationInput): Promise<SolarCalculationResult> {
+export async function performSolarCalculation(input: SolarCalculationInput): Promise<{
+  success: boolean
+  data?: SolarCalculationResult
+  error?: string
+}> {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-        },
-      },
-    )
-
-    // Get current user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError) {
-      console.error("User authentication error:", userError)
+    // Validate inputs
+    if (!input.address || !input.monthlyBill || !input.roofArea) {
+      return { success: false, error: "Required fields are missing" }
     }
 
-    // Default values
-    const electricityRate = input.electricityRate || 0.12 // $0.12 per kWh
-    const systemEfficiency = input.systemEfficiency || 0.85 // 85% efficiency
-    const panelWattage = input.panelWattage || 400 // 400W panels
-    const costPerWatt = 3.5 // $3.50 per watt installed
-    const sunHoursPerDay = 5.5 // Average sun hours (will be replaced by NREL data)
+    // Solar calculation logic
+    const avgDailySunHours = 5.5 // Default for most US locations
+    const systemEfficiency = 0.85
+    const panelWattage = 400
+    const costPerWatt = 3.0
+    const federalTaxCredit = 0.3
 
-    // Calculate annual electricity consumption
-    const annualConsumption = (input.monthlyBill / electricityRate) * 12 // kWh per year
+    // Calculate system size needed
+    const annualKwhNeeded = (input.monthlyBill * 12) / input.electricityRate
+    const systemSizeKw = annualKwhNeeded / (avgDailySunHours * 365 * systemEfficiency)
 
-    // Calculate required system size
-    const systemSize = annualConsumption / (sunHoursPerDay * 365 * systemEfficiency) // kW
+    // Round to nearest 0.5 kW
+    const roundedSystemSize = Math.round(systemSizeKw * 2) / 2
 
-    // Calculate number of panels needed
-    const numberOfPanels = Math.ceil((systemSize * 1000) / panelWattage)
+    // Calculate panels needed
+    const panelsNeeded = Math.ceil((roundedSystemSize * 1000) / panelWattage)
 
-    // Calculate actual system size based on panels
-    const actualSystemSize = (numberOfPanels * panelWattage) / 1000 // kW
+    // Recalculate actual system size based on panels
+    const actualSystemSize = (panelsNeeded * panelWattage) / 1000
 
-    // Calculate annual production
-    const annualProduction = actualSystemSize * sunHoursPerDay * 365 * systemEfficiency // kWh
+    // Calculate production
+    const annualProductionKwh = Math.round(actualSystemSize * avgDailySunHours * 365 * systemEfficiency)
+
+    // Calculate costs
+    const systemCost = Math.round(actualSystemSize * 1000 * costPerWatt)
+    const taxCredit = Math.round(systemCost * federalTaxCredit)
+    const netCost = systemCost - taxCredit
 
     // Calculate savings
-    const annualSavings = annualProduction * electricityRate
-    const monthlySavings = annualSavings / 12
+    const annualSavings = Math.round(annualProductionKwh * input.electricityRate)
+    const monthlySavings = Math.round(annualSavings / 12)
 
-    // Calculate installation cost
-    const installationCost = actualSystemSize * 1000 * costPerWatt
+    // Calculate ROI
+    const roiYears = Math.round((netCost / annualSavings) * 10) / 10
 
-    // Calculate payback period
-    const paybackPeriod = installationCost / annualSavings
+    // Environmental impact
+    const co2OffsetTons = Math.round(annualProductionKwh * 0.0004 * 100) / 100
+    const treesEquivalent = Math.round(co2OffsetTons * 16)
 
-    // Calculate 20-year savings
-    const twentyYearSavings = annualSavings * 20 - installationCost
-
-    // Calculate CO2 offset (pounds per year)
-    const co2Offset = annualProduction * 0.92 // 0.92 lbs CO2 per kWh
-
-    // Calculate roof coverage
-    const panelArea = numberOfPanels * 21.5 // 21.5 sq ft per panel
-    const roofCoverage = (panelArea / input.roofArea) * 100
-
-    const result = {
-      systemSize: Math.round(actualSystemSize * 100) / 100,
-      annualProduction: Math.round(annualProduction),
-      monthlySavings: Math.round(monthlySavings * 100) / 100,
-      annualSavings: Math.round(annualSavings * 100) / 100,
-      paybackPeriod: Math.round(paybackPeriod * 10) / 10,
-      co2Offset: Math.round(co2Offset),
-      numberOfPanels,
-      roofCoverage: Math.round(roofCoverage * 10) / 10,
-      installationCost: Math.round(installationCost),
-      twentyYearSavings: Math.round(twentyYearSavings),
+    const result: SolarCalculationResult = {
+      systemSizeKw: actualSystemSize,
+      panelsNeeded,
+      annualProductionKwh,
+      systemCost,
+      netCost,
+      annualSavings,
+      monthlySavings,
+      roiYears,
+      co2OffsetTons,
+      treesEquivalent,
     }
 
-    // Save calculation to database if user is authenticated
+    // Save calculation to database
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
     if (user) {
-      try {
-        await supabase.from("solar_calculations").insert({
-          user_id: user.id,
-          monthly_bill: input.monthlyBill,
-          roof_area: input.roofArea,
-          location: input.location,
-          latitude: input.latitude,
-          longitude: input.longitude,
-          system_size: result.systemSize,
-          annual_production: result.annualProduction,
-          annual_savings: result.annualSavings,
-          installation_cost: result.installationCost,
-          payback_period: result.paybackPeriod,
-          created_at: new Date().toISOString(),
-        })
-      } catch (dbError) {
-        console.error("Error saving calculation:", dbError)
-        // Don't fail the calculation if database save fails
-      }
+      await supabase.from("solar_calculations").insert({
+        user_id: user.id,
+        calculation_type: "advanced",
+        input_data: input,
+        result_data: result,
+        created_at: new Date().toISOString(),
+      })
+
+      revalidatePath("/dashboard")
     }
 
-    return {
-      success: true,
-      data: result,
-    }
+    return { success: true, data: result }
   } catch (error) {
     console.error("Solar calculation error:", error)
     return {
       success: false,
-      error: "An error occurred during calculation",
+      error: error instanceof Error ? error.message : "Calculation failed",
     }
   }
 }
 
-export async function getSolarCalculationHistory() {
+export async function getSolarCalculations() {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-        },
-      },
-    )
-
+    const supabase = await createClient()
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser()
 
     if (userError || !user) {
-      return {
-        success: false,
-        error: "User not authenticated",
-      }
+      return { success: false, error: "User not authenticated" }
     }
 
     const { data, error } = await supabase
@@ -179,75 +133,18 @@ export async function getSolarCalculationHistory() {
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(10)
 
     if (error) {
-      console.error("Error fetching calculation history:", error)
-      return {
-        success: false,
-        error: error.message,
-      }
+      console.error("Error fetching calculations:", error)
+      return { success: false, error: error.message }
     }
 
-    return {
-      success: true,
-      data,
-    }
+    return { success: true, data }
   } catch (error) {
-    console.error("Error fetching calculation history:", error)
+    console.error("Get calculations error:", error)
     return {
       success: false,
-      error: "An error occurred while fetching calculation history",
-    }
-  }
-}
-
-export async function deleteSolarCalculation(calculationId: string) {
-  try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-        },
-      },
-    )
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return {
-        success: false,
-        error: "User not authenticated",
-      }
-    }
-
-    const { error } = await supabase.from("solar_calculations").delete().eq("id", calculationId).eq("user_id", user.id) // Ensure user can only delete their own calculations
-
-    if (error) {
-      console.error("Error deleting calculation:", error)
-      return {
-        success: false,
-        error: error.message,
-      }
-    }
-
-    return {
-      success: true,
-      message: "Calculation deleted successfully",
-    }
-  } catch (error) {
-    console.error("Error deleting calculation:", error)
-    return {
-      success: false,
-      error: "An error occurred while deleting the calculation",
+      error: error instanceof Error ? error.message : "Failed to fetch calculations",
     }
   }
 }

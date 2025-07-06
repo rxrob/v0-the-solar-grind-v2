@@ -1,229 +1,134 @@
 "use server"
 
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase-server"
 
-interface UsageTrackingResult {
-  success: boolean
-  error?: string
-  calculationsUsed?: number
-  calculationsRemaining?: number
-  canUseFeature?: boolean
-}
-
-export async function trackCalculationUsage(userId: string, calculationType: string): Promise<UsageTrackingResult> {
+export async function trackUsage(userId: string, action: string) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set(name, value, options)
-          },
-          remove(name: string, options: any) {
-            cookieStore.set(name, "", options)
-          },
-        },
-      },
-    )
+    const supabase = await createClient()
 
-    // Get current user data
-    const { data: userData, error: userError } = await supabase.from("users").select("*").eq("id", userId).single()
-
-    if (userError) {
-      return { success: false, error: userError.message }
-    }
-
-    if (!userData) {
-      return { success: false, error: "User not found" }
-    }
-
-    // Check if user can use this feature
-    const isPro = userData.subscription_type === "pro" && userData.subscription_status === "active"
-    const hasTrialAccess = !userData.pro_trial_used && calculationType === "advanced"
-    const hasCalculationsLeft = userData.calculations_used < userData.monthly_calculation_limit
-
-    if (!isPro && !hasTrialAccess && !hasCalculationsLeft) {
-      return {
-        success: false,
-        error: "Calculation limit reached",
-        calculationsUsed: userData.calculations_used,
-        calculationsRemaining: userData.monthly_calculation_limit - userData.calculations_used,
-        canUseFeature: false,
-      }
-    }
-
-    // Update usage tracking
-    const updates: any = {}
-
-    if (!isPro) {
-      if (calculationType === "advanced" && !userData.pro_trial_used) {
-        updates.pro_trial_used = true
-      } else {
-        updates.calculations_used = userData.calculations_used + 1
-      }
-    }
-
-    if (Object.keys(updates).length > 0) {
-      updates.updated_at = new Date().toISOString()
-
-      const { error: updateError } = await supabase.from("users").update(updates).eq("id", userId)
-
-      if (updateError) {
-        return { success: false, error: updateError.message }
-      }
-    }
-
-    return {
-      success: true,
-      calculationsUsed: updates.calculations_used || userData.calculations_used,
-      calculationsRemaining:
-        userData.monthly_calculation_limit - (updates.calculations_used || userData.calculations_used),
-      canUseFeature: true,
-    }
-  } catch (error) {
-    console.error("Error tracking usage:", error)
-    return { success: false, error: "Failed to track usage" }
-  }
-}
-
-export async function getUserUsageStats(userId: string): Promise<UsageTrackingResult & { userData?: any }> {
-  try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-        },
-      },
-    )
-
-    const { data: userData, error } = await supabase.from("users").select("*").eq("id", userId).single()
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    if (!userData) {
-      return { success: false, error: "User not found" }
-    }
-
-    return {
-      success: true,
-      calculationsUsed: userData.calculations_used,
-      calculationsRemaining: userData.monthly_calculation_limit - userData.calculations_used,
-      canUseFeature:
-        userData.subscription_type === "pro" || userData.calculations_used < userData.monthly_calculation_limit,
-      userData,
-    }
-  } catch (error) {
-    console.error("Error getting usage stats:", error)
-    return { success: false, error: "Failed to get usage stats" }
-  }
-}
-
-export async function resetMonthlyUsage(userId: string): Promise<UsageTrackingResult> {
-  try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set(name, value, options)
-          },
-          remove(name: string, options: any) {
-            cookieStore.set(name, "", options)
-          },
-        },
-      },
-    )
-
-    const { error } = await supabase
-      .from("users")
-      .update({
-        calculations_used: 0,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId)
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, calculationsUsed: 0 }
-  } catch (error) {
-    console.error("Error resetting usage:", error)
-    return { success: false, error: "Failed to reset usage" }
-  }
-}
-
-export async function upgradeToProTrial(userId: string): Promise<UsageTrackingResult> {
-  try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set(name, value, options)
-          },
-          remove(name: string, options: any) {
-            cookieStore.set(name, "", options)
-          },
-        },
-      },
-    )
-
-    // Check if user has already used trial
+    // Get current user's subscription status
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("pro_trial_used")
+      .select("subscription_status, monthly_calculations_used")
       .eq("id", userId)
       .single()
 
     if (userError) {
+      console.error("Error fetching user data:", userError)
       return { success: false, error: userError.message }
     }
 
-    if (userData?.pro_trial_used) {
-      return { success: false, error: "Pro trial already used" }
+    // Check usage limits for free users
+    if (userData.subscription_status === "free" && action === "calculation") {
+      const currentUsage = userData.monthly_calculations_used || 0
+      const freeLimit = 5
+
+      if (currentUsage >= freeLimit) {
+        return {
+          success: false,
+          error: "Monthly calculation limit reached. Upgrade to Pro for unlimited calculations.",
+          limitReached: true,
+        }
+      }
+
+      // Increment usage count
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({
+          monthly_calculations_used: currentUsage + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId)
+
+      if (updateError) {
+        console.error("Error updating usage:", updateError)
+        return { success: false, error: updateError.message }
+      }
     }
+
+    // Log the usage
+    const { error: logError } = await supabase.from("usage_logs").insert({
+      user_id: userId,
+      action,
+      timestamp: new Date().toISOString(),
+    })
+
+    if (logError) {
+      console.error("Error logging usage:", logError)
+      // Don't fail the request if logging fails
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Usage tracking error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Usage tracking failed",
+    }
+  }
+}
+
+export async function getUserUsageStats(userId: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("subscription_status, monthly_calculations_used, subscription_type")
+      .eq("id", userId)
+      .single()
+
+    if (error) {
+      console.error("Error fetching usage stats:", error)
+      return { success: false, error: error.message }
+    }
+
+    const freeLimit = 5
+    const remainingCalculations =
+      data.subscription_status === "free" ? Math.max(0, freeLimit - (data.monthly_calculations_used || 0)) : -1 // Unlimited for pro users
+
+    return {
+      success: true,
+      data: {
+        subscriptionStatus: data.subscription_status,
+        subscriptionType: data.subscription_type,
+        monthlyCalculationsUsed: data.monthly_calculations_used || 0,
+        remainingCalculations,
+        isUnlimited: data.subscription_status !== "free",
+      },
+    }
+  } catch (error) {
+    console.error("Get usage stats error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch usage stats",
+    }
+  }
+}
+
+export async function resetMonthlyUsage() {
+  try {
+    const supabase = await createClient()
 
     const { error } = await supabase
       .from("users")
       .update({
-        subscription_type: "pro",
-        subscription_status: "trial",
-        pro_trial_used: true,
+        monthly_calculations_used: 0,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", userId)
+      .neq("id", "00000000-0000-0000-0000-000000000000") // Update all real users
 
     if (error) {
+      console.error("Error resetting monthly usage:", error)
       return { success: false, error: error.message }
     }
 
-    return { success: true, canUseFeature: true }
+    return { success: true }
   } catch (error) {
-    console.error("Error upgrading to pro trial:", error)
-    return { success: false, error: "Failed to upgrade to pro trial" }
+    console.error("Reset monthly usage error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to reset usage",
+    }
   }
 }
