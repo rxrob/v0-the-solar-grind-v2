@@ -1,238 +1,179 @@
 "use server"
 
-import { getCurrentUserReal } from "./auth-real"
+import { createServerClient } from "@/lib/supabase-server-client"
+import { cookies } from "next/headers"
 
-export interface CalculationResult {
+interface CalculationResult {
   annualProduction: number
   monthlyProduction: number[]
   dailyAverage: number
   peakProduction: number
-  systemCost: number
+  systemSize: number
+  panelCount: number
+  estimatedCost: number
   annualSavings: number
   paybackPeriod: number
   co2Offset: number
-  equivalentTrees: number
-  systemSize: number
-  numberOfPanels: number
-  roofAreaNeeded: number
+  roofArea: number
+  sunHours: number
 }
 
-export interface SolarCalculationParams {
+interface SolarParams {
   address: string
-  latitude: number
-  longitude: number
+  lat: number
+  lng: number
   monthlyBill: number
-  roofArea?: number
-  systemSize?: number
-  panelEfficiency?: number
-  electricityRate?: number
-  installationCost?: number
+  roofSize: number
+  shading: string
+  roofType: string
+  electricityRate: number
 }
 
-export async function calculateSolarPotential(params: SolarCalculationParams): Promise<CalculationResult> {
+async function fetchSunHours(lat: number, lng: number): Promise<number> {
   try {
-    // Get current user for tracking
-    const user = await getCurrentUserReal()
-
-    // Validate required parameters
-    if (!params.latitude || !params.longitude) {
-      throw new Error("Location coordinates are required")
+    const nrelApiKey = process.env.NREL_API_KEY
+    if (!nrelApiKey) {
+      console.warn("NREL API key not found, using default sun hours")
+      return 5.0 // Default sun hours
     }
 
-    if (!params.monthlyBill || params.monthlyBill <= 0) {
-      throw new Error("Valid monthly electricity bill is required")
-    }
+    const url = `https://developer.nrel.gov/api/solar/solar_resource/v1.json?api_key=${nrelApiKey}&lat=${lat}&lon=${lng}`
+    const response = await fetch(url)
 
-    // Default values
-    const electricityRate = params.electricityRate || 0.12 // $/kWh
-    const panelEfficiency = params.panelEfficiency || 20 // %
-    const installationCost = params.installationCost || 3.0 // $/W
-    const systemLosses = 0.14 // 14% system losses
-    const degradationRate = 0.005 // 0.5% per year
-
-    // Calculate annual usage from monthly bill
-    const annualUsage = (params.monthlyBill / electricityRate) * 12
-
-    // Get solar irradiance data
-    const solarData = await fetchSolarIrradiance(params.latitude, params.longitude)
-    const peakSunHours = solarData.averageDailyIrradiance || 4.5
-
-    // Calculate recommended system size
-    const recommendedSystemSize = params.systemSize || calculateSystemSize(annualUsage, peakSunHours)
-
-    // Calculate energy production
-    const systemEfficiency = (panelEfficiency / 100) * (1 - systemLosses)
-    const annualProduction = recommendedSystemSize * peakSunHours * 365 * systemEfficiency
-
-    // Calculate monthly production with seasonal variations
-    const monthlyProduction = calculateMonthlyProduction(annualProduction, params.latitude)
-
-    // Calculate financial metrics
-    const systemCost = recommendedSystemSize * installationCost * 1000 // Convert kW to W
-    const annualSavings = Math.min(annualProduction, annualUsage) * electricityRate
-    const paybackPeriod = systemCost / annualSavings
-
-    // Calculate environmental impact
-    const co2PerKwh = 0.4 // kg CO2 per kWh
-    const co2Offset = annualProduction * co2PerKwh
-    const equivalentTrees = co2Offset / 22 // kg CO2 per tree per year
-
-    // Calculate system specifications
-    const panelWattage = 400 // Standard panel wattage
-    const numberOfPanels = Math.ceil((recommendedSystemSize * 1000) / panelWattage)
-    const panelArea = 2.0 // m² per panel
-    const roofAreaNeeded = numberOfPanels * panelArea
-
-    const result: CalculationResult = {
-      annualProduction: Math.round(annualProduction),
-      monthlyProduction: monthlyProduction.map((p: number) => Math.round(p)),
-      dailyAverage: Math.round(annualProduction / 365),
-      peakProduction: Math.round(recommendedSystemSize * 0.8), // 80% of rated capacity
-      systemCost: Math.round(systemCost),
-      annualSavings: Math.round(annualSavings),
-      paybackPeriod: Math.round(paybackPeriod * 10) / 10,
-      co2Offset: Math.round(co2Offset),
-      equivalentTrees: Math.round(equivalentTrees),
-      systemSize: Math.round(recommendedSystemSize * 10) / 10,
-      numberOfPanels,
-      roofAreaNeeded: Math.round(roofAreaNeeded),
-    }
-
-    // Save calculation if user is authenticated
-    if (user && user.email) {
-      await saveSolarCalculation(user.email, params, result)
-    }
-
-    return result
-  } catch (error) {
-    console.error("Solar calculation error:", error)
-    throw new Error(error instanceof Error ? error.message : "Calculation failed")
-  }
-}
-
-async function fetchSolarIrradiance(latitude: number, longitude: number) {
-  try {
-    const apiKey = process.env.NREL_API_KEY
-    if (!apiKey) {
-      console.warn("NREL API key not configured, using default values")
-      return { averageDailyIrradiance: 4.5 }
-    }
-
-    const url = `https://developer.nrel.gov/api/solar/solar_resource/v1.json?api_key=${apiKey}&lat=${latitude}&lon=${longitude}`
-
-    const response = await fetch(url, { next: { revalidate: 3600 } }) // Cache for 1 hour
     if (!response.ok) {
-      throw new Error(`NREL API error: ${response.status}`)
+      console.warn("NREL API request failed, using default sun hours")
+      return 5.0
     }
 
     const data = await response.json()
-    return {
-      averageDailyIrradiance: data.outputs?.avg_ghi?.annual || 4.5,
-    }
+    return data.outputs?.avg_ghi?.annual || 5.0
   } catch (error) {
-    console.error("NREL API error:", error)
-    // Return default values if API fails
-    return { averageDailyIrradiance: 4.5 }
+    console.error("Error fetching sun hours:", error)
+    return 5.0 // Fallback value
   }
 }
 
-function calculateSystemSize(annualUsage: number, peakSunHours: number): number {
-  // Calculate system size needed to offset 100% of usage
-  const systemEfficiency = 0.8 // 80% overall system efficiency
-  const systemSize = annualUsage / (peakSunHours * 365 * systemEfficiency)
-  return Math.max(1, Math.min(20, systemSize)) // Limit between 1kW and 20kW
-}
-
-function calculateMonthlyProduction(annualProduction: number, latitude: number): number[] {
-  // Seasonal adjustment factors based on latitude
-  const isNorthern = latitude > 0
-  const seasonalFactors = isNorthern
-    ? [0.7, 0.8, 1.0, 1.2, 1.3, 1.4, 1.4, 1.3, 1.1, 0.9, 0.7, 0.6] // Northern hemisphere
-    : [1.4, 1.3, 1.1, 0.9, 0.7, 0.6, 0.7, 0.8, 1.0, 1.2, 1.3, 1.4] // Southern hemisphere
-
-  const monthlyProduction: number[] = []
-  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-
-  for (let i = 0; i < 12; i++) {
-    const monthlyProd = (annualProduction / 365) * daysInMonth[i] * seasonalFactors[i]
-    monthlyProduction.push(monthlyProd)
-  }
-
-  return monthlyProduction
-}
-
-async function saveSolarCalculation(userEmail: string, params: SolarCalculationParams, result: CalculationResult) {
+async function saveCalculation(userEmail: string, params: SolarParams, results: CalculationResult) {
   try {
-    // This would save to database in a real implementation
-    console.log("Saving solar calculation for:", userEmail)
-    console.log("Params:", params)
-    console.log("Result:", result)
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
 
-    // In a real implementation, you would save to Supabase here
-    // const supabase = createServerClient()
-    // await supabase.from('solar_calculations').insert({
-    //   user_email: userEmail,
-    //   calculation_params: params,
-    //   calculation_results: result,
-    //   created_at: new Date().toISOString()
-    // })
+    const { error } = await supabase.from("solar_calculations").insert({
+      user_email: userEmail,
+      calculation_type: "basic",
+      input_data: params,
+      results: results,
+      created_at: new Date().toISOString(),
+    })
+
+    if (error) {
+      console.error("Error saving calculation:", error)
+    }
   } catch (error) {
-    console.error("Error saving solar calculation:", error)
-    // Don't throw error here as it shouldn't break the calculation
+    console.error("Error saving calculation:", error)
   }
 }
 
-export async function getSolarCalculationHistory(limit = 10) {
+export async function performSolarCalculation(params: SolarParams): Promise<CalculationResult> {
   try {
-    const user = await getCurrentUserReal()
+    // Get current user
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-    if (!user || !user.email) {
-      return {
-        success: false,
-        error: "User not authenticated",
-      }
+    // Fetch sun hours data
+    const sunHours = await fetchSunHours(params.lat, params.lng)
+
+    // Calculate annual usage from monthly bill
+    const annualUsage = (params.monthlyBill / params.electricityRate) * 12
+
+    // Calculate system size needed (kW)
+    const systemSize = annualUsage / (sunHours * 365 * 0.8) // 80% efficiency factor
+
+    // Apply shading factor
+    let shadingFactor = 1.0
+    switch (params.shading) {
+      case "heavy":
+        shadingFactor = 0.7
+        break
+      case "moderate":
+        shadingFactor = 0.85
+        break
+      case "light":
+        shadingFactor = 0.95
+        break
+      default:
+        shadingFactor = 1.0
     }
 
-    // This would fetch from database in a real implementation
-    console.log("Fetching solar calculation history for:", user.email)
-
-    // Return mock data for now
-    return {
-      success: true,
-      calculations: [],
+    // Apply roof type factor
+    let roofFactor = 1.0
+    switch (params.roofType) {
+      case "asphalt":
+        roofFactor = 1.0
+        break
+      case "metal":
+        roofFactor = 1.05
+        break
+      case "tile":
+        roofFactor = 0.95
+        break
+      case "flat":
+        roofFactor = 0.9
+        break
+      default:
+        roofFactor = 1.0
     }
+
+    // Calculate adjusted system size
+    const adjustedSystemSize = Math.min(systemSize, params.roofSize / 100) // Limit by roof size
+
+    // Calculate annual production
+    const annualProduction = adjustedSystemSize * sunHours * 365 * shadingFactor * roofFactor
+
+    // Calculate monthly production (simplified seasonal variation)
+    const monthlyProduction = []
+    const seasonalFactors = [0.8, 0.9, 1.1, 1.2, 1.3, 1.3, 1.4, 1.3, 1.1, 1.0, 0.8, 0.7]
+
+    for (let i = 0; i < 12; i++) {
+      monthlyProduction.push((annualProduction / 12) * seasonalFactors[i])
+    }
+
+    // Calculate other metrics
+    const dailyAverage = annualProduction / 365
+    const peakProduction = adjustedSystemSize * 5 // Assuming 5 hours of peak sun
+    const panelCount = Math.ceil((adjustedSystemSize * 1000) / 400) // 400W panels
+    const estimatedCost = adjustedSystemSize * 3000 // $3/W installed cost
+    const annualSavings = Math.min(annualProduction, annualUsage) * params.electricityRate
+    const paybackPeriod = estimatedCost / annualSavings
+    const co2Offset = annualProduction * 0.0004 * 1000 // kg CO2 per year
+    const roofArea = adjustedSystemSize * 100 // sq ft needed
+
+    const results: CalculationResult = {
+      annualProduction: Math.round(annualProduction),
+      monthlyProduction: monthlyProduction.map((p) => Math.round(p)),
+      dailyAverage: Math.round(dailyAverage),
+      peakProduction: Math.round(peakProduction),
+      systemSize: Math.round(adjustedSystemSize * 10) / 10,
+      panelCount,
+      estimatedCost: Math.round(estimatedCost),
+      annualSavings: Math.round(annualSavings),
+      paybackPeriod: Math.round(paybackPeriod * 10) / 10,
+      co2Offset: Math.round(co2Offset),
+      roofArea: Math.round(roofArea),
+      sunHours: Math.round(sunHours * 10) / 10,
+    }
+
+    // Save calculation to database if user is authenticated
+    if (user?.email) {
+      await saveCalculation(user.email, params, results)
+    }
+
+    return results
   } catch (error) {
-    console.error("Error fetching calculation history:", error)
-    return {
-      success: false,
-      error: "Failed to fetch calculation history",
-    }
-  }
-}
-
-export async function deleteSolarCalculation(calculationId: string) {
-  try {
-    const user = await getCurrentUserReal()
-
-    if (!user || !user.email) {
-      return {
-        success: false,
-        error: "User not authenticated",
-      }
-    }
-
-    // This would delete from database in a real implementation
-    console.log("Deleting solar calculation:", calculationId, "for user:", user.email)
-
-    return {
-      success: true,
-      message: "Calculation deleted successfully",
-    }
-  } catch (error) {
-    console.error("Error deleting calculation:", error)
-    return {
-      success: false,
-      error: "Failed to delete calculation",
-    }
+    console.error("Solar calculation error:", error)
+    throw new Error("Failed to perform solar calculation")
   }
 }

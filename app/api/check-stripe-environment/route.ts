@@ -61,9 +61,7 @@ export async function GET() {
     // Test Stripe connection
     if (secretKey && secretKey.startsWith("sk_")) {
       try {
-        const stripe = new Stripe(secretKey, {
-          apiVersion: "2024-06-20",
-        })
+        const stripe = new Stripe(secretKey)
 
         const account = await stripe.accounts.retrieve()
 

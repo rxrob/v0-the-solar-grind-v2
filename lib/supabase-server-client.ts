@@ -1,15 +1,14 @@
-import { createServerClient as createSupabaseServerClient, type CookieOptions } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
+import type { cookies } from "next/headers"
+import { createClient } from "@supabase/supabase-js"
 
-export function createServerClient() {
-  const cookieStore = cookies()
-
-  return createSupabaseServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+export function createServerClient(cookieStore: ReturnType<typeof cookies>) {
+  return createSupabaseServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value
       },
-      set(name: string, value: string, options: CookieOptions) {
+      set(name: string, value: string, options: any) {
         try {
           cookieStore.set({ name, value, ...options })
         } catch (error) {
@@ -18,7 +17,7 @@ export function createServerClient() {
           // user sessions.
         }
       },
-      remove(name: string, options: CookieOptions) {
+      remove(name: string, options: any) {
         try {
           cookieStore.set({ name, value: "", ...options })
         } catch (error) {
@@ -31,23 +30,37 @@ export function createServerClient() {
   })
 }
 
-// Test database connection
-export async function testDatabaseConnection() {
+// Test connection function
+export async function testSupabaseConnection() {
   try {
-    const supabase = createServerClient()
-    const { data, error } = await supabase.from("users").select("count", { count: "exact", head: true })
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    if (error) {
-      console.error("Database connection test failed:", error)
-      return { success: false, error: error.message }
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Missing Supabase environment variables")
     }
 
-    return { success: true, message: "Database connection successful" }
-  } catch (error) {
-    console.error("Database connection test error:", error)
-    return { success: false, error: "Failed to connect to database" }
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Test the connection by trying to fetch from auth.users
+    const { data, error } = await supabase.auth.admin.listUsers()
+
+    if (error) {
+      throw error
+    }
+
+    return {
+      success: true,
+      message: "Supabase connection successful",
+      userCount: data.users.length,
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message,
+    }
   }
 }
 
 // Re-export createClient for compatibility
-export { createServerClient as createClient }
+export { createClient }
