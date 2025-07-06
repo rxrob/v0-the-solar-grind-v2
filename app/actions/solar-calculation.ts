@@ -1,6 +1,15 @@
 "use server"
 
-import type { CalculationResult } from "@/types"
+interface CalculationResult {
+  systemSize: number
+  annualProduction: number
+  monthlyBillOffset: number
+  totalCost: number
+  paybackPeriod: number
+  co2Offset: number
+  roofArea: number
+  panelCount: number
+}
 
 export async function calculateSolar(
   address: string,

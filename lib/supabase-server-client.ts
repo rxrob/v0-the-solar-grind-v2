@@ -2,21 +2,28 @@ import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { createClient } from "@supabase/supabase-js"
 
-export async function createServerClient() {
-  const cookieStore = await cookies()
+export function createServerClient() {
+  const cookieStore = cookies()
 
   return createSupabaseServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll()
+      get(name: string) {
+        return cookieStore.get(name)?.value
       },
-      setAll(cookiesToSet) {
+      set(name: string, value: string, options: any) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
+          cookieStore.set({ name, value, ...options })
         } catch (error) {
-          // The `setAll` method was called from a Server Component.
+          // The `set` method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing
+          // user sessions.
+        }
+      },
+      remove(name: string, options: any) {
+        try {
+          cookieStore.set({ name, value: "", ...options })
+        } catch (error) {
+          // The `delete` method was called from a Server Component.
           // This can be ignored if you have middleware refreshing
           // user sessions.
         }
@@ -25,68 +32,23 @@ export async function createServerClient() {
   })
 }
 
-// Export createClient for compatibility
-export { createClient }
-
-// Test database connection
-export async function testDatabaseConnection() {
+// Test connection function
+export async function testSupabaseConnection() {
   try {
-    const supabase = await createServerClient()
+    const supabase = createServerClient()
     const { data, error } = await supabase.from("users").select("count").limit(1)
 
     if (error) {
-      console.error("Database connection test failed:", error)
+      console.error("Supabase connection error:", error)
       return { success: false, error: error.message }
     }
 
-    return { success: true, message: "Database connection successful" }
+    return { success: true, message: "Connection successful" }
   } catch (error) {
-    console.error("Database connection test error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
+    console.error("Supabase connection test failed:", error)
+    return { success: false, error: "Connection failed" }
   }
 }
 
-// Get server-side user session
-export async function getServerSession() {
-  try {
-    const supabase = await createServerClient()
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession()
-
-    if (error) {
-      console.error("Get session error:", error)
-      return null
-    }
-
-    return session
-  } catch (error) {
-    console.error("Get session error:", error)
-    return null
-  }
-}
-
-// Get server-side user
-export async function getServerUser() {
-  try {
-    const supabase = await createServerClient()
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-
-    if (error) {
-      console.error("Get user error:", error)
-      return null
-    }
-
-    return user
-  } catch (error) {
-    console.error("Get user error:", error)
-    return null
-  }
-}
+// Re-export createClient for compatibility
+export { createClient }
