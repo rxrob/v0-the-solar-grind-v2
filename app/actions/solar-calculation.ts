@@ -239,3 +239,30 @@ export async function saveAdvancedCalculation(userId: string, input: AdvancedSol
     return { success: false, error: "Failed to save calculation" }
   }
 }
+
+export async function getUserAdvancedCalculations(userId: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from("solar_calculations")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("calculation_type", "advanced")
+      .order("created_at", { ascending: false })
+      .limit(10)
+
+    if (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+
+    return { success: true, data: data || [] }
+  } catch (error) {
+    console.error("Get user advanced calculations error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch calculations",
+      data: [],
+    }
+  }
+}

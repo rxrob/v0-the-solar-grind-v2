@@ -29,7 +29,12 @@ export async function signUp(email: string, password: string, fullName: string) 
         email: data.user.email,
         full_name: fullName,
         subscription_type: "free",
+        subscription_status: "active",
+        calculations_used: 0,
+        monthly_calculation_limit: 3,
+        pro_trial_used: false,
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
 
       if (profileError) {
