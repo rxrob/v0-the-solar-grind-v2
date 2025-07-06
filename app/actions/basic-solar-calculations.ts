@@ -4,171 +4,109 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 
 interface BasicSolarInput {
-  address: string
   monthlyBill: number
-  roofArea: number
-  electricityRate?: number
-  customerName?: string
-  customerEmail?: string
-  customerPhone?: string
+  roofSize: number
+  location: string
+  userId?: string
 }
 
 interface BasicSolarResult {
-  success: boolean
-  error?: string
-  data?: {
-    systemSize: number
-    annualProduction: number
-    monthlySavings: number
-    annualSavings: number
-    paybackPeriod: number
-    co2Offset: number
-    numberOfPanels: number
-    roofCoverage: number
-    installationCost: number
-    twentyYearSavings: number
-    federalTaxCredit: number
-    netCost: number
-    monthlyPayment: number
-    peakSunHours: number
-  }
+  systemSize: number
+  estimatedCost: number
+  annualSavings: number
+  paybackPeriod: number
+  co2Reduction: number
+  panelsNeeded: number
+  roofCoverage: number
+  monthlyPayment: number
+  twentyYearSavings: number
 }
 
 export async function calculateBasicSolarSystem(input: BasicSolarInput): Promise<BasicSolarResult> {
-  try {
-    // Basic solar calculation logic
-    const electricityRate = input.electricityRate || 0.12 // $0.12 per kWh default
-    const systemEfficiency = 0.85 // 85% efficiency
-    const panelWattage = 400 // 400W panels
-    const costPerWatt = 3.5 // $3.50 per watt installed
-    const peakSunHours = 5.5 // Average peak sun hours
-    const federalTaxCreditRate = 0.3 // 30% federal tax credit
+  const { monthlyBill, roofSize, location } = input
 
-    // Calculate annual electricity consumption
-    const annualConsumption = (input.monthlyBill / electricityRate) * 12 // kWh per year
+  // Basic calculations
+  const annualUsage = monthlyBill * 12 * 12 // Rough kWh estimate
+  const systemSize = Math.min(annualUsage / 1200, roofSize / 100) // kW
+  const panelsNeeded = Math.ceil(systemSize / 0.4) // 400W panels
+  const roofCoverage = (panelsNeeded * 20) / roofSize // sq ft per panel
 
-    // Calculate required system size
-    const systemSize = annualConsumption / (peakSunHours * 365 * systemEfficiency) // kW
+  // Cost calculations
+  const costPerWatt = 3.5
+  const estimatedCost = systemSize * 1000 * costPerWatt
+  const federalTaxCredit = estimatedCost * 0.3
+  const netCost = estimatedCost - federalTaxCredit
 
-    // Calculate number of panels needed
-    const numberOfPanels = Math.ceil((systemSize * 1000) / panelWattage)
+  // Savings calculations
+  const annualProduction = systemSize * 1200 // kWh per year
+  const electricityRate = 0.13 // per kWh
+  const annualSavings = annualProduction * electricityRate
+  const paybackPeriod = netCost / annualSavings
+  const twentyYearSavings = annualSavings * 20 - netCost
 
-    // Calculate actual system size based on panels
-    const actualSystemSize = (numberOfPanels * panelWattage) / 1000 // kW
+  // Environmental impact
+  const co2Reduction = annualProduction * 0.92 // lbs CO2 per kWh
 
-    // Calculate annual production
-    const annualProduction = actualSystemSize * peakSunHours * 365 * systemEfficiency // kWh
+  // Financing
+  const monthlyPayment = netCost / (20 * 12) // 20-year loan estimate
 
-    // Calculate savings
-    const annualSavings = annualProduction * electricityRate
-    const monthlySavings = annualSavings / 12
-
-    // Calculate installation cost
-    const installationCost = actualSystemSize * 1000 * costPerWatt
-
-    // Calculate federal tax credit
-    const federalTaxCredit = installationCost * federalTaxCreditRate
-
-    // Calculate net cost after tax credit
-    const netCost = installationCost - federalTaxCredit
-
-    // Calculate payback period
-    const paybackPeriod = netCost / annualSavings
-
-    // Calculate 20-year savings
-    const twentyYearSavings = annualSavings * 20 - netCost
-
-    // Calculate monthly payment (assuming 20-year loan at 4.5% APR)
-    const loanTerm = 20 * 12 // 20 years in months
-    const monthlyRate = 0.045 / 12 // 4.5% APR monthly
-    const monthlyPayment =
-      (netCost * (monthlyRate * Math.pow(1 + monthlyRate, loanTerm))) / (Math.pow(1 + monthlyRate, loanTerm) - 1)
-
-    // Calculate CO2 offset (pounds per year)
-    const co2Offset = annualProduction * 0.92 // 0.92 lbs CO2 per kWh
-
-    // Calculate roof coverage
-    const panelArea = numberOfPanels * 21.5 // 21.5 sq ft per panel
-    const roofCoverage = (panelArea / input.roofArea) * 100
-
-    const result = {
-      systemSize: Math.round(actualSystemSize * 100) / 100,
-      annualProduction: Math.round(annualProduction),
-      monthlySavings: Math.round(monthlySavings * 100) / 100,
-      annualSavings: Math.round(annualSavings * 100) / 100,
-      paybackPeriod: Math.round(paybackPeriod * 10) / 10,
-      co2Offset: Math.round(co2Offset),
-      numberOfPanels,
-      roofCoverage: Math.round(roofCoverage * 10) / 10,
-      installationCost: Math.round(installationCost),
-      twentyYearSavings: Math.round(twentyYearSavings),
-      federalTaxCredit: Math.round(federalTaxCredit),
-      netCost: Math.round(netCost),
-      monthlyPayment: Math.round(monthlyPayment * 100) / 100,
-      peakSunHours: Math.round(peakSunHours * 10) / 10,
-    }
-
-    // Save calculation to database if user is authenticated
-    try {
-      const cookieStore = cookies()
-      const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          cookies: {
-            get(name: string) {
-              return cookieStore.get(name)?.value
-            },
-          },
-        },
-      )
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (!userError && user) {
-        await supabase.from("solar_calculations").insert({
-          user_id: user.id,
-          calculation_type: "basic",
-          address: input.address,
-          monthly_bill: input.monthlyBill,
-          roof_area: input.roofArea,
-          electricity_rate: electricityRate,
-          system_size: result.systemSize,
-          annual_production: result.annualProduction,
-          annual_savings: result.annualSavings,
-          installation_cost: result.installationCost,
-          net_cost: result.netCost,
-          payback_period: result.paybackPeriod,
-          customer_name: input.customerName,
-          customer_email: input.customerEmail,
-          customer_phone: input.customerPhone,
-          created_at: new Date().toISOString(),
-        })
-      }
-    } catch (dbError) {
-      console.error("Error saving basic calculation:", dbError)
-      // Don't fail the calculation if database save fails
-    }
-
-    return {
-      success: true,
-      data: result,
-    }
-  } catch (error) {
-    console.error("Basic solar calculation error:", error)
-    return {
-      success: false,
-      error: "An error occurred during calculation",
-    }
+  return {
+    systemSize: Math.round(systemSize * 100) / 100,
+    estimatedCost: Math.round(estimatedCost),
+    annualSavings: Math.round(annualSavings),
+    paybackPeriod: Math.round(paybackPeriod * 10) / 10,
+    co2Reduction: Math.round(co2Reduction),
+    panelsNeeded,
+    roofCoverage: Math.round(roofCoverage * 100),
+    monthlyPayment: Math.round(monthlyPayment),
+    twentyYearSavings: Math.round(twentyYearSavings),
   }
 }
 
-export async function getBasicCalculationHistory() {
+export async function saveBasicCalculation(userId: string, input: BasicSolarInput, result: BasicSolarResult) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            cookieStore.set({ name, value, ...options })
+          },
+          remove(name: string, options: any) {
+            cookieStore.set({ name, value: "", ...options })
+          },
+        },
+      },
+    )
+
+    const { error } = await supabase.from("solar_calculations").insert({
+      user_id: userId,
+      calculation_type: "basic",
+      input_data: input,
+      result_data: result,
+      created_at: new Date().toISOString(),
+    })
+
+    if (error) {
+      console.error("Error saving calculation:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error saving calculation:", error)
+    return { success: false, error: "Failed to save calculation" }
+  }
+}
+
+export async function getUserBasicCalculations(userId: string) {
+  try {
+    const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -181,46 +119,24 @@ export async function getBasicCalculationHistory() {
       },
     )
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return {
-        success: false,
-        error: "User not authenticated",
-      }
-    }
-
     const { data, error } = await supabase
       .from("solar_calculations")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("calculation_type", "basic")
       .order("created_at", { ascending: false })
-      .limit(10)
 
     if (error) {
-      console.error("Error fetching basic calculation history:", error)
-      return {
-        success: false,
-        error: error.message,
-      }
+      console.error("Error fetching calculations:", error)
+      return { success: false, error: error.message, data: [] }
     }
 
-    return {
-      success: true,
-      data,
-    }
+    return { success: true, data: data || [] }
   } catch (error) {
-    console.error("Error fetching basic calculation history:", error)
-    return {
-      success: false,
-      error: "An error occurred while fetching calculation history",
-    }
+    console.error("Error fetching calculations:", error)
+    return { success: false, error: "Failed to fetch calculations", data: [] }
   }
 }
 
-// Add this export alias at the end of the file
+// Export alias for backward compatibility
 export const calculateBasicSolar = calculateBasicSolarSystem
