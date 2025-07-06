@@ -1,315 +1,249 @@
 "use server"
 
 import { createServerClient } from "@/lib/supabase-server-client"
-import { headers } from "next/headers"
+import { revalidatePath } from "next/cache"
 
-export async function signUpReal(email: string, password: string, name?: string) {
-  const supabase = createServerClient()
-
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: name || "",
-        },
-      },
-    })
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    // Check if email confirmation is required
-    if (data.user && !data.session) {
-      return {
-        success: true,
-        needsVerification: true,
-        message: "Please check your email to confirm your account.",
-      }
-    }
-
-    // Create user profile in custom table
-    if (data.user) {
-      const { error: profileError } = await supabase.from("users").insert({
-        id: data.user.id,
-        email: data.user.email,
-        name: name || "",
-        subscription_tier: "free",
-        subscription_status: "active",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-
-      if (profileError) {
-        console.error("Profile creation error:", profileError)
-      }
-    }
-
-    return { success: true, user: data.user }
-  } catch (error) {
-    console.error("Sign up error:", error)
-    return { success: false, error: "Failed to create account" }
-  }
+interface AuthResult {
+  success: boolean
+  error?: string
+  user?: any
+  needsVerification?: boolean
+  message?: string
 }
 
-export async function signInReal(email: string, password: string) {
-  const supabase = createServerClient()
-
+export async function signInWithEmailReal(email: string, password: string): Promise<AuthResult> {
   try {
+    const supabase = createServerClient()
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
     if (error) {
-      return { success: false, error: error.message }
+      return {
+        success: false,
+        error: error.message,
+      }
     }
 
-    return { success: true, user: data.user }
+    revalidatePath("/", "layout")
+    return {
+      success: true,
+      user: data.user,
+    }
   } catch (error) {
     console.error("Sign in error:", error)
-    return { success: false, error: "Failed to sign in" }
+    return {
+      success: false,
+      error: "An unexpected error occurred during sign in",
+    }
   }
 }
 
-export async function signInWithEmailReal(email: string, password: string) {
-  return signInReal(email, password)
+export async function signUpReal(email: string, password: string, fullName: string): Promise<AuthResult> {
+  try {
+    const supabase = createServerClient()
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
+    })
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+      }
+    }
+
+    // Check if email confirmation is required
+    if (data.user && !data.user.email_confirmed_at) {
+      return {
+        success: true,
+        needsVerification: true,
+        user: data.user,
+      }
+    }
+
+    // Create user profile in our users table
+    if (data.user) {
+      const { error: profileError } = await supabase.from("users").insert({
+        id: data.user.id,
+        email: data.user.email,
+        full_name: fullName,
+        subscription_type: "free",
+        subscription_status: "active",
+        created_at: new Date().toISOString(),
+      })
+
+      if (profileError) {
+        console.error("Error creating user profile:", profileError)
+      }
+    }
+
+    return {
+      success: true,
+      user: data.user,
+    }
+  } catch (error) {
+    console.error("Sign up error:", error)
+    return {
+      success: false,
+      error: "An unexpected error occurred during sign up",
+    }
+  }
 }
 
-export async function signOutReal() {
-  const supabase = createServerClient()
-
+export async function signOutReal(): Promise<AuthResult> {
   try {
+    const supabase = createServerClient()
+
     const { error } = await supabase.auth.signOut()
 
     if (error) {
-      return { success: false, error: error.message }
+      return {
+        success: false,
+        error: error.message,
+      }
     }
 
-    return { success: true }
+    revalidatePath("/", "layout")
+    return {
+      success: true,
+    }
   } catch (error) {
     console.error("Sign out error:", error)
-    return { success: false, error: "Failed to sign out" }
+    return {
+      success: false,
+      error: "An unexpected error occurred during sign out",
+    }
   }
 }
 
 export async function getCurrentUserReal() {
-  const supabase = createServerClient()
-
   try {
+    const supabase = createServerClient()
+
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser()
 
     if (error) {
-      return { success: false, error: error.message, user: null }
+      console.error("Get user error:", error)
+      return null
     }
 
     if (!user) {
-      return { success: false, error: "Not authenticated", user: null }
+      return null
     }
 
-    // Get user profile from custom users table
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", user.email)
-      .single()
+    // Get user profile from our users table
+    const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
 
-    return {
-      success: true,
-      user: {
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError)
+      return {
         ...user,
-        profile: profile || null,
-      },
-    }
-  } catch (error) {
-    console.error("Get user error:", error)
-    return { success: false, error: "Failed to get user", user: null }
-  }
-}
-
-export async function resetPasswordReal(email: string) {
-  const supabase = createServerClient()
-  const origin = headers().get("origin")
-
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${origin}/reset-password`,
-    })
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return {
-      success: true,
-      message: "Password reset email sent. Please check your inbox.",
-    }
-  } catch (error) {
-    console.error("Reset password error:", error)
-    return { success: false, error: "Failed to send reset email" }
-  }
-}
-
-export async function updatePasswordReal(password: string) {
-  const supabase = createServerClient()
-
-  try {
-    const { error } = await supabase.auth.updateUser({
-      password: password,
-    })
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return {
-      success: true,
-      message: "Password updated successfully.",
-    }
-  } catch (error) {
-    console.error("Update password error:", error)
-    return { success: false, error: "Failed to update password" }
-  }
-}
-
-export async function signInWithGoogleReal() {
-  const supabase = createServerClient()
-  const origin = headers().get("origin")
-
-  try {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${origin}/auth/callback`,
-      },
-    })
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, url: data.url }
-  } catch (error) {
-    console.error("Google sign in error:", error)
-    return { success: false, error: "Failed to sign in with Google" }
-  }
-}
-
-export async function handleAuthCallbackReal(code: string) {
-  const supabase = createServerClient()
-
-  try {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    // Create user profile if it doesn't exist
-    if (data.user) {
-      const { data: existingProfile } = await supabase.from("users").select("id").eq("email", data.user.email).single()
-
-      if (!existingProfile) {
-        const { error: profileError } = await supabase.from("users").insert({
-          id: data.user.id,
-          email: data.user.email,
-          name: data.user.user_metadata?.name || "",
-          avatar_url: data.user.user_metadata?.avatar_url || "",
-          subscription_tier: "free",
-          subscription_status: "active",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-
-        if (profileError) {
-          console.error("Profile creation error:", profileError)
-        }
+        subscriptionPlan: "basic",
+        subscriptionStatus: "inactive",
+        emailVerified: !!user.email_confirmed_at,
       }
     }
 
-    return { success: true, user: data.user }
+    return {
+      ...user,
+      subscriptionPlan: profile?.subscription_type || "basic",
+      subscriptionStatus: profile?.subscription_status || "inactive",
+      emailVerified: !!user.email_confirmed_at,
+      profile,
+    }
   } catch (error) {
-    console.error("Auth callback error:", error)
-    return { success: false, error: "Failed to handle auth callback" }
+    console.error("Get current user error:", error)
+    return null
   }
 }
 
-export async function checkAuthStatusReal() {
-  const supabase = createServerClient()
-
+export async function resetPasswordReal(email: string): Promise<AuthResult> {
   try {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
+    const supabase = createServerClient()
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
+    })
 
     if (error) {
-      return { authenticated: false, user: null, error: error.message }
-    }
-
-    return { authenticated: !!user, user }
-  } catch (error) {
-    console.error("Auth status check error:", error)
-    return { authenticated: false, user: null, error: "Failed to check auth status" }
-  }
-}
-
-export async function getUserProfileReal() {
-  const supabase = createServerClient()
-
-  try {
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "Not authenticated" }
-    }
-
-    // Get user profile from custom users table
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", user.email)
-      .single()
-
-    if (profileError) {
-      return { success: false, error: "Profile not found" }
+      return {
+        success: false,
+        error: error.message,
+      }
     }
 
     return {
       success: true,
-      user: {
-        ...user,
-        profile,
-      },
+      message: "Password reset email sent successfully",
     }
   } catch (error) {
-    console.error("Get profile error:", error)
-    return { success: false, error: "Failed to get user profile" }
+    console.error("Reset password error:", error)
+    return {
+      success: false,
+      error: "An unexpected error occurred during password reset",
+    }
+  }
+}
+
+export async function updatePasswordReal(newPassword: string): Promise<AuthResult> {
+  try {
+    const supabase = createServerClient()
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+      }
+    }
+
+    return {
+      success: true,
+      message: "Password updated successfully",
+    }
+  } catch (error) {
+    console.error("Update password error:", error)
+    return {
+      success: false,
+      error: "An unexpected error occurred during password update",
+    }
   }
 }
 
 export async function updateUserProfileReal(updates: {
   name?: string
-  avatar_url?: string
-}) {
-  const supabase = createServerClient()
-
+  phone?: string
+  company?: string
+}): Promise<AuthResult> {
   try {
+    const supabase = createServerClient()
+
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "Not authenticated" }
+      return {
+        success: false,
+        error: "User not authenticated",
+      }
     }
 
     // Update auth user metadata
@@ -318,56 +252,130 @@ export async function updateUserProfileReal(updates: {
     })
 
     if (updateError) {
-      return { success: false, error: updateError.message }
+      return {
+        success: false,
+        error: updateError.message,
+      }
     }
 
     // Update custom users table
     const { error: profileError } = await supabase
       .from("users")
       .update({
-        ...updates,
+        full_name: updates.name,
+        phone: updates.phone,
+        company: updates.company,
         updated_at: new Date().toISOString(),
       })
-      .eq("email", user.email)
+      .eq("id", user.id)
 
     if (profileError) {
       console.error("Profile update error:", profileError)
     }
 
-    return { success: true, message: "Profile updated successfully" }
+    return {
+      success: true,
+      message: "Profile updated successfully",
+    }
   } catch (error) {
     console.error("Update profile error:", error)
-    return { success: false, error: "Failed to update profile" }
+    return {
+      success: false,
+      error: "An unexpected error occurred during profile update",
+    }
   }
 }
 
-export async function deleteAccountReal() {
-  const supabase = createServerClient()
-
+export async function checkUserPermissions(action: "basic_calc" | "pro_calc" | "admin") {
   try {
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const user = await getCurrentUserReal()
 
-    if (authError || !user) {
-      return { success: false, error: "Not authenticated" }
+    if (!user) {
+      return {
+        canPerform: false,
+        reason: "User not authenticated",
+      }
     }
 
-    // Delete user data from custom tables
-    await supabase.from("solar_calculations").delete().eq("user_email", user.email)
+    const subscriptionPlan = user.subscriptionPlan || "basic"
+    const subscriptionStatus = user.subscriptionStatus || "inactive"
 
-    await supabase.from("user_projects").delete().eq("user_email", user.email)
+    // Check if user's subscription is active
+    if (subscriptionStatus !== "active") {
+      return {
+        canPerform: false,
+        reason: "Subscription not active",
+      }
+    }
 
-    await supabase.from("users").delete().eq("email", user.email)
+    switch (action) {
+      case "basic_calc":
+        return {
+          canPerform: true,
+          reason: "Basic calculations available to all users",
+        }
 
-    // Sign out user
-    await supabase.auth.signOut()
+      case "pro_calc":
+        return {
+          canPerform: subscriptionPlan === "professional" || subscriptionPlan === "enterprise",
+          reason: subscriptionPlan === "basic" ? "Pro subscription required" : "Access granted",
+        }
 
-    return { success: true, message: "Account deleted successfully" }
+      case "admin":
+        return {
+          canPerform: subscriptionPlan === "enterprise",
+          reason: subscriptionPlan !== "enterprise" ? "Enterprise subscription required" : "Access granted",
+        }
+
+      default:
+        return {
+          canPerform: false,
+          reason: "Unknown action",
+        }
+    }
   } catch (error) {
-    console.error("Delete account error:", error)
-    return { success: false, error: "Failed to delete account" }
+    console.error("Permission check error:", error)
+    return {
+      canPerform: false,
+      reason: "Permission check failed",
+    }
+  }
+}
+
+export async function trackUsageReal(calculationType: "basic" | "pro") {
+  try {
+    const user = await getCurrentUserReal()
+
+    if (!user) {
+      return {
+        error: "User not authenticated",
+      }
+    }
+
+    const supabase = createServerClient()
+
+    // Track usage in database
+    const { error } = await supabase.from("usage_tracking").insert({
+      user_id: user.id,
+      calculation_type: calculationType,
+      timestamp: new Date().toISOString(),
+    })
+
+    if (error) {
+      console.error("Usage tracking error:", error)
+      return {
+        error: "Failed to track usage",
+      }
+    }
+
+    return {
+      success: true,
+    }
+  } catch (error) {
+    console.error("Track usage error:", error)
+    return {
+      error: "Failed to track usage",
+    }
   }
 }
 

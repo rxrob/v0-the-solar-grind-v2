@@ -1,6 +1,5 @@
-import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
+import { createServerClient as createSupabaseServerClient, type CookieOptions } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { createClient } from "@supabase/supabase-js"
 
 export function createServerClient() {
   const cookieStore = cookies()
@@ -10,7 +9,7 @@ export function createServerClient() {
       get(name: string) {
         return cookieStore.get(name)?.value
       },
-      set(name: string, value: string, options: any) {
+      set(name: string, value: string, options: CookieOptions) {
         try {
           cookieStore.set({ name, value, ...options })
         } catch (error) {
@@ -19,7 +18,7 @@ export function createServerClient() {
           // user sessions.
         }
       },
-      remove(name: string, options: any) {
+      remove(name: string, options: CookieOptions) {
         try {
           cookieStore.set({ name, value: "", ...options })
         } catch (error) {
@@ -32,23 +31,23 @@ export function createServerClient() {
   })
 }
 
-// Test connection function
-export async function testSupabaseConnection() {
+// Test database connection
+export async function testDatabaseConnection() {
   try {
     const supabase = createServerClient()
-    const { data, error } = await supabase.from("users").select("count").limit(1)
+    const { data, error } = await supabase.from("users").select("count", { count: "exact", head: true })
 
     if (error) {
-      console.error("Supabase connection error:", error)
+      console.error("Database connection test failed:", error)
       return { success: false, error: error.message }
     }
 
-    return { success: true, message: "Connection successful" }
+    return { success: true, message: "Database connection successful" }
   } catch (error) {
-    console.error("Supabase connection test failed:", error)
-    return { success: false, error: "Connection failed" }
+    console.error("Database connection test error:", error)
+    return { success: false, error: "Failed to connect to database" }
   }
 }
 
 // Re-export createClient for compatibility
-export { createClient }
+export { createServerClient as createClient }
