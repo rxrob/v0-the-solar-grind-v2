@@ -9,17 +9,17 @@ import { Toaster as Sonner } from "@/components/ui/sonner"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "MySolarAI - AI-Powered Solar Analysis Platform",
+  title: "MySolarAI - AI-Powered Solar Analysis",
   description:
-    "Get instant, accurate solar analysis for any property. Professional-grade tools and insights to evaluate solar potential with confidence.",
+    "Get instant, accurate solar energy assessments for any property using advanced AI, satellite imagery, and real-time data. Make informed decisions about your solar investment.",
   keywords: [
     "solar",
     "solar panels",
+    "solar energy",
     "solar calculator",
-    "solar analysis",
     "renewable energy",
     "AI",
-    "solar potential",
+    "satellite imagery",
   ],
   authors: [{ name: "MySolarAI Team" }],
   creator: "MySolarAI",
@@ -34,9 +34,9 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "MySolarAI - AI-Powered Solar Analysis Platform",
+    title: "MySolarAI - AI-Powered Solar Analysis",
     description:
-      "Get instant, accurate solar analysis for any property. Professional-grade tools and insights to evaluate solar potential with confidence.",
+      "Get instant, accurate solar energy assessments for any property using advanced AI, satellite imagery, and real-time data.",
     url: "/",
     siteName: "MySolarAI",
     images: [
@@ -52,9 +52,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "MySolarAI - AI-Powered Solar Analysis Platform",
+    title: "MySolarAI - AI-Powered Solar Analysis",
     description:
-      "Get instant, accurate solar analysis for any property. Professional-grade tools and insights to evaluate solar potential with confidence.",
+      "Get instant, accurate solar energy assessments for any property using advanced AI, satellite imagery, and real-time data.",
     images: ["/images/mysolarai-design.png"],
     creator: "@mysolarai",
   },

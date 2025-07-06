@@ -83,6 +83,7 @@ export async function signOut() {
 }
 
 // Legacy exports for backward compatibility
+export { createClient as createSupabaseClient }
 export { createClient as createBrowserClient }
 
 // Type exports

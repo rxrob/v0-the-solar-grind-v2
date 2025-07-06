@@ -39,7 +39,14 @@ export async function signInWithEmailReal(email: string, password: string) {
 
     // Rate limiting
     if (!checkRateLimit(`signin:${validatedEmail}`)) {
-      return { success: false, error: "Too many sign-in attempts. Please try again later." }
+      return {
+        success: false,
+        error: "Too many sign-in attempts. Please try again later.",
+        user: null,
+        email: null,
+        profile: null,
+        subscriptionPlan: null,
+      }
     }
 
     const supabase = createClient()
@@ -51,7 +58,14 @@ export async function signInWithEmailReal(email: string, password: string) {
 
     if (error) {
       console.error("Sign in error:", error.message)
-      return { success: false, error: error.message }
+      return {
+        success: false,
+        error: error.message,
+        user: null,
+        email: null,
+        profile: null,
+        subscriptionPlan: null,
+      }
     }
 
     if (data.user && data.user.email) {
@@ -73,13 +87,34 @@ export async function signInWithEmailReal(email: string, password: string) {
       redirect("/dashboard")
     }
 
-    return { success: true, user: data.user, data }
+    return {
+      success: true,
+      user: data.user,
+      email: data.user?.email || null,
+      profile: null,
+      subscriptionPlan: "free",
+      data,
+    }
   } catch (error: any) {
     console.error("Sign in error:", error)
     if (error instanceof z.ZodError) {
-      return { success: false, error: error.errors[0].message }
+      return {
+        success: false,
+        error: error.errors[0].message,
+        user: null,
+        email: null,
+        profile: null,
+        subscriptionPlan: null,
+      }
     }
-    return { success: false, error: "Sign in failed. Please try again." }
+    return {
+      success: false,
+      error: "Sign in failed. Please try again.",
+      user: null,
+      email: null,
+      profile: null,
+      subscriptionPlan: null,
+    }
   }
 }
 
@@ -92,7 +127,14 @@ export async function signUpReal(email: string, password: string) {
 
     // Rate limiting
     if (!checkRateLimit(`signup:${validatedEmail}`)) {
-      return { success: false, error: "Too many sign-up attempts. Please try again later." }
+      return {
+        success: false,
+        error: "Too many sign-up attempts. Please try again later.",
+        user: null,
+        email: null,
+        profile: null,
+        subscriptionPlan: null,
+      }
     }
 
     const supabase = createClient()
@@ -104,7 +146,14 @@ export async function signUpReal(email: string, password: string) {
 
     if (error) {
       console.error("Sign up error:", error.message)
-      return { success: false, error: error.message }
+      return {
+        success: false,
+        error: error.message,
+        user: null,
+        email: null,
+        profile: null,
+        subscriptionPlan: null,
+      }
     }
 
     if (data.user && data.user.email) {
@@ -122,16 +171,44 @@ export async function signUpReal(email: string, password: string) {
         // Don't fail the signup if profile creation fails
       }
 
-      return { success: true, message: "Check your email to confirm your account", user: data.user }
+      return {
+        success: true,
+        message: "Check your email to confirm your account",
+        user: data.user,
+        email: data.user.email,
+        profile: null,
+        subscriptionPlan: "free",
+      }
     }
 
-    return { success: true, user: data.user, data }
+    return {
+      success: true,
+      user: data.user,
+      email: data.user?.email || null,
+      profile: null,
+      subscriptionPlan: "free",
+      data,
+    }
   } catch (error: any) {
     console.error("Sign up error:", error)
     if (error instanceof z.ZodError) {
-      return { success: false, error: error.errors[0].message }
+      return {
+        success: false,
+        error: error.errors[0].message,
+        user: null,
+        email: null,
+        profile: null,
+        subscriptionPlan: null,
+      }
     }
-    return { success: false, error: "Sign up failed. Please try again." }
+    return {
+      success: false,
+      error: "Sign up failed. Please try again.",
+      user: null,
+      email: null,
+      profile: null,
+      subscriptionPlan: null,
+    }
   }
 }
 
@@ -173,6 +250,7 @@ export async function getCurrentUserReal() {
         user: null,
         email: null,
         profile: null,
+        subscriptionPlan: null,
       }
     }
 
@@ -186,6 +264,7 @@ export async function getCurrentUserReal() {
         error: null,
         email: user.email,
         profile,
+        subscriptionPlan: profile?.subscription_type || "free",
       }
     }
 
@@ -195,6 +274,7 @@ export async function getCurrentUserReal() {
       error: null,
       email: null,
       profile: null,
+      subscriptionPlan: null,
     }
   } catch (error: any) {
     console.error("Get current user error:", error)
@@ -204,6 +284,7 @@ export async function getCurrentUserReal() {
       user: null,
       email: null,
       profile: null,
+      subscriptionPlan: null,
     }
   }
 }
