@@ -1,39 +1,29 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Only return configuration status and public site key
-    const hasRecaptchaSecret = !!process.env.RECAPTCHA_SECRET_KEY
-    const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+    // Only return configuration status, not actual keys
+    const hasRecaptcha = !!process.env.RECAPTCHA_SECRET_KEY
 
-    return NextResponse.json(
-      {
-        recaptcha: {
-          available: hasRecaptchaSecret && !!recaptchaSiteKey,
-          siteKey: recaptchaSiteKey || null,
-          status: hasRecaptchaSecret && recaptchaSiteKey ? "configured" : "missing",
-        },
+    return NextResponse.json({
+      success: true,
+      recaptcha: {
+        enabled: hasRecaptcha,
+        configured: hasRecaptcha,
       },
-      {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate",
-          "X-Content-Type-Options": "nosniff",
-          "X-Frame-Options": "DENY",
-        },
-      },
-    )
+    })
   } catch (error) {
     console.error("reCAPTCHA config error:", error)
     return NextResponse.json(
-      { error: "Configuration check failed" },
       {
-        status: 500,
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate",
-          "X-Content-Type-Options": "nosniff",
-          "X-Frame-Options": "DENY",
+        success: false,
+        error: "Failed to get reCAPTCHA configuration",
+        recaptcha: {
+          enabled: false,
+          configured: false,
         },
       },
+      { status: 500 },
     )
   }
 }

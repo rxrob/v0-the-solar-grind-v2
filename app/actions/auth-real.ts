@@ -54,11 +54,11 @@ export async function signInWithEmailReal(email: string, password: string) {
       return { success: false, error: error.message }
     }
 
-    if (data.user) {
+    if (data.user && data.user.email) {
       // Check if user profile exists
       const { data: profile } = await supabase.from("users").select("*").eq("id", data.user.id).single()
 
-      if (!profile && data.user.email) {
+      if (!profile) {
         // Create user profile if it doesn't exist
         await supabase.from("users").insert({
           id: data.user.id,

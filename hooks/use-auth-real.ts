@@ -8,9 +8,9 @@ interface UserProfile {
   id: string
   email: string
   subscription_type: "free" | "pro"
-  pro_trial_used?: boolean
-  single_reports_purchased?: number
-  stripe_customer_id?: string
+  pro_trial_used: boolean | null
+  single_reports_purchased: number | null
+  stripe_customer_id: string | null
   created_at: string
   updated_at: string
 }

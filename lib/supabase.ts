@@ -5,18 +5,30 @@ import type { Database } from "@/types/supabase"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Create client function - REQUIRED EXPORT
-export function createClient() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
+// Singleton pattern for Supabase client
+let supabaseInstance: ReturnType<typeof createSupabaseClient<Database>> | null = null
+
+export function getSupabaseClient() {
+  if (!supabaseInstance) {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Missing Supabase environment variables")
+    }
+
+    supabaseInstance = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    })
   }
 
-  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-  })
+  return supabaseInstance
+}
+
+// Create client function - REQUIRED EXPORT
+export function createClient() {
+  return getSupabaseClient()
 }
 
 // Server-side Supabase client - REQUIRED EXPORT
@@ -278,6 +290,29 @@ export async function testConnection() {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
     }
+  }
+}
+
+// Helper functions
+export async function checkSupabaseConnection() {
+  try {
+    const { data, error } = await supabase.from("users").select("count").limit(1)
+    return { success: !error, error: error?.message }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Connection failed",
+    }
+  }
+}
+
+export async function getSupabaseStatus() {
+  const connection = await checkSupabaseConnection()
+  return {
+    connected: connection.success,
+    error: connection.error,
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL ? "configured" : "missing",
+    key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "configured" : "missing",
   }
 }
 

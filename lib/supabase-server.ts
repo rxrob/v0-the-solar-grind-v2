@@ -1,43 +1,52 @@
 import { createClient } from "@supabase/supabase-js"
+import { cookies } from "next/headers"
 import type { Database } from "@/types/supabase"
 
-// Server-side environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-// Server-side Supabase client - REQUIRED EXPORT
+// Create server-side Supabase client
 export function createSupabaseServerClient() {
-  if (typeof window !== "undefined") {
-    throw new Error("createSupabaseServerClient can only be called on the server")
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase environment variables for server client")
   }
+
+  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
+
+// Create server-side client with cookies for auth
+export function createSupabaseServerClientWithAuth() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing Supabase environment variables")
   }
 
   return createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  })
-}
-
-// Admin Supabase client (server-only)
-export function createAdminSupabaseClient() {
-  if (typeof window !== "undefined") {
-    throw new Error("createAdminSupabaseClient can only be called on the server")
-  }
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase admin environment variables")
-  }
-
-  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+    cookies: {
+      get(name: string) {
+        return cookies().get(name)?.value
+      },
+      set(name: string, value: string, options: any) {
+        try {
+          cookies().set({ name, value, ...options })
+        } catch (error) {
+          // Handle cookie setting errors in server components
+        }
+      },
+      remove(name: string, options: any) {
+        try {
+          cookies().set({ name, value: "", ...options })
+        } catch (error) {
+          // Handle cookie removal errors in server components
+        }
+      },
     },
   })
 }
@@ -52,27 +61,81 @@ export async function testServerConnection() {
       return {
         success: false,
         error: error.message,
-        canQuery: false,
+        details: "Failed to query users table",
       }
     }
 
     return {
       success: true,
-      canQuery: true,
       message: "Server connection successful",
+      data,
     }
-  } catch (error: any) {
+  } catch (error) {
     return {
       success: false,
-      error: error.message || "Unknown error",
-      canQuery: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      details: "Server connection failed",
+    }
+  }
+}
+
+// Get user by ID (server-side)
+export async function getUserById(userId: string) {
+  try {
+    const supabase = createSupabaseServerClient()
+    const { data, error } = await supabase.from("users").select("*").eq("id", userId).single()
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, user: data }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
+
+// Update user subscription (server-side)
+export async function updateUserSubscription(
+  userId: string,
+  subscriptionData: {
+    subscription_type?: string
+    subscription_status?: string
+    stripe_customer_id?: string
+    stripe_subscription_id?: string
+  },
+) {
+  try {
+    const supabase = createSupabaseServerClient()
+    const { data, error } = await supabase
+      .from("users")
+      .update({
+        ...subscriptionData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select()
+      .single()
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, user: data }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
     }
   }
 }
 
 // Legacy exports for backward compatibility
-export { createSupabaseServerClient as createServerSupabaseClient }
-export { createAdminSupabaseClient as createServiceSupabaseClient }
+export { createSupabaseServerClient as createServerClient }
+export { createSupabaseServerClient as createServiceSupabaseClient }
 
 // Type exports
 export type { Database }

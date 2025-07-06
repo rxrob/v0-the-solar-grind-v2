@@ -1,42 +1,96 @@
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
-// Client-side environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Singleton client instance
-let supabaseClient: ReturnType<typeof createClient<Database>> | null = null
-
-// Create or get existing Supabase client
-export function createSupabaseClient() {
-  if (typeof window === "undefined") {
-    throw new Error("createSupabaseClient can only be called on the client")
-  }
-
-  if (!supabaseClient) {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error("Missing Supabase environment variables")
-    }
-
-    supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    })
-  }
-
-  return supabaseClient
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables")
 }
 
-// Default export - the singleton client
+// Create client-side Supabase client (singleton pattern)
+function createSupabaseClient() {
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+  })
+}
+
+// Export singleton instance
 export const supabase = createSupabaseClient()
 
-// Check if Supabase is available on client
-export function isSupabaseClientAvailable(): boolean {
-  return !!(supabaseUrl && supabaseAnonKey)
+// Test client connection
+export async function testClientConnection() {
+  try {
+    const { data, error } = await supabase.from("users").select("count").limit(1)
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+        details: "Failed to query users table from client",
+      }
+    }
+
+    return {
+      success: true,
+      message: "Client connection successful",
+      data,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      details: "Client connection failed",
+    }
+  }
 }
+
+// Get current user session
+export async function getCurrentUser() {
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, user }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
+
+// Sign out user
+export async function signOut() {
+  try {
+    const { error } = await supabase.auth.signOut()
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
+
+// Legacy exports for backward compatibility
+export { createSupabaseClient as createClient }
+export { createSupabaseClient as createBrowserClient }
 
 // Type exports
 export type { Database }
