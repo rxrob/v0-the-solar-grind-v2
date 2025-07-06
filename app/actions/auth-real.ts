@@ -1,6 +1,6 @@
 "use server"
 
-import { createPagesServerClient } from "@supabase/auth-helpers-nextjs"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
@@ -17,7 +17,7 @@ interface AuthResult {
 export async function signUpReal(email: string, password: string, fullName?: string): Promise<AuthResult> {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -84,7 +84,7 @@ export async function signUpReal(email: string, password: string, fullName?: str
 export async function signInWithEmailReal(email: string, password: string): Promise<AuthResult> {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -117,7 +117,7 @@ export async function signInWithEmailReal(email: string, password: string): Prom
 export async function signOutReal(): Promise<void> {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
     await supabase.auth.signOut()
     revalidatePath("/", "layout")
   } catch (error) {
@@ -129,7 +129,7 @@ export async function signOutReal(): Promise<void> {
 export async function getCurrentUserReal() {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
     const {
       data: { user },
       error,
@@ -173,7 +173,7 @@ export async function getCurrentUserReal() {
 export async function resetPasswordReal(email: string): Promise<AuthResult> {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
@@ -203,7 +203,7 @@ export async function resetPasswordReal(email: string): Promise<AuthResult> {
 export async function updatePasswordReal(newPassword: string): Promise<AuthResult> {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
 
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
@@ -233,7 +233,7 @@ export async function updatePasswordReal(newPassword: string): Promise<AuthResul
 export async function signInWithGoogleReal(): Promise<AuthResult> {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -269,7 +269,7 @@ export async function signInWithGoogleReal(): Promise<AuthResult> {
 export async function handleAuthCallbackReal(code: string): Promise<AuthResult> {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
@@ -328,7 +328,7 @@ export async function getUserProfileReal() {
     }
 
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
     const { data, error } = await supabase.from("users").select("*").eq("id", user.id).single()
 
     if (error) {
@@ -359,7 +359,7 @@ export async function updateUserProfileReal(updates: {
     }
 
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
     const { error } = await supabase.from("users").update(updates).eq("id", user.id)
 
     if (error) {

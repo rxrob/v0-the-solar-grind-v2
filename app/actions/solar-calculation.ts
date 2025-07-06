@@ -1,6 +1,6 @@
 "use server"
 
-import { createPagesServerClient } from "@supabase/auth-helpers-nextjs"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 
 interface SolarCalculationInput {
@@ -34,7 +34,7 @@ interface SolarCalculationResult {
 export async function calculateSolarSystem(input: SolarCalculationInput): Promise<SolarCalculationResult> {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
 
     // Get current user
     const {
@@ -140,7 +140,7 @@ export async function calculateSolarSystem(input: SolarCalculationInput): Promis
 export async function getSolarCalculationHistory() {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
 
     const {
       data: { user },
@@ -185,7 +185,7 @@ export async function getSolarCalculationHistory() {
 export async function deleteSolarCalculation(calculationId: string) {
   try {
     const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient({ cookies: cookieStore })
 
     const {
       data: { user },
