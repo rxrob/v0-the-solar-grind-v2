@@ -1,7 +1,7 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import Stripe from "stripe"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Check if Stripe keys are configured
     const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY
@@ -28,21 +28,23 @@ export async function GET(request: NextRequest) {
       apiVersion: "2025-06-30.basil",
     })
 
-    // Test the connection by retrieving account information
+    // Test the connection
     const account = await stripe.accounts.retrieve()
 
     return NextResponse.json({
       success: true,
-      message: "Stripe environment configured correctly",
-      details: {
-        publishableKey: !!publishableKey,
-        secretKey: !!secretKey,
-        webhookSecret: !!webhookSecret,
+      data: {
         accountId: account.id,
         country: account.country,
-        currency: account.default_currency,
-        chargesEnabled: account.charges_enabled,
+        defaultCurrency: account.default_currency,
+        detailsSubmitted: account.details_submitted,
         payoutsEnabled: account.payouts_enabled,
+        chargesEnabled: account.charges_enabled,
+      },
+      environment: {
+        publishableKey: publishableKey.substring(0, 12) + "...",
+        secretKey: secretKey.substring(0, 12) + "...",
+        webhookSecret: !!webhookSecret,
       },
     })
   } catch (error) {
@@ -50,8 +52,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to connect to Stripe",
-        details: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )

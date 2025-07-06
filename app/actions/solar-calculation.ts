@@ -1,18 +1,16 @@
 "use server"
 
 import { createClient } from "@/lib/supabase-server"
+import { revalidatePath } from "next/cache"
 
 interface AdvancedSolarInput {
   address: string
   monthlyBill: number
   roofArea: number
-  roofType: string
-  roofAge: number
+  roofTilt: number
+  roofAzimuth: number
   shadingFactor: number
-  panelType: string
-  inverterType: string
-  batteryStorage: boolean
-  batteryCapacity?: number
+  electricityRate: number
   userId?: string
   latitude?: number
   longitude?: number
@@ -24,248 +22,178 @@ interface AdvancedSolarResult {
   data?: {
     systemSize: number
     panelsNeeded: number
-    annualProduction: number
-    monthlyProduction: number[]
+    estimatedCost: number
     annualSavings: number
     paybackPeriod: number
     co2Reduction: number
-    installationCost: number
-    roofCoverage: number
-    efficiencyFactors: {
-      roofType: number
-      roofAge: number
-      shading: number
-      panelType: number
-      inverter: number
-    }
-    batteryInfo?: {
-      capacity: number
-      cost: number
-      backupHours: number
-    }
+    monthlyProduction: number[]
+    roofAreaUsed: number
+    efficiency: number
+    netMeteringCredit: number
+    maintenanceCost: number
+    warrantyYears: number
   }
 }
 
 export async function calculateAdvancedSolar(input: AdvancedSolarInput): Promise<AdvancedSolarResult> {
   try {
-    const {
-      address,
-      monthlyBill,
-      roofArea,
-      roofType,
-      roofAge,
-      shadingFactor,
-      panelType,
-      inverterType,
-      batteryStorage,
-      batteryCapacity = 0,
-      userId,
-      latitude,
-      longitude,
-    } = input
+    const supabase = await createClient()
 
-    // Validate inputs
-    if (monthlyBill <= 0 || roofArea <= 0) {
+    // Advanced calculations with real-world factors
+    const monthlyUsage = input.monthlyBill / input.electricityRate
+    const annualUsage = monthlyUsage * 12
+
+    // Efficiency factors
+    const tiltFactor = calculateTiltFactor(input.roofTilt, input.latitude || 40)
+    const azimuthFactor = calculateAzimuthFactor(input.roofAzimuth)
+    const shadingEfficiency = 1 - input.shadingFactor / 100
+    const systemEfficiency = 0.85 // Inverter and system losses
+
+    const totalEfficiency = tiltFactor * azimuthFactor * shadingEfficiency * systemEfficiency
+
+    // System sizing with efficiency factors
+    const peakSunHours = 4.5 // Average for US
+    const systemSize = annualUsage / (peakSunHours * 365 * totalEfficiency)
+
+    // Panel calculations (400W panels, 20 sq ft each)
+    const panelWattage = 0.4
+    const panelArea = 20
+    const panelsNeeded = Math.ceil(systemSize / panelWattage)
+    const roofAreaUsed = panelsNeeded * panelArea
+
+    // Check if system fits on roof
+    if (roofAreaUsed > input.roofArea) {
       return {
         success: false,
-        error: "Monthly bill and roof area must be greater than zero",
+        error: `System requires ${roofAreaUsed} sq ft but only ${input.roofArea} sq ft available`,
       }
     }
 
-    // Get solar irradiance data (mock for now, would use NREL API in production)
-    const avgSunHours = latitude ? calculateSunHours(latitude) : 5.5
-    const monthlyIrradiance = generateMonthlyIrradiance(latitude || 40)
+    // Cost calculations with incentives
+    const costPerWatt = 3.2 // Current market rate
+    const grossCost = systemSize * 1000 * costPerWatt
+    const federalTaxCredit = grossCost * 0.3 // 30% federal tax credit
+    const estimatedCost = grossCost - federalTaxCredit
 
-    // Calculate efficiency factors
-    const efficiencyFactors = {
-      roofType: getRoofTypeEfficiency(roofType),
-      roofAge: getRoofAgeEfficiency(roofAge),
-      shading: shadingFactor / 100,
-      panelType: getPanelTypeEfficiency(panelType),
-      inverter: getInverterEfficiency(inverterType),
-    }
-
-    // Calculate overall system efficiency
-    const systemEfficiency = Object.values(efficiencyFactors).reduce((acc, factor) => acc * factor, 1)
-
-    // Estimate electricity rate (would get from utility API in production)
-    const electricityRate = 0.12 // $0.12 per kWh average
-
-    // Calculate annual energy consumption
-    const annualConsumption = (monthlyBill / electricityRate) * 12
-
-    // Calculate required system size
-    const systemSize = annualConsumption / (avgSunHours * 365 * systemEfficiency)
-
-    // Calculate number of panels needed
-    const panelWattage = getPanelWattage(panelType)
-    const panelsNeeded = Math.ceil((systemSize * 1000) / panelWattage)
-
-    // Calculate actual system size based on panels
-    const actualSystemSize = (panelsNeeded * panelWattage) / 1000
-
-    // Calculate monthly production based on irradiance
-    const monthlyProduction = monthlyIrradiance.map(
-      (irradiance) => actualSystemSize * irradiance * 30 * systemEfficiency,
-    )
-
-    // Calculate annual production
+    // Monthly production with seasonal variation
+    const monthlyProduction = calculateMonthlyProduction(systemSize, totalEfficiency, input.latitude || 40)
     const annualProduction = monthlyProduction.reduce((sum, month) => sum + month, 0)
 
-    // Calculate installation cost
-    const baseCostPerWatt = getPanelCost(panelType)
-    const inverterCost = getInverterCost(inverterType, actualSystemSize)
-    const installationCost = actualSystemSize * 1000 * baseCostPerWatt + inverterCost
+    // Financial calculations
+    const annualSavings = annualProduction * input.electricityRate
+    const netMeteringCredit = Math.max(0, (annualProduction - annualUsage) * input.electricityRate * 0.8)
+    const totalAnnualBenefit = annualSavings + netMeteringCredit
+    const paybackPeriod = estimatedCost / totalAnnualBenefit
 
-    // Calculate battery costs if applicable
-    let batteryInfo
-    if (batteryStorage && batteryCapacity > 0) {
-      const batteryCost = batteryCapacity * 800 // $800 per kWh
-      const backupHours = (batteryCapacity * 1000) / ((monthlyBill / electricityRate / 30 / 24) * 1000)
+    // Environmental impact
+    const co2ReductionPerKwh = 0.92 // lbs CO2 per kWh
+    const co2Reduction = annualProduction * co2ReductionPerKwh
 
-      batteryInfo = {
-        capacity: batteryCapacity,
-        cost: batteryCost,
-        backupHours: Math.round(backupHours * 10) / 10,
-      }
-    }
+    // Maintenance and warranty
+    const maintenanceCost = systemSize * 15 // $15 per kW annually
+    const warrantyYears = 25
 
-    // Calculate annual savings
-    const annualSavings = Math.min(annualProduction * electricityRate, monthlyBill * 12)
-
-    // Calculate payback period
-    const totalCost = installationCost + (batteryInfo?.cost || 0)
-    const paybackPeriod = totalCost / annualSavings
-
-    // Calculate CO2 reduction
-    const co2Reduction = annualProduction * 0.92 // lbs CO2 per kWh
-
-    // Calculate roof coverage
-    const panelArea = panelsNeeded * 20 // 20 sq ft per panel
-    const roofCoverage = (panelArea / roofArea) * 100
-
-    const result = {
-      systemSize: Math.round(actualSystemSize * 100) / 100,
+    const calculationData = {
+      systemSize: Math.round(systemSize * 100) / 100,
       panelsNeeded,
-      annualProduction: Math.round(annualProduction),
-      monthlyProduction: monthlyProduction.map((p) => Math.round(p)),
-      annualSavings: Math.round(annualSavings),
+      estimatedCost: Math.round(estimatedCost),
+      annualSavings: Math.round(totalAnnualBenefit),
       paybackPeriod: Math.round(paybackPeriod * 10) / 10,
       co2Reduction: Math.round(co2Reduction),
-      installationCost: Math.round(totalCost),
-      roofCoverage: Math.round(roofCoverage * 10) / 10,
-      efficiencyFactors,
-      batteryInfo,
+      monthlyProduction: monthlyProduction.map((month) => Math.round(month)),
+      roofAreaUsed,
+      efficiency: Math.round(totalEfficiency * 100),
+      netMeteringCredit: Math.round(netMeteringCredit),
+      maintenanceCost: Math.round(maintenanceCost),
+      warrantyYears,
     }
 
-    // Save calculation to database if user is provided
-    if (userId) {
-      try {
-        const supabase = await createClient()
-        await supabase.from("solar_calculations").insert({
-          user_id: userId,
-          calculation_type: "advanced",
-          input_data: input,
-          result_data: result,
-          created_at: new Date().toISOString(),
-        })
+    // Save calculation to database
+    if (input.userId) {
+      const { error: saveError } = await supabase.from("solar_calculations").insert({
+        user_id: input.userId,
+        calculation_type: "advanced",
+        input_data: input,
+        result_data: calculationData,
+        created_at: new Date().toISOString(),
+      })
 
-        // Update user's calculation count
-        await supabase.rpc("increment_user_calculations", { user_id: userId })
-      } catch (dbError) {
-        console.error("Error saving calculation:", dbError)
+      if (saveError) {
+        console.error("Error saving advanced calculation:", saveError)
       }
+
+      revalidatePath("/dashboard")
     }
 
     return {
       success: true,
-      data: result,
+      data: calculationData,
     }
   } catch (error) {
     console.error("Advanced solar calculation error:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Calculation failed",
+      error: error instanceof Error ? error.message : "Advanced calculation failed",
     }
   }
 }
 
-// Helper functions
-function calculateSunHours(latitude: number): number {
-  // Simplified calculation based on latitude
-  const baseSunHours = 5.5
-  const latitudeAdjustment = (40 - Math.abs(latitude)) * 0.02
-  return Math.max(3, Math.min(8, baseSunHours + latitudeAdjustment))
+function calculateTiltFactor(tilt: number, latitude: number): number {
+  const optimalTilt = latitude
+  const tiltDifference = Math.abs(tilt - optimalTilt)
+  return Math.max(0.7, 1 - tiltDifference * 0.005)
 }
 
-function generateMonthlyIrradiance(latitude: number): number[] {
-  // Generate monthly solar irradiance values (kWh/m²/day)
-  const baseIrradiance = [3.2, 4.1, 5.3, 6.2, 6.8, 7.1, 6.9, 6.3, 5.4, 4.2, 3.4, 2.9]
-  const latitudeMultiplier = 1 + (40 - Math.abs(latitude)) * 0.01
-
-  return baseIrradiance.map((irr) => Math.max(2, irr * latitudeMultiplier))
+function calculateAzimuthFactor(azimuth: number): number {
+  // 180 degrees is optimal (south-facing)
+  const azimuthDifference = Math.abs(azimuth - 180)
+  return Math.max(0.6, 1 - azimuthDifference * 0.002)
 }
 
-function getRoofTypeEfficiency(roofType: string): number {
-  const efficiencies: { [key: string]: number } = {
-    asphalt: 0.95,
-    metal: 0.98,
-    tile: 0.92,
-    slate: 0.9,
-    flat: 0.85,
+function calculateMonthlyProduction(systemSize: number, efficiency: number, latitude: number): number[] {
+  // Solar irradiance varies by month and latitude
+  const baseSolarHours = [3.1, 4.2, 5.4, 6.7, 7.8, 8.2, 8.0, 7.3, 6.1, 4.8, 3.5, 2.9]
+
+  // Adjust for latitude (simplified model)
+  const latitudeAdjustment = 1 + (40 - latitude) * 0.01
+
+  return baseSolarHours.map((hours) => {
+    const adjustedHours = hours * latitudeAdjustment
+    const daysInMonth = 30.44 // Average days per month
+    return systemSize * adjustedHours * daysInMonth * efficiency
+  })
+}
+
+export async function getAdvancedCalculations(userId: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from("solar_calculations")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("calculation_type", "advanced")
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error getting advanced calculations:", error)
+      return {
+        success: false,
+        error: error.message,
+        data: [],
+      }
+    }
+
+    return {
+      success: true,
+      data: data || [],
+    }
+  } catch (error) {
+    console.error("Get advanced calculations error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get calculations",
+      data: [],
+    }
   }
-  return efficiencies[roofType] || 0.95
-}
-
-function getRoofAgeEfficiency(roofAge: number): number {
-  if (roofAge < 5) return 1.0
-  if (roofAge < 10) return 0.98
-  if (roofAge < 20) return 0.95
-  return 0.9
-}
-
-function getPanelTypeEfficiency(panelType: string): number {
-  const efficiencies: { [key: string]: number } = {
-    monocrystalline: 0.22,
-    polycrystalline: 0.18,
-    "thin-film": 0.12,
-  }
-  return efficiencies[panelType] || 0.2
-}
-
-function getInverterEfficiency(inverterType: string): number {
-  const efficiencies: { [key: string]: number } = {
-    string: 0.95,
-    "power-optimizer": 0.97,
-    microinverter: 0.96,
-  }
-  return efficiencies[inverterType] || 0.95
-}
-
-function getPanelWattage(panelType: string): number {
-  const wattages: { [key: string]: number } = {
-    monocrystalline: 400,
-    polycrystalline: 350,
-    "thin-film": 300,
-  }
-  return wattages[panelType] || 400
-}
-
-function getPanelCost(panelType: string): number {
-  const costs: { [key: string]: number } = {
-    monocrystalline: 3.2,
-    polycrystalline: 2.8,
-    "thin-film": 2.5,
-  }
-  return costs[panelType] || 3.0
-}
-
-function getInverterCost(inverterType: string, systemSize: number): number {
-  const costsPerKW: { [key: string]: number } = {
-    string: 200,
-    "power-optimizer": 300,
-    microinverter: 400,
-  }
-  const costPerKW = costsPerKW[inverterType] || 250
-  return systemSize * costPerKW
 }

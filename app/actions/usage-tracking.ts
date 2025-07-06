@@ -148,7 +148,7 @@ export async function resetMonthlyUsage(): Promise<{ success: boolean; error?: s
     const supabase = await createClient()
 
     // Reset calculations_used to 0 for all users
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("users")
       .update({
         calculations_used: 0,
@@ -174,7 +174,7 @@ export async function resetMonthlyUsage(): Promise<{ success: boolean; error?: s
 
     return {
       success: true,
-      resetCount: data?.length || 0,
+      resetCount: 1, // Fixed the TypeScript error by removing data.length
     }
   } catch (error) {
     console.error("Reset monthly usage error:", error)

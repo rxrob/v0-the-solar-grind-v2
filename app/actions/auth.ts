@@ -8,88 +8,9 @@ interface AuthResult {
   success: boolean
   error?: string
   user?: any
-  message?: string
 }
 
-export async function signUp(formData: FormData) {
-  const supabase = await createClient()
-
-  const data = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
-  }
-
-  const { error } = await supabase.auth.signUp(data)
-
-  if (error) {
-    redirect("/error")
-  }
-
-  revalidatePath("/", "layout")
-  redirect("/")
-}
-
-export async function signIn(formData: FormData) {
-  const supabase = await createClient()
-
-  const data = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
-  }
-
-  const { error } = await supabase.auth.signInWithPassword(data)
-
-  if (error) {
-    redirect("/error")
-  }
-
-  revalidatePath("/", "layout")
-  redirect("/")
-}
-
-export async function signOut() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  revalidatePath("/", "layout")
-  redirect("/")
-}
-
-export async function getCurrentUser() {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-
-    if (error) {
-      console.error("Error getting current user:", error)
-      return null
-    }
-
-    if (!user) {
-      return null
-    }
-
-    // Get additional user data from our users table
-    const { data: userData, error: userError } = await supabase.from("users").select("*").eq("id", user.id).single()
-
-    if (userError) {
-      console.error("Error fetching user data:", userError)
-      return user
-    }
-
-    return {
-      ...user,
-      ...userData,
-    }
-  } catch (error) {
-    console.error("Get current user error:", error)
-    return null
-  }
-}
-
-export async function signUpAction(email: string, password: string, fullName?: string): Promise<AuthResult> {
+export async function signUp(email: string, password: string, fullName?: string): Promise<AuthResult> {
   try {
     const supabase = await createClient()
 
@@ -98,43 +19,53 @@ export async function signUpAction(email: string, password: string, fullName?: s
       password,
       options: {
         data: {
-          full_name: fullName || "",
+          full_name: fullName,
         },
       },
     })
 
     if (error) {
-      return { success: false, error: error.message }
+      console.error("Sign up error:", error)
+      return {
+        success: false,
+        error: error.message,
+      }
     }
 
     if (data.user) {
-      // Insert user into our users table
-      const { error: insertError } = await supabase.from("users").insert({
+      // Create user profile
+      const { error: profileError } = await supabase.from("users").insert({
         id: data.user.id,
-        email: data.user.email!,
+        email: data.user.email,
         full_name: fullName,
         subscription_type: "free",
         subscription_status: "active",
-        calculations_used: 0,
         monthly_calculation_limit: 3,
-        pro_trial_used: false,
+        calculations_used: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
 
-      if (insertError) {
-        console.error("Error inserting user:", insertError)
+      if (profileError) {
+        console.error("Profile creation error:", profileError)
+        // Don't fail signup if profile creation fails
       }
     }
 
-    return { success: true, message: "Check your email to confirm your account" }
+    return {
+      success: true,
+      user: data.user,
+    }
   } catch (error) {
     console.error("Sign up error:", error)
-    return { success: false, error: "An unexpected error occurred" }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Sign up failed",
+    }
   }
 }
 
-export async function signInAction(email: string, password: string): Promise<AuthResult> {
+export async function signIn(email: string, password: string): Promise<AuthResult> {
   try {
     const supabase = await createClient()
 
@@ -144,72 +75,107 @@ export async function signInAction(email: string, password: string): Promise<Aut
     })
 
     if (error) {
-      return { success: false, error: error.message }
+      console.error("Sign in error:", error)
+      return {
+        success: false,
+        error: error.message,
+      }
     }
 
-    if (data.user) {
-      redirect("/dashboard")
+    revalidatePath("/", "layout")
+    return {
+      success: true,
+      user: data.user,
     }
-
-    return { success: true }
   } catch (error) {
     console.error("Sign in error:", error)
-    return { success: false, error: "An unexpected error occurred" }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Sign in failed",
+    }
   }
 }
 
-export async function signOutAction(): Promise<void> {
+export async function signOut(): Promise<AuthResult> {
   try {
     const supabase = await createClient()
-    await supabase.auth.signOut()
+
+    const { error } = await supabase.auth.signOut()
+
+    if (error) {
+      console.error("Sign out error:", error)
+      return {
+        success: false,
+        error: error.message,
+      }
+    }
+
+    revalidatePath("/", "layout")
+    redirect("/")
   } catch (error) {
     console.error("Sign out error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Sign out failed",
+    }
   }
-
-  redirect("/")
 }
 
-export async function login(formData: FormData) {
-  const supabase = await createClient()
+export async function getCurrentUser() {
+  try {
+    const supabase = await createClient()
 
-  const data = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
+
+    if (error) {
+      console.error("Get current user error:", error)
+      return {
+        success: false,
+        error: error.message,
+        user: null,
+      }
+    }
+
+    if (!user) {
+      return {
+        success: false,
+        error: "No user found",
+        user: null,
+      }
+    }
+
+    // Get user profile data
+    const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
+
+    if (profileError) {
+      console.error("Get user profile error:", profileError)
+      return {
+        success: true,
+        user: {
+          ...user,
+          profile: null,
+        },
+      }
+    }
+
+    return {
+      success: true,
+      user: {
+        ...user,
+        profile,
+      },
+    }
+  } catch (error) {
+    console.error("Get current user error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get current user",
+      user: null,
+    }
   }
-
-  const { error } = await supabase.auth.signInWithPassword(data)
-
-  if (error) {
-    redirect("/error")
-  }
-
-  revalidatePath("/", "layout")
-  redirect("/dashboard")
-}
-
-export async function signup(formData: FormData) {
-  const supabase = await createClient()
-
-  const data = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
-  }
-
-  const { error } = await supabase.auth.signUp(data)
-
-  if (error) {
-    redirect("/error")
-  }
-
-  revalidatePath("/", "layout")
-  redirect("/dashboard")
-}
-
-export async function logout() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  revalidatePath("/", "layout")
-  redirect("/")
 }
 
 export async function resetPassword(email: string): Promise<AuthResult> {
@@ -221,6 +187,7 @@ export async function resetPassword(email: string): Promise<AuthResult> {
     })
 
     if (error) {
+      console.error("Reset password error:", error)
       return {
         success: false,
         error: error.message,
@@ -229,13 +196,12 @@ export async function resetPassword(email: string): Promise<AuthResult> {
 
     return {
       success: true,
-      message: "Password reset email sent",
     }
   } catch (error) {
     console.error("Reset password error:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to send reset email",
+      error: error instanceof Error ? error.message : "Password reset failed",
     }
   }
 }
@@ -249,6 +215,7 @@ export async function updatePassword(password: string): Promise<AuthResult> {
     })
 
     if (error) {
+      console.error("Update password error:", error)
       return {
         success: false,
         error: error.message,
@@ -257,13 +224,45 @@ export async function updatePassword(password: string): Promise<AuthResult> {
 
     return {
       success: true,
-      message: "Password updated successfully",
     }
   } catch (error) {
     console.error("Update password error:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to update password",
+      error: error instanceof Error ? error.message : "Password update failed",
+    }
+  }
+}
+
+export async function updateProfile(userId: string, updates: any): Promise<AuthResult> {
+  try {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from("users")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+
+    if (error) {
+      console.error("Update profile error:", error)
+      return {
+        success: false,
+        error: error.message,
+      }
+    }
+
+    revalidatePath("/dashboard")
+    return {
+      success: true,
+    }
+  } catch (error) {
+    console.error("Update profile error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Profile update failed",
     }
   }
 }
