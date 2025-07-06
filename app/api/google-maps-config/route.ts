@@ -1,17 +1,20 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getServerConfig } from "@/lib/env-validation"
+import { NextResponse } from "next/server"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const config = getServerConfig()
+    // Only return configuration status, never the actual key
+    const hasGoogleMapsKey = !!process.env.GOOGLE_MAPS_API_KEY
+    const hasGeocodingKey = !!process.env.GOOGLE_GEOCODING_API_KEY
+    const hasElevationKey = !!process.env.GOOGLE_ELEVATION_API_KEY
 
-    // Only return configuration status, never the actual keys
     return NextResponse.json(
       {
-        configured: !!config.googleMapsApiKey,
-        geocoding: !!config.googleGeocodingApiKey,
-        elevation: !!config.googleElevationApiKey,
-        status: "ready",
+        googleMaps: {
+          available: hasGoogleMapsKey,
+          geocoding: hasGeocodingKey,
+          elevation: hasElevationKey,
+          status: hasGoogleMapsKey ? "configured" : "missing",
+        },
       },
       {
         headers: {
@@ -24,13 +27,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Google Maps config error:", error)
     return NextResponse.json(
-      {
-        configured: false,
-        geocoding: false,
-        elevation: false,
-        status: "error",
-        error: "Configuration error",
-      },
+      { error: "Configuration check failed" },
       {
         status: 500,
         headers: {

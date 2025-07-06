@@ -20,15 +20,14 @@ const serverEnvSchema = z.object({
   nrelApiKey: z.string().optional(),
   stripeSecretKey: z.string().optional(),
   stripeWebhookSecret: z.string().optional(),
-  stripePublishableKey: z.string().optional(),
-  recaptchaSiteKey: z.string().optional(),
   recaptchaSecretKey: z.string().optional(),
-  resendApiKey: z.string().optional(),
+  recaptchaSiteKey: z.string().optional(),
+  stripePublishableKey: z.string().optional(),
   baseUrl: z.string().url().optional(),
   nodeEnv: z.enum(["development", "production", "test"]).optional(),
 })
 
-// Get client-side configuration
+// Client configuration getter
 export function getClientConfig() {
   if (typeof window === "undefined") {
     throw new Error("getClientConfig can only be called on the client")
@@ -43,7 +42,7 @@ export function getClientConfig() {
   })
 }
 
-// Get server-side configuration
+// Server configuration getter
 export function getServerConfig() {
   if (typeof window !== "undefined") {
     throw new Error("getServerConfig can only be called on the server")
@@ -59,30 +58,33 @@ export function getServerConfig() {
     nrelApiKey: process.env.NREL_API_KEY,
     stripeSecretKey: process.env.STRIPE_SECRET_KEY,
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-    stripePublishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-    recaptchaSiteKey: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
     recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY,
-    resendApiKey: process.env.RESEND_API_KEY,
+    recaptchaSiteKey: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
+    stripePublishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
     baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
     nodeEnv: process.env.NODE_ENV as "development" | "production" | "test",
   })
 }
 
-// Validate environment on startup
-export function validateEnvironment() {
+// Validation functions
+export function validateClientEnv() {
   try {
-    if (typeof window !== "undefined") {
-      getClientConfig()
-      return { success: true, environment: "client" }
-    } else {
-      getServerConfig()
-      return { success: true, environment: "server" }
-    }
+    return getClientConfig()
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-      environment: typeof window !== "undefined" ? "client" : "server",
-    }
+    console.error("Client environment validation failed:", error)
+    throw error
   }
 }
+
+export function validateServerEnv() {
+  try {
+    return getServerConfig()
+  } catch (error) {
+    console.error("Server environment validation failed:", error)
+    throw error
+  }
+}
+
+// Type exports
+export type ClientConfig = z.infer<typeof clientEnvSchema>
+export type ServerConfig = z.infer<typeof serverEnvSchema>

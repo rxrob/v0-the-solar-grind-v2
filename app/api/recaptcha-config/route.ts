@@ -1,20 +1,22 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getServerConfig } from "@/lib/env-validation"
+import { NextResponse } from "next/server"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const config = getServerConfig()
+    // Only return configuration status and public site key
+    const hasRecaptchaSecret = !!process.env.RECAPTCHA_SECRET_KEY
+    const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
 
-    // Only return the public site key, never the secret key
     return NextResponse.json(
       {
-        siteKey: config.recaptchaSiteKey || null,
-        configured: !!(config.recaptchaSiteKey && config.recaptchaSecretKey),
-        status: "ready",
+        recaptcha: {
+          available: hasRecaptchaSecret && !!recaptchaSiteKey,
+          siteKey: recaptchaSiteKey || null,
+          status: hasRecaptchaSecret && recaptchaSiteKey ? "configured" : "missing",
+        },
       },
       {
         headers: {
-          "Cache-Control": "public, max-age=3600",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
           "X-Content-Type-Options": "nosniff",
           "X-Frame-Options": "DENY",
         },
@@ -23,12 +25,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("reCAPTCHA config error:", error)
     return NextResponse.json(
-      {
-        siteKey: null,
-        configured: false,
-        status: "error",
-        error: "Configuration error",
-      },
+      { error: "Configuration check failed" },
       {
         status: 500,
         headers: {

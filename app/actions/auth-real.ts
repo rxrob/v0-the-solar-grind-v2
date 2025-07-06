@@ -42,7 +42,7 @@ export async function signInWithEmailReal(email: string, password: string) {
       return { success: false, error: "Too many sign-in attempts. Please try again later." }
     }
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerSupabaseClient()
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: validatedEmail,
@@ -58,11 +58,11 @@ export async function signInWithEmailReal(email: string, password: string) {
       // Check if user profile exists
       const { data: profile } = await supabase.from("users").select("*").eq("id", data.user.id).single()
 
-      if (!profile) {
+      if (!profile && data.user.email) {
         // Create user profile if it doesn't exist
         await supabase.from("users").insert({
           id: data.user.id,
-          email: data.user.email!,
+          email: data.user.email,
           subscription_type: "free",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -95,7 +95,7 @@ export async function signUpReal(email: string, password: string) {
       return { success: false, error: "Too many sign-up attempts. Please try again later." }
     }
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerSupabaseClient()
 
     const { data, error } = await supabase.auth.signUp({
       email: validatedEmail,
@@ -107,12 +107,12 @@ export async function signUpReal(email: string, password: string) {
       return { success: false, error: error.message }
     }
 
-    if (data.user) {
+    if (data.user && data.user.email) {
       // Create user profile
       try {
         await supabase.from("users").insert({
           id: data.user.id,
-          email: data.user.email!,
+          email: data.user.email,
           subscription_type: "free",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -138,7 +138,7 @@ export async function signUpReal(email: string, password: string) {
 // Sign out - REQUIRED EXPORT
 export async function signOutReal() {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerSupabaseClient()
 
     const { error } = await supabase.auth.signOut()
 
@@ -158,7 +158,7 @@ export async function signOutReal() {
 // Get current user - REQUIRED EXPORT
 export async function getCurrentUserReal() {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerSupabaseClient()
 
     const {
       data: { user },
@@ -195,7 +195,7 @@ export async function resetPasswordReal(email: string) {
       return { success: false, error: "Too many reset attempts. Please try again later." }
     }
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerSupabaseClient()
 
     const { error } = await supabase.auth.resetPasswordForEmail(validatedEmail)
 
@@ -220,7 +220,7 @@ export async function updatePasswordReal(password: string) {
     // Input validation
     const validatedPassword = passwordSchema.parse(password)
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerSupabaseClient()
 
     const { error } = await supabase.auth.updateUser({ password: validatedPassword })
 
@@ -250,7 +250,7 @@ export async function updateUserProfileReal(userId: string, updates: any) {
     }
 
     // Sanitize updates - only allow specific fields
-    const allowedFields = ["subscription_type"]
+    const allowedFields = ["subscription_type", "pro_trial_used", "single_reports_purchased", "stripe_customer_id"]
     const sanitizedUpdates = Object.keys(updates)
       .filter((key) => allowedFields.includes(key))
       .reduce((obj: any, key) => {
@@ -262,7 +262,7 @@ export async function updateUserProfileReal(userId: string, updates: any) {
       return { success: false, error: "No valid fields to update" }
     }
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerSupabaseClient()
 
     const { data, error } = await supabase
       .from("users")
@@ -296,11 +296,11 @@ export async function checkUserPermissions(userId: string) {
     // Input validation
     const validatedUserId = userIdSchema.parse(userId)
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerSupabaseClient()
 
     const { data: profile, error } = await supabase
       .from("users")
-      .select("subscription_type")
+      .select("subscription_type, pro_trial_used, single_reports_purchased")
       .eq("id", validatedUserId)
       .single()
 
@@ -311,6 +311,8 @@ export async function checkUserPermissions(userId: string) {
 
     const permissions = {
       canAccessPro: profile.subscription_type === "pro",
+      canUseTrial: !profile.pro_trial_used,
+      singleReports: profile.single_reports_purchased || 0,
       subscriptionType: profile.subscription_type,
     }
 

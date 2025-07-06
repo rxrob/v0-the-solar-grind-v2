@@ -1,16 +1,19 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getSupabaseConfig, testConnection } from "@/lib/supabase"
+import { NextResponse } from "next/server"
+import { testServerConnection } from "@/lib/supabase-server"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const config = getSupabaseConfig()
-    const connectionTest = await testConnection()
+    const connectionTest = await testServerConnection()
 
     return NextResponse.json(
       {
-        ...config,
-        connection: connectionTest,
-        timestamp: new Date().toISOString(),
+        supabase: {
+          configured: !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          connection: connectionTest.success,
+          canQuery: connectionTest.canQuery,
+          error: connectionTest.error || null,
+          status: connectionTest.success ? "connected" : "error",
+        },
       },
       {
         headers: {
@@ -23,11 +26,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Supabase status error:", error)
     return NextResponse.json(
-      {
-        isAvailable: false,
-        error: "Status check failed",
-        timestamp: new Date().toISOString(),
-      },
+      { error: "Status check failed" },
       {
         status: 500,
         headers: {

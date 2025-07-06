@@ -1,13 +1,16 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { createClient } from "@/lib/supabase-client"
+import { createClient } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
 
 interface UserProfile {
   id: string
   email: string
   subscription_type: "free" | "pro"
+  pro_trial_used?: boolean
+  single_reports_purchased?: number
+  stripe_customer_id?: string
   created_at: string
   updated_at: string
 }
@@ -32,6 +35,7 @@ export function useAuthReal(): AuthState &
   AuthActions & {
     isAuthenticated: boolean
     isPro: boolean
+    canUseTrial: boolean
   } {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -268,7 +272,7 @@ export function useAuthReal(): AuthState &
         setState((prev) => ({ ...prev, loading: true, error: null }))
 
         // Sanitize updates
-        const allowedFields = ["subscription_type"]
+        const allowedFields = ["subscription_type", "pro_trial_used", "single_reports_purchased", "stripe_customer_id"]
         const sanitizedUpdates = Object.keys(updates)
           .filter((key) => allowedFields.includes(key))
           .reduce((obj: any, key) => {
@@ -312,6 +316,7 @@ export function useAuthReal(): AuthState &
     refreshProfile,
     isAuthenticated: !!state.user,
     isPro: state.profile?.subscription_type === "pro",
+    canUseTrial: !state.profile?.pro_trial_used,
   }
 }
 

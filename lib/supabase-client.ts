@@ -1,14 +1,20 @@
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
-// Client-side Supabase singleton
+// Client-side environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+// Singleton client instance
 let supabaseClient: ReturnType<typeof createClient<Database>> | null = null
 
-export function getSupabaseClient() {
-  if (!supabaseClient) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Create or get existing Supabase client
+export function createSupabaseClient() {
+  if (typeof window === "undefined") {
+    throw new Error("createSupabaseClient can only be called on the client")
+  }
 
+  if (!supabaseClient) {
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error("Missing Supabase environment variables")
     }
@@ -24,12 +30,13 @@ export function getSupabaseClient() {
   return supabaseClient
 }
 
-// Default export
-export const supabase = getSupabaseClient()
+// Default export - the singleton client
+export const supabase = createSupabaseClient()
 
-// Named exports
-export { getSupabaseClient as createClient }
-export { getSupabaseClient as createSupabaseClient }
+// Check if Supabase is available on client
+export function isSupabaseClientAvailable(): boolean {
+  return !!(supabaseUrl && supabaseAnonKey)
+}
 
 // Type exports
 export type { Database }

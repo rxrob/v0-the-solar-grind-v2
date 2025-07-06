@@ -42,19 +42,36 @@ export function createAdminSupabaseClient() {
   })
 }
 
-// Get server Supabase client
-export function getSupabaseServer() {
-  return createSupabaseServerClient()
-}
+// Test server connection
+export async function testServerConnection() {
+  try {
+    const supabase = createSupabaseServerClient()
+    const { data, error } = await supabase.from("users").select("count").limit(1)
 
-// Get admin Supabase client
-export function getSupabaseAdmin() {
-  return createAdminSupabaseClient()
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+        canQuery: false,
+      }
+    }
+
+    return {
+      success: true,
+      canQuery: true,
+      message: "Server connection successful",
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || "Unknown error",
+      canQuery: false,
+    }
+  }
 }
 
 // Legacy exports for backward compatibility
-export { createSupabaseServerClient as createClient }
-export { createSupabaseServerClient as createServerClient }
+export { createSupabaseServerClient as createServerSupabaseClient }
 export { createAdminSupabaseClient as createServiceSupabaseClient }
 
 // Type exports
