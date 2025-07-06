@@ -2,361 +2,282 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Skeleton } from "@/components/ui/skeleton"
-import {
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  RefreshCw,
-  Database,
-  Server,
-  Shield,
-  Globe,
-  ArrowLeft,
-} from "lucide-react"
-import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { RefreshCw, CheckCircle, XCircle, AlertCircle, Database, Server } from "lucide-react"
 
-interface DiagnosticsData {
+interface StatusResult {
   success: boolean
-  timestamp: string
-  environment: {
+  error?: string
+  message?: string
+}
+
+interface SupabaseStatus {
+  configuration: {
     url: string
     anonKey: string
     serviceKey: string
-    configured: boolean
+    isConfigured: boolean
   }
-  client: {
-    hasInstance: boolean
-    configured: boolean
-    url: string
-    anonKey: string
+  connections: {
+    server: StatusResult
+    database: StatusResult
+    auth: StatusResult
   }
-  server: {
-    success: boolean
-    error?: string
-  }
-  database: {
-    success: boolean
-    error?: string
-  }
-  auth: {
-    success: boolean
-    error?: string
-  }
-  overall: {
-    healthy: boolean
-    issues: string[]
-  }
-  error?: string
+  overall: boolean
 }
 
 export default function SupabaseDiagnosticsPage() {
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsData | null>(null)
+  const [status, setStatus] = useState<SupabaseStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchDiagnostics = async () => {
+  const checkStatus = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      console.log("🔍 Fetching diagnostics...")
       const response = await fetch("/api/supabase-status")
-
-      console.log("📡 Response status:", response.status)
-      console.log("📡 Response headers:", Object.fromEntries(response.headers.entries()))
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("❌ Response not ok:", errorText)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      const contentType = response.headers.get("content-type")
-      if (!contentType?.includes("application/json")) {
-        const responseText = await response.text()
-        console.error("❌ Invalid content type:", contentType, responseText)
-        throw new Error(`Expected JSON, got ${contentType}. Response: ${responseText.slice(0, 200)}...`)
-      }
-
       const data = await response.json()
-      console.log("✅ Diagnostics data:", data)
 
-      setDiagnostics(data)
+      if (!data.success) {
+        throw new Error(data.error || "Failed to check status")
+      }
+
+      setStatus(data.status)
     } catch (err) {
-      console.error("❌ Failed to fetch diagnostics:", err)
-      setError(err instanceof Error ? err.message : "Unknown error occurred")
-
-      // Provide fallback data for debugging
-      setDiagnostics({
-        success: false,
-        timestamp: new Date().toISOString(),
-        environment: { url: "Unknown", anonKey: "Unknown", serviceKey: "Unknown", configured: false },
-        client: { hasInstance: false, configured: false, url: "Unknown", anonKey: "Unknown" },
-        server: { success: false, error: "Failed to test" },
-        database: { success: false, error: "Failed to test" },
-        auth: { success: false, error: "Failed to test" },
-        overall: { healthy: false, issues: ["Failed to fetch diagnostics"] },
-        error: err instanceof Error ? err.message : "Unknown error",
-      })
+      console.error("Status check error:", err)
+      setError(err instanceof Error ? err.message : "Failed to check status")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchDiagnostics()
+    checkStatus()
   }, [])
 
   const getStatusIcon = (success: boolean) => {
-    return success ? <CheckCircle className="h-5 w-5 text-green-500" /> : <XCircle className="h-5 w-5 text-red-500" />
+    if (success) {
+      return <CheckCircle className="h-5 w-5 text-green-500" />
+    }
+    return <XCircle className="h-5 w-5 text-red-500" />
   }
 
   const getStatusBadge = (success: boolean, label?: string) => {
-    return (
-      <Badge variant={success ? "default" : "destructive"} className={success ? "bg-green-100 text-green-800" : ""}>
-        {label || (success ? "Healthy" : "Error")}
-      </Badge>
-    )
+    if (success) {
+      return (
+        <Badge variant="default" className="bg-green-500">
+          {label || "Connected"}
+        </Badge>
+      )
+    }
+    return <Badge variant="destructive">{label || "Failed"}</Badge>
   }
 
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Home
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Supabase Diagnostics</h1>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-32" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
+  const getConfigBadge = (value: string) => {
+    if (value === "Configured") {
+      return (
+        <Badge variant="default" className="bg-green-500">
+          Configured
+        </Badge>
+      )
+    }
+    if (value === "Missing") {
+      return <Badge variant="destructive">Missing</Badge>
+    }
+    return <Badge variant="secondary">{value}</Badge>
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Home
-            </Link>
-          </Button>
+    <div className="container mx-auto py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold">Supabase Diagnostics</h1>
-            <p className="text-gray-600">System health and configuration status</p>
+            <h1 className="text-3xl font-bold">Supabase Diagnostics</h1>
+            <p className="text-muted-foreground mt-2">
+              Check the status of your Supabase configuration and connections
+            </p>
           </div>
+          <Button onClick={checkStatus} disabled={loading} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
-        <Button onClick={fetchDiagnostics} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </div>
 
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>Failed to fetch diagnostics: {error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Debug Information */}
-      {error && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Debug Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs font-mono bg-gray-100 p-3 rounded">
-              <div>Error: {error}</div>
-              <div>Timestamp: {new Date().toISOString()}</div>
-              <div>URL: {window.location.href}</div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {diagnostics && (
-        <>
-          {/* Overall Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {getStatusIcon(diagnostics.overall.healthy)}
-                Overall System Health
-              </CardTitle>
-              <CardDescription>Last checked: {new Date(diagnostics.timestamp).toLocaleString()}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {getStatusBadge(
-                  diagnostics.overall.healthy,
-                  diagnostics.overall.healthy ? "All Systems Operational" : "Issues Detected",
-                )}
-
-                {diagnostics.overall.issues.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="font-medium text-sm mb-2">Issues Found:</h4>
-                    <ul className="space-y-1">
-                      {diagnostics.overall.issues.map((issue, index) => (
-                        <li key={index} className="text-sm text-red-600 flex items-center gap-2">
-                          <XCircle className="h-3 w-3" />
-                          {issue}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+        {error && (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+                <span className="text-red-700">{error}</span>
               </div>
             </CardContent>
           </Card>
+        )}
 
-          {/* Detailed Status */}
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Environment */}
+        {loading && !status && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+                <span>Checking Supabase status...</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {status && (
+          <div className="space-y-6">
+            {/* Overall Status */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  Environment Configuration
+                  {getStatusIcon(status.overall)}
+                  Overall Status
                 </CardTitle>
+                <CardDescription>
+                  {status.overall
+                    ? "Supabase is properly configured and all connections are working"
+                    : "There are issues with your Supabase configuration or connections"}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {getStatusBadge(diagnostics.environment.configured)}
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Supabase URL:</span>
-                      <span className="font-mono">{diagnostics.environment.url}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Anon Key:</span>
-                      <span className="font-mono">{diagnostics.environment.anonKey}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Service Key:</span>
-                      <span className="font-mono">{diagnostics.environment.serviceKey}</span>
-                    </div>
-                  </div>
-                </div>
+                {getStatusBadge(status.overall, status.overall ? "All Systems Operational" : "Issues Detected")}
               </CardContent>
             </Card>
 
-            {/* Client */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {getStatusIcon(diagnostics.client.configured)}
-                  Client Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {getStatusBadge(diagnostics.client.configured)}
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Has Instance:</span>
-                      <span>{diagnostics.client.hasInstance ? "Yes" : "No"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Configured:</span>
-                      <span>{diagnostics.client.configured ? "Yes" : "No"}</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Server */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Server className="h-5 w-5" />
-                  Server Connection
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {getStatusBadge(diagnostics.server.success)}
-                  {diagnostics.server.error && (
-                    <div className="text-sm text-red-600">Error: {diagnostics.server.error}</div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Database */}
+            {/* Configuration Status */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Database className="h-5 w-5" />
-                  Database Connection
+                  Configuration
                 </CardTitle>
+                <CardDescription>Environment variables and configuration status</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {getStatusBadge(diagnostics.database.success)}
-                  {diagnostics.database.error && (
-                    <div className="text-sm text-red-600">Error: {diagnostics.database.error}</div>
-                  )}
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Supabase URL</span>
+                    {getConfigBadge(status.configuration.url)}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Anon Key</span>
+                    {getConfigBadge(status.configuration.anonKey)}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Service Key</span>
+                    {getConfigBadge(status.configuration.serviceKey)}
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Overall Configuration</span>
+                  {getStatusBadge(status.configuration.isConfigured)}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Auth */}
+            {/* Connection Tests */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Authentication
+                  <Server className="h-5 w-5" />
+                  Connection Tests
                 </CardTitle>
+                <CardDescription>Live connection tests to Supabase services</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  {getStatusBadge(diagnostics.auth.success)}
-                  {diagnostics.auth.error && (
-                    <div className="text-sm text-red-600">Error: {diagnostics.auth.error}</div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(status.connections.server.success)}
+                      <span className="font-medium">Server Connection</span>
+                    </div>
+                    {getStatusBadge(status.connections.server.success)}
+                  </div>
+                  {status.connections.server.error && (
+                    <p className="text-sm text-red-600 ml-7">{status.connections.server.error}</p>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(status.connections.database.success)}
+                      <span className="font-medium">Database Connection</span>
+                    </div>
+                    {getStatusBadge(status.connections.database.success)}
+                  </div>
+                  {status.connections.database.error && (
+                    <p className="text-sm text-red-600 ml-7">{status.connections.database.error}</p>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(status.connections.auth.success)}
+                      <span className="font-medium">Authentication</span>
+                    </div>
+                    {getStatusBadge(status.connections.auth.success)}
+                  </div>
+                  {status.connections.auth.error && (
+                    <p className="text-sm text-red-600 ml-7">{status.connections.auth.error}</p>
                   )}
                 </div>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Raw Data */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Raw Diagnostics Data</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto max-h-64">
-                {JSON.stringify(diagnostics, null, 2)}
-              </pre>
-            </CardContent>
-          </Card>
-        </>
-      )}
+            {/* Troubleshooting */}
+            {!status.overall && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-orange-500" />
+                    Troubleshooting
+                  </CardTitle>
+                  <CardDescription>Common issues and solutions</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    {!status.configuration.isConfigured && (
+                      <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                        <h4 className="font-medium text-orange-800 mb-2">Configuration Issues</h4>
+                        <ul className="text-sm text-orange-700 space-y-1">
+                          <li>• Check that all environment variables are set in your .env.local file</li>
+                          <li>• Verify your Supabase project URL and keys are correct</li>
+                          <li>• Ensure SUPABASE_SERVICE_ROLE_KEY is set for server operations</li>
+                        </ul>
+                      </div>
+                    )}
+
+                    {!status.connections.server.success && (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <h4 className="font-medium text-red-800 mb-2">Server Connection Issues</h4>
+                        <ul className="text-sm text-red-700 space-y-1">
+                          <li>• Check your internet connection</li>
+                          <li>• Verify your Supabase project is active</li>
+                          <li>• Check if your Supabase URL is correct</li>
+                        </ul>
+                      </div>
+                    )}
+
+                    {!status.connections.database.success && (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <h4 className="font-medium text-red-800 mb-2">Database Connection Issues</h4>
+                        <ul className="text-sm text-red-700 space-y-1">
+                          <li>• Verify your service role key has the correct permissions</li>
+                          <li>• Check if the 'users' table exists in your database</li>
+                          <li>• Ensure Row Level Security (RLS) policies are configured correctly</li>
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

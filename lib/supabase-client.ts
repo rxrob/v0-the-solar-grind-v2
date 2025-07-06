@@ -1,65 +1,78 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
-// Global variable to store the singleton client instance
-let clientInstance: SupabaseClient<Database> | null = null
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export function getSupabaseClient(): SupabaseClient<Database> {
-  // If we already have a client instance, return it
-  if (clientInstance) {
-    console.log("🔄 Reusing existing Supabase client instance")
-    return clientInstance
+let supabaseInstance: ReturnType<typeof createSupabaseClient<Database>> | null = null
+
+function getSupabaseClient() {
+  if (!supabaseInstance) {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Missing Supabase environment variables")
+    }
+
+    console.log("Creating new Supabase client instance")
+    supabaseInstance = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
+  } else {
+    console.log("Reusing existing Supabase client instance")
   }
+  return supabaseInstance
+}
 
-  // Get environment variables
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-
-  // Create new client instance
-  console.log("🆕 Creating new Supabase client instance")
-  clientInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  })
-
-  return clientInstance
+// REQUIRED EXPORT - createClient as named export
+export function createClient() {
+  return getSupabaseClient()
 }
 
 // Export the singleton client instance
 export const supabase = getSupabaseClient()
 
-// Export for compatibility
-export default supabase
-
-// Function to reset the client (useful for testing)
-export function resetSupabaseClient() {
-  console.log("🔄 Resetting Supabase client instance")
-  clientInstance = null
+// Get client status for diagnostics
+export function getSupabaseClientStatus() {
+  return {
+    hasUrl: !!supabaseUrl,
+    hasKey: !!supabaseAnonKey,
+    isConfigured: !!(supabaseUrl && supabaseAnonKey),
+    clientExists: !!supabaseInstance,
+  }
 }
 
-// Function to check if client is configured
+// Check if Supabase is configured
 export function isSupabaseConfigured(): boolean {
+  return !!(supabaseUrl && supabaseAnonKey)
+}
+
+// Reset client instance (for testing)
+export function resetSupabaseClient() {
+  console.log("Resetting Supabase client instance")
+  supabaseInstance = null
+}
+
+// Test connection
+export async function testConnection() {
   try {
     const client = getSupabaseClient()
-    return !!client
-  } catch {
-    return false
+    const { data, error } = await client.from("users").select("count").limit(1)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, message: "Connection successful" }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
   }
 }
 
-// Function to get client status
-export function getClientStatus() {
-  return {
-    hasInstance: !!clientInstance,
-    configured: isSupabaseConfigured(),
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL ? "Set" : "Missing",
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "Set" : "Missing",
-  }
-}
+// Default export
+export default getSupabaseClient

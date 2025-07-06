@@ -2,16 +2,15 @@ import { createClient as createSupabaseClientBase, type SupabaseClient } from "@
 import type { Database } from "@/types/supabase"
 
 // Environment variables with proper validation
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-// Create client function
+// Create client function - REQUIRED EXPORT
 export function createClient(): SupabaseClient<Database> {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing Supabase environment variables")
   }
-
   return createSupabaseClientBase<Database>(supabaseUrl, supabaseAnonKey)
 }
 

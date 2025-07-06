@@ -2,43 +2,32 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    // Only check configuration status without exposing keys
-    const googleMapsConfigured = !!process.env.GOOGLE_MAPS_API_KEY
-    const geocodingConfigured = !!process.env.GOOGLE_GEOCODING_API_KEY
-    const elevationConfigured = !!process.env.GOOGLE_ELEVATION_API_KEY
+    // Only return configuration status, not actual keys
+    const hasGoogleMapsKey = !!process.env.GOOGLE_MAPS_API_KEY
+    const hasGeocodingKey = !!process.env.GOOGLE_GEOCODING_API_KEY
+    const hasElevationKey = !!process.env.GOOGLE_ELEVATION_API_KEY
 
     return NextResponse.json({
       success: true,
-      configured: {
-        googleMaps: googleMapsConfigured,
-        geocoding: geocodingConfigured,
-        elevation: elevationConfigured,
-        overall: googleMapsConfigured && geocodingConfigured && elevationConfigured,
+      config: {
+        googleMaps: hasGoogleMapsKey ? "Configured" : "Missing",
+        geocoding: hasGeocodingKey ? "Configured" : "Missing",
+        elevation: hasElevationKey ? "Configured" : "Missing",
+        isConfigured: hasGoogleMapsKey && hasGeocodingKey && hasElevationKey,
       },
-      services: {
-        maps: googleMapsConfigured ? "Available" : "Not configured",
-        geocoding: geocodingConfigured ? "Available" : "Not configured",
-        elevation: elevationConfigured ? "Available" : "Not configured",
-      },
-      message: googleMapsConfigured ? "Google Maps services are configured" : "Google Maps services need configuration",
     })
-  } catch (error: any) {
-    console.error("Error checking Google Maps configuration:", error)
+  } catch (error) {
+    console.error("Google Maps config error:", error)
     return NextResponse.json(
       {
         success: false,
-        configured: {
-          googleMaps: false,
-          geocoding: false,
-          elevation: false,
-          overall: false,
-        },
-        services: {
-          maps: "Error",
+        error: "Failed to check Google Maps configuration",
+        config: {
+          googleMaps: "Error",
           geocoding: "Error",
           elevation: "Error",
+          isConfigured: false,
         },
-        error: "Failed to check Google Maps configuration",
       },
       { status: 500 },
     )
