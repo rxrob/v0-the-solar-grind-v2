@@ -73,7 +73,7 @@ export async function signInWithEmailReal(email: string, password: string) {
       redirect("/dashboard")
     }
 
-    return { success: true, data }
+    return { success: true, user: data.user, data }
   } catch (error: any) {
     console.error("Sign in error:", error)
     if (error instanceof z.ZodError) {
@@ -122,10 +122,10 @@ export async function signUpReal(email: string, password: string) {
         // Don't fail the signup if profile creation fails
       }
 
-      return { success: true, message: "Check your email to confirm your account" }
+      return { success: true, message: "Check your email to confirm your account", user: data.user }
     }
 
-    return { success: true, data }
+    return { success: true, user: data.user, data }
   } catch (error: any) {
     console.error("Sign up error:", error)
     if (error instanceof z.ZodError) {

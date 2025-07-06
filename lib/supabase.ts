@@ -1,4 +1,4 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient, createBrowserClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
 // Environment variables - only public ones accessible on client
@@ -27,8 +27,8 @@ export function getSupabaseClient() {
 }
 
 // Create client function - REQUIRED EXPORT
-export const createClient = () => {
-  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey)
+export function createClient() {
+  return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 }
 
 // Server-side Supabase client - REQUIRED EXPORT

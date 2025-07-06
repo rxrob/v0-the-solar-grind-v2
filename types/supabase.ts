@@ -78,21 +78,27 @@ export interface Database {
           id: string
           user_id: string
           project_id: string | null
-          calculation_data: Json
+          calculation_type: string
+          input_data: Json
+          result_data: Json
           created_at: string
         }
         Insert: {
           id?: string
           user_id: string
           project_id?: string | null
-          calculation_data: Json
+          calculation_type: string
+          input_data: Json
+          result_data: Json
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           project_id?: string | null
-          calculation_data?: Json
+          calculation_type?: string
+          input_data?: Json
+          result_data?: Json
           created_at?: string
         }
       }
