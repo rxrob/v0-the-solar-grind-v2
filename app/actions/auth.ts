@@ -97,7 +97,7 @@ export async function signUp(email: string, password: string, fullName: string) 
     }
 
     if (result.success) {
-      if (result.needsVerification) {
+      if ("needsVerification" in result && result.needsVerification) {
         return {
           success: true,
           needsVerification: true,
