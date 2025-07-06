@@ -3,8 +3,7 @@ import { signInWithEmailReal } from "@/app/actions/auth-real"
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { email, password } = body
+    const { email, password } = await request.json()
 
     if (!email || !password) {
       return NextResponse.json({ success: false, error: "Email and password are required" }, { status: 400 })
@@ -15,14 +14,16 @@ export async function POST(request: NextRequest) {
     if (result.success) {
       return NextResponse.json({
         success: true,
-        message: result.message,
         user: result.user,
       })
     } else {
-      return NextResponse.json({ success: false, error: result.error }, { status: 401 })
+      return NextResponse.json({
+        success: false,
+        error: result.error,
+      })
     }
   } catch (error) {
-    console.error("Signin API error:", error)
+    console.error("Sign in API error:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }

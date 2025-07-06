@@ -1,12 +1,9 @@
 "use server"
 
-import { createServerClient } from "@/lib/supabase-server-client"
-import { cookies } from "next/headers"
+import { getCurrentUserReal } from "./auth-real"
 
 interface AdvancedSolarParams {
   address: string
-  lat: number
-  lng: number
   systemSize: number
   panelType: string
   inverterType: string
@@ -14,212 +11,103 @@ interface AdvancedSolarParams {
   shading: string
   tilt: number
   azimuth: number
-  annualUsage: number
   electricityRate: number
-  netMeteringRate: number
+  annualUsage: number
   installationCost: number
   incentives: number
   financingOption: string
-  loanTerm: number
-  loanRate: number
-  degradationRate: number
-  maintenanceCost: number
-  insuranceCost: number
-  propertyTaxRate: number
+  loanTerm?: number
+  interestRate?: number
 }
 
 interface AdvancedSolarResults {
-  systemDetails: {
-    systemSize: number
-    panelCount: number
-    panelType: string
-    inverterType: string
-    roofType: string
-    tilt: number
-    azimuth: number
-    shading: string
-  }
-  energyProduction: {
+  basicResults: {
     annualProduction: number
     monthlyProduction: number[]
     dailyAverage: number
     peakProduction: number
-    capacityFactor: number
-    performanceRatio: number
-  }
-  energyConsumption: {
-    annualUsage: number
-    monthlyConsumption: number[]
-    netUsage: number[]
-    excessProduction: number[]
+    co2Offset: number
   }
   financialAnalysis: {
     totalSystemCost: number
     netSystemCost: number
     annualSavings: number
-    monthlySavings: number[]
     paybackPeriod: number
     roi25Year: number
     netPresentValue: number
-    levelizedCostOfEnergy: number
-    totalSavings25Year: number
+    monthlyPayment?: number
+    totalInterest?: number
   }
+  monthlyBreakdown: {
+    month: string
+    production: number
+    consumption: number
+    netUsage: number
+    billWithSolar: number
+    billWithoutSolar: number
+    savings: number
+  }[]
+  yearlyProjection: {
+    year: number
+    production: number
+    degradation: number
+    savings: number
+    cumulativeSavings: number
+  }[]
   environmentalImpact: {
     co2OffsetAnnual: number
     co2Offset25Year: number
     treesEquivalent: number
-    coalOffset: number
-  }
-  weatherData: {
-    sunHours: number
-    irradiance: number
-    temperature: number
-    weatherAdjustment: number
+    carsOffRoadEquivalent: number
   }
   recommendations: string[]
-  warnings: string[]
-}
-
-async function fetchNRELData(lat: number, lng: number, systemSize: number, tilt: number, azimuth: number) {
-  try {
-    const nrelApiKey = process.env.NREL_API_KEY
-    if (!nrelApiKey) {
-      throw new Error("NREL API key not configured")
-    }
-
-    // Fetch PVWatts data
-    const pvwattsUrl = `https://developer.nrel.gov/api/pvwatts/v6.json?api_key=${nrelApiKey}&lat=${lat}&lon=${lng}&system_capacity=${systemSize}&azimuth=${azimuth}&tilt=${tilt}&array_type=1&module_type=1&losses=14`
-
-    const pvwattsResponse = await fetch(pvwattsUrl)
-    if (!pvwattsResponse.ok) {
-      throw new Error(`NREL PVWatts API error: ${pvwattsResponse.status}`)
-    }
-
-    const pvwattsData = await pvwattsResponse.json()
-
-    // Fetch solar resource data
-    const solarUrl = `https://developer.nrel.gov/api/solar/solar_resource/v1.json?api_key=${nrelApiKey}&lat=${lat}&lon=${lng}`
-
-    const solarResponse = await fetch(solarUrl)
-    if (!solarResponse.ok) {
-      throw new Error(`NREL Solar Resource API error: ${solarResponse.status}`)
-    }
-
-    const solarData = await solarResponse.json()
-
-    return {
-      pvwatts: pvwattsData,
-      solar: solarData,
-    }
-  } catch (error) {
-    console.error("NREL API error:", error)
-    // Return fallback data
-    return {
-      pvwatts: {
-        outputs: {
-          ac_annual: systemSize * 1400, // Fallback: 1400 kWh per kW
-          ac_monthly: Array(12).fill((systemSize * 1400) / 12),
-          capacity_factor: 16.5,
-          performance_ratio: 0.85,
-        },
-      },
-      solar: {
-        outputs: {
-          avg_dni: { annual: 5.5 },
-          avg_ghi: { annual: 4.8 },
-          avg_lat_tilt: { annual: 5.2 },
-        },
-      },
-    }
-  }
-}
-
-async function saveAdvancedCalculation(userEmail: string, params: AdvancedSolarParams, results: AdvancedSolarResults) {
-  try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
-
-    const { error } = await supabase.from("solar_calculations").insert({
-      user_email: userEmail,
-      calculation_type: "advanced",
-      input_data: params,
-      results: results,
-      created_at: new Date().toISOString(),
-    })
-
-    if (error) {
-      console.error("Error saving calculation:", error)
-    }
-  } catch (error) {
-    console.error("Error saving calculation:", error)
-  }
 }
 
 export async function performAdvancedSolarCalculation(params: AdvancedSolarParams): Promise<AdvancedSolarResults> {
   try {
-    // Get current user
-    const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Get current user for tracking
+    const user = await getCurrentUserReal()
 
-    // Fetch NREL data
-    const nrelData = await fetchNRELData(params.lat, params.lng, params.systemSize, params.tilt, params.azimuth)
-
-    // Extract data from NREL response
-    const annualProduction = nrelData.pvwatts.outputs.ac_annual || params.systemSize * 1400
-    const monthlyProductionRaw = nrelData.pvwatts.outputs.ac_monthly || Array(12).fill(annualProduction / 12)
-    const capacityFactor = nrelData.pvwatts.outputs.capacity_factor || 16.5
-    const performanceRatio = nrelData.pvwatts.outputs.performance_ratio || 0.85
-
-    // Calculate system details
-    const panelWattage =
-      params.panelType === "monocrystalline" ? 400 : params.panelType === "polycrystalline" ? 350 : 300
-    const panelCount = Math.ceil((params.systemSize * 1000) / panelWattage)
-
-    // Apply shading and orientation adjustments
-    let shadingFactor = 1.0
-    switch (params.shading) {
-      case "heavy":
-        shadingFactor = 0.7
-        break
-      case "moderate":
-        shadingFactor = 0.85
-        break
-      case "light":
-        shadingFactor = 0.95
-        break
-      default:
-        shadingFactor = 1.0
+    // Panel efficiency factors
+    const panelEfficiencyMap = {
+      monocrystalline: 0.22,
+      polycrystalline: 0.18,
+      "thin-film": 0.12,
     }
 
-    // Orientation adjustment
-    let orientationFactor = 1.0
-    if (params.azimuth >= 135 && params.azimuth <= 225) {
-      orientationFactor = 1.0 // South-facing
-    } else if (params.azimuth >= 90 && params.azimuth <= 270) {
-      orientationFactor = 0.9 // East/West-facing
-    } else {
-      orientationFactor = 0.7 // North-facing
+    // Inverter efficiency factors
+    const inverterEfficiencyMap = {
+      "string-inverter": 0.95,
+      "power-optimizer": 0.97,
+      "micro-inverter": 0.96,
     }
 
-    // Tilt adjustment
-    let tiltFactor = 1.0
-    const optimalTilt = Math.abs(params.lat)
-    const tiltDifference = Math.abs(params.tilt - optimalTilt)
-    if (tiltDifference <= 15) {
-      tiltFactor = 1.0
-    } else if (tiltDifference <= 30) {
-      tiltFactor = 0.95
-    } else {
-      tiltFactor = 0.85
+    // Shading factors
+    const shadingFactorMap = {
+      none: 1.0,
+      minimal: 0.95,
+      moderate: 0.85,
+      heavy: 0.7,
     }
 
-    // Apply all adjustment factors
-    const adjustedAnnualProduction = annualProduction * shadingFactor * orientationFactor * tiltFactor
+    // Get location-specific data (simplified for demo)
+    const locationData = await getLocationSolarData(params.address)
 
-    // Calculate monthly production with adjustments
+    // Calculate system specifications
+    const panelEfficiency = panelEfficiencyMap[params.panelType as keyof typeof panelEfficiencyMap] || 0.2
+    const inverterEfficiency = inverterEfficiencyMap[params.inverterType as keyof typeof inverterEfficiencyMap] || 0.95
+    const shadingFactor = shadingFactorMap[params.shading as keyof typeof shadingFactorMap] || 0.9
+
+    // Calculate tilt and azimuth factors
+    const tiltFactor = calculateTiltFactor(params.tilt, locationData.latitude)
+    const azimuthFactor = calculateAzimuthFactor(params.azimuth)
+
+    // Calculate annual production
+    const baseProduction = params.systemSize * locationData.averageSunHours * 365
+    const adjustedProduction =
+      baseProduction * panelEfficiency * inverterEfficiency * shadingFactor * tiltFactor * azimuthFactor
+
+    // Calculate monthly production with seasonal variations
     const monthlyConsumption: number[] = []
     const seasonalFactors = [1.1, 1.0, 0.9, 0.8, 0.7, 0.8, 1.2, 1.3, 1.1, 0.9, 1.0, 1.1]
     const avgMonthlyUsage = params.annualUsage / 12
@@ -228,167 +116,132 @@ export async function performAdvancedSolarCalculation(params: AdvancedSolarParam
       monthlyConsumption.push(avgMonthlyUsage * seasonalFactors[i])
     }
 
-    const monthlyProduction: number[] = monthlyProductionRaw.map((production: number, index: number) => {
-      return production * shadingFactor * orientationFactor * tiltFactor * seasonalFactors[index]
-    })
+    const monthlyProduction: number[] = []
+    const monthlyProductionFactors = [0.7, 0.8, 1.0, 1.2, 1.3, 1.4, 1.4, 1.3, 1.1, 0.9, 0.7, 0.6]
 
-    // Calculate net usage and excess production
-    const netUsage = monthlyConsumption.map((consumption, index) => {
-      return Math.max(0, consumption - monthlyProduction[index])
-    })
+    for (let i = 0; i < 12; i++) {
+      const monthlyProd = (adjustedProduction / 12) * monthlyProductionFactors[i]
+      monthlyProduction.push(Math.round(monthlyProd))
+    }
 
-    const excessProduction = monthlyProduction.map((production, index) => {
-      return Math.max(0, production - monthlyConsumption[index])
-    })
-
-    // Financial calculations
+    // Calculate financial analysis
     const totalSystemCost = params.installationCost
     const netSystemCost = totalSystemCost - params.incentives
+    const annualSavings = Math.min(
+      adjustedProduction * params.electricityRate,
+      params.annualUsage * params.electricityRate,
+    )
+    const paybackPeriod = netSystemCost / annualSavings
 
-    // Calculate monthly savings
-    const monthlySavings = monthlyProduction.map((production: number, index: number) => {
-      const consumptionOffset = Math.min(production, monthlyConsumption[index])
-      const excessCredit = Math.max(0, production - monthlyConsumption[index]) * params.netMeteringRate
-      return consumptionOffset * params.electricityRate + excessCredit
-    })
-
-    const annualSavings = monthlySavings.reduce((sum, saving) => sum + saving, 0)
-
-    // Financing calculations
+    // Calculate financing details if applicable
     let monthlyPayment = 0
-    if (params.financingOption === "loan") {
-      const monthlyRate = params.loanRate / 100 / 12
+    let totalInterest = 0
+
+    if (params.financingOption === "loan" && params.loanTerm && params.interestRate) {
+      const monthlyRate = params.interestRate / 100 / 12
       const numPayments = params.loanTerm * 12
       monthlyPayment =
         (netSystemCost * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) /
         (Math.pow(1 + monthlyRate, numPayments) - 1)
+      totalInterest = monthlyPayment * numPayments - netSystemCost
     }
 
-    // Calculate payback period
-    const netAnnualSavings = annualSavings - (params.maintenanceCost + params.insuranceCost)
-    const paybackPeriod =
-      params.financingOption === "cash"
-        ? netSystemCost / netAnnualSavings
-        : netSystemCost / (netAnnualSavings - monthlyPayment * 12)
-
-    // 25-year analysis
-    const years = 25
-    let totalSavings25Year = 0
-    let npvCalculation = 0
+    // Calculate NPV and ROI
     const discountRate = 0.06 // 6% discount rate
-
-    for (let year = 1; year <= years; year++) {
-      const degradationFactor = Math.pow(1 - params.degradationRate / 100, year - 1)
-      const yearlyProduction = adjustedAnnualProduction * degradationFactor
-      const yearlySavings = yearlyProduction * params.electricityRate - params.maintenanceCost - params.insuranceCost
-
-      totalSavings25Year += yearlySavings
-      npvCalculation += yearlySavings / Math.pow(1 + discountRate, year)
+    let npv = -netSystemCost
+    for (let year = 1; year <= 25; year++) {
+      const yearlyBenefit = annualSavings * Math.pow(0.995, year - 1) // 0.5% annual degradation
+      npv += yearlyBenefit / Math.pow(1 + discountRate, year)
     }
 
-    const netPresentValue = npvCalculation - netSystemCost
-    const roi25Year = ((totalSavings25Year - netSystemCost) / netSystemCost) * 100
+    const roi25Year = ((npv + netSystemCost) / netSystemCost) * 100
 
-    // LCOE calculation
-    const totalEnergyProduced25Year = Array.from(
-      { length: years },
-      (_, year) => adjustedAnnualProduction * Math.pow(1 - params.degradationRate / 100, year),
-    ).reduce((sum, production) => sum + production, 0)
+    // Generate monthly breakdown
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    const monthlyBreakdown = monthNames.map((month, index) => {
+      const production = monthlyProduction[index]
+      const consumption = monthlyConsumption[index]
+      const netUsage = Math.max(0, consumption - production)
+      const billWithSolar = netUsage * params.electricityRate
+      const billWithoutSolar = consumption * params.electricityRate
+      const savings = billWithoutSolar - billWithSolar
 
-    const levelizedCostOfEnergy = netSystemCost / totalEnergyProduced25Year
+      return {
+        month,
+        production: Math.round(production),
+        consumption: Math.round(consumption),
+        netUsage: Math.round(netUsage),
+        billWithSolar: Math.round(billWithSolar * 100) / 100,
+        billWithoutSolar: Math.round(billWithoutSolar * 100) / 100,
+        savings: Math.round(savings * 100) / 100,
+      }
+    })
 
-    // Environmental impact
-    const co2OffsetAnnual = adjustedAnnualProduction * 0.0004 // 0.4 kg CO2 per kWh
-    const co2Offset25Year = co2OffsetAnnual * years * (1 - ((params.degradationRate / 100) * years) / 2)
-    const treesEquivalent = co2Offset25Year / 21 // 21 kg CO2 per tree per year
-    const coalOffset = co2Offset25Year / 820 // 820 kg CO2 per ton of coal
+    // Generate 25-year projection
+    const yearlyProjection = []
+    let cumulativeSavings = 0
 
-    // Weather data
-    const sunHours = nrelData.solar.outputs?.avg_ghi?.annual || 5.0
-    const irradiance = nrelData.solar.outputs?.avg_dni?.annual || 5.5
-    const temperature = 25 // Default temperature
-    const weatherAdjustment = capacityFactor / 20 // Normalize to percentage
+    for (let year = 1; year <= 25; year++) {
+      const degradationFactor = Math.pow(0.995, year - 1)
+      const yearProduction = Math.round(adjustedProduction * degradationFactor)
+      const yearSavings = Math.min(yearProduction * params.electricityRate, params.annualUsage * params.electricityRate)
+      cumulativeSavings += yearSavings
+
+      yearlyProjection.push({
+        year,
+        production: yearProduction,
+        degradation: Math.round((1 - degradationFactor) * 100 * 10) / 10,
+        savings: Math.round(yearSavings),
+        cumulativeSavings: Math.round(cumulativeSavings),
+      })
+    }
+
+    // Calculate environmental impact
+    const co2OffsetAnnual = adjustedProduction * 0.0007 // metric tons CO2 per kWh
+    const co2Offset25Year = co2OffsetAnnual * 25 * 0.9 // Account for degradation
+    const treesEquivalent = Math.round(co2Offset25Year * 16) // Trees planted equivalent
+    const carsOffRoadEquivalent = Math.round(co2Offset25Year / 4.6) // Cars off road for 1 year
 
     // Generate recommendations
-    const recommendations: string[] = []
-    const warnings: string[] = []
-
-    if (params.tilt < optimalTilt - 15 || params.tilt > optimalTilt + 15) {
-      recommendations.push(`Consider adjusting tilt angle to ${Math.round(optimalTilt)}° for optimal performance`)
-    }
-
-    if (params.azimuth < 135 || params.azimuth > 225) {
-      recommendations.push("Consider south-facing orientation for maximum energy production")
-    }
-
-    if (params.shading !== "none") {
-      recommendations.push("Consider tree trimming or system relocation to reduce shading impact")
-    }
-
-    if (paybackPeriod > 15) {
-      warnings.push(
-        "Payback period exceeds 15 years - consider reducing system size or exploring additional incentives",
-      )
-    }
-
-    if (params.systemSize > params.annualUsage / 1200) {
-      warnings.push("System may be oversized for your energy usage - consider reducing capacity")
-    }
+    const recommendations = generateRecommendations(params, {
+      paybackPeriod,
+      roi25Year,
+      shadingFactor,
+      tiltFactor,
+      azimuthFactor,
+    })
 
     const results: AdvancedSolarResults = {
-      systemDetails: {
-        systemSize: params.systemSize,
-        panelCount,
-        panelType: params.panelType,
-        inverterType: params.inverterType,
-        roofType: params.roofType,
-        tilt: params.tilt,
-        azimuth: params.azimuth,
-        shading: params.shading,
-      },
-      energyProduction: {
-        annualProduction: Math.round(adjustedAnnualProduction),
+      basicResults: {
+        annualProduction: Math.round(adjustedProduction),
         monthlyProduction: monthlyProduction.map((p: number) => Math.round(p)),
-        dailyAverage: Math.round(adjustedAnnualProduction / 365),
-        peakProduction: Math.round(params.systemSize * 5), // Assuming 5 hours peak sun
-        capacityFactor: Math.round(capacityFactor * 10) / 10,
-        performanceRatio: Math.round(performanceRatio * 100) / 100,
-      },
-      energyConsumption: {
-        annualUsage: params.annualUsage,
-        monthlyConsumption: monthlyConsumption.map((c: number) => Math.round(c)),
-        netUsage: netUsage.map((u: number) => Math.round(u)),
-        excessProduction: excessProduction.map((e: number) => Math.round(e)),
+        dailyAverage: Math.round(adjustedProduction / 365),
+        peakProduction: Math.round(params.systemSize * 1000), // Peak watts
+        co2Offset: Math.round(co2OffsetAnnual * 1000) / 1000,
       },
       financialAnalysis: {
         totalSystemCost,
         netSystemCost,
         annualSavings: Math.round(annualSavings),
-        monthlySavings: monthlySavings.map((s: number) => Math.round(s)),
         paybackPeriod: Math.round(paybackPeriod * 10) / 10,
         roi25Year: Math.round(roi25Year * 10) / 10,
-        netPresentValue: Math.round(netPresentValue),
-        levelizedCostOfEnergy: Math.round(levelizedCostOfEnergy * 1000) / 1000,
-        totalSavings25Year: Math.round(totalSavings25Year),
+        netPresentValue: Math.round(npv),
+        monthlyPayment: monthlyPayment > 0 ? Math.round(monthlyPayment * 100) / 100 : undefined,
+        totalInterest: totalInterest > 0 ? Math.round(totalInterest) : undefined,
       },
+      monthlyBreakdown,
+      yearlyProjection,
       environmentalImpact: {
-        co2OffsetAnnual: Math.round(co2OffsetAnnual),
-        co2Offset25Year: Math.round(co2Offset25Year),
-        treesEquivalent: Math.round(treesEquivalent),
-        coalOffset: Math.round(coalOffset * 10) / 10,
-      },
-      weatherData: {
-        sunHours: Math.round(sunHours * 10) / 10,
-        irradiance: Math.round(irradiance * 10) / 10,
-        temperature,
-        weatherAdjustment: Math.round(weatherAdjustment * 10) / 10,
+        co2OffsetAnnual: Math.round(co2OffsetAnnual * 1000) / 1000,
+        co2Offset25Year: Math.round(co2Offset25Year * 1000) / 1000,
+        treesEquivalent,
+        carsOffRoadEquivalent,
       },
       recommendations,
-      warnings,
     }
 
     // Save calculation to database if user is authenticated
-    if (user?.email) {
+    if (user && user.email) {
       await saveAdvancedCalculation(user.email, params, results)
     }
 
@@ -396,5 +249,98 @@ export async function performAdvancedSolarCalculation(params: AdvancedSolarParam
   } catch (error) {
     console.error("Advanced solar calculation error:", error)
     throw new Error("Failed to perform advanced solar calculation")
+  }
+}
+
+async function getLocationSolarData(address: string) {
+  // Simplified location data - in production, this would call NREL API
+  return {
+    latitude: 40.7128,
+    longitude: -74.006,
+    averageSunHours: 4.5,
+    peakSunHours: 5.2,
+  }
+}
+
+function calculateTiltFactor(tilt: number, latitude: number): number {
+  // Simplified tilt calculation
+  const optimalTilt = latitude
+  const tiltDifference = Math.abs(tilt - optimalTilt)
+
+  if (tiltDifference <= 15) return 1.0
+  if (tiltDifference <= 30) return 0.95
+  if (tiltDifference <= 45) return 0.85
+  return 0.75
+}
+
+function calculateAzimuthFactor(azimuth: number): number {
+  // Optimal azimuth is 180 (south-facing)
+  const azimuthDifference = Math.abs(azimuth - 180)
+
+  if (azimuthDifference <= 15) return 1.0
+  if (azimuthDifference <= 30) return 0.95
+  if (azimuthDifference <= 45) return 0.9
+  if (azimuthDifference <= 90) return 0.8
+  return 0.6
+}
+
+function generateRecommendations(
+  params: AdvancedSolarParams,
+  analysis: {
+    paybackPeriod: number
+    roi25Year: number
+    shadingFactor: number
+    tiltFactor: number
+    azimuthFactor: number
+  },
+): string[] {
+  const recommendations: string[] = []
+
+  if (analysis.paybackPeriod < 8) {
+    recommendations.push("Excellent investment opportunity with quick payback period")
+  } else if (analysis.paybackPeriod > 12) {
+    recommendations.push("Consider increasing system size or exploring additional incentives")
+  }
+
+  if (analysis.roi25Year > 200) {
+    recommendations.push("Outstanding long-term return on investment")
+  }
+
+  if (analysis.shadingFactor < 0.9) {
+    recommendations.push("Consider tree trimming or panel relocation to reduce shading impact")
+  }
+
+  if (analysis.tiltFactor < 0.95) {
+    recommendations.push("Optimize panel tilt angle for better performance")
+  }
+
+  if (analysis.azimuthFactor < 0.95) {
+    recommendations.push("Consider south-facing orientation for optimal energy production")
+  }
+
+  if (params.panelType === "thin-film") {
+    recommendations.push("Consider upgrading to monocrystalline panels for better efficiency")
+  }
+
+  if (params.inverterType === "string-inverter" && analysis.shadingFactor < 0.9) {
+    recommendations.push("Consider power optimizers or micro-inverters for shaded installations")
+  }
+
+  return recommendations
+}
+
+async function saveAdvancedCalculation(userEmail: string, params: AdvancedSolarParams, results: AdvancedSolarResults) {
+  try {
+    // In production, this would save to database
+    console.log("Saving advanced calculation for user:", userEmail)
+    console.log("Calculation results:", {
+      address: params.address,
+      systemSize: params.systemSize,
+      annualProduction: results.basicResults.annualProduction,
+      annualSavings: results.financialAnalysis.annualSavings,
+      paybackPeriod: results.financialAnalysis.paybackPeriod,
+    })
+  } catch (error) {
+    console.error("Error saving advanced calculation:", error)
   }
 }
