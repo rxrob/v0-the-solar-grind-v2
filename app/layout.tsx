@@ -10,23 +10,12 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: {
-    default: "MySolarAI - AI-Powered Solar Analysis & Calculator",
+    default: "MySolarAI - Smart Solar Analysis Platform",
     template: "%s | MySolarAI",
   },
   description:
-    "Get instant, accurate solar calculations with our advanced AI technology. Analyze your property, calculate savings, and generate professional reports in minutes.",
-  keywords: [
-    "solar calculator",
-    "solar analysis",
-    "solar panels",
-    "renewable energy",
-    "AI solar",
-    "solar savings",
-    "solar installation",
-    "solar ROI",
-    "solar reports",
-    "NREL data",
-  ],
+    "AI-powered solar analysis platform for professionals and homeowners. Get detailed solar calculations, cost analysis, and professional reports.",
+  keywords: ["solar", "solar panels", "solar calculator", "renewable energy", "solar analysis", "AI", "solar reports"],
   authors: [{ name: "MySolarAI Team" }],
   creator: "MySolarAI",
   publisher: "MySolarAI",
@@ -35,7 +24,7 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://mysolarai.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://mysolarai.com"),
   alternates: {
     canonical: "/",
   },
@@ -43,25 +32,24 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "/",
-    title: "MySolarAI - AI-Powered Solar Analysis & Calculator",
+    title: "MySolarAI - Smart Solar Analysis Platform",
     description:
-      "Get instant, accurate solar calculations with our advanced AI technology. Analyze your property, calculate savings, and generate professional reports in minutes.",
+      "AI-powered solar analysis platform for professionals and homeowners. Get detailed solar calculations, cost analysis, and professional reports.",
     siteName: "MySolarAI",
     images: [
       {
         url: "/images/og-image.png",
         width: 1200,
         height: 630,
-        alt: "MySolarAI - AI-Powered Solar Analysis",
+        alt: "MySolarAI - Smart Solar Analysis Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "MySolarAI - AI-Powered Solar Analysis & Calculator",
-    description:
-      "Get instant, accurate solar calculations with our advanced AI technology. Analyze your property, calculate savings, and generate professional reports in minutes.",
-    images: ["/images/twitter-image.png"],
+    title: "MySolarAI - Smart Solar Analysis Platform",
+    description: "AI-powered solar analysis platform for professionals and homeowners.",
+    images: ["/images/og-image.png"],
     creator: "@mysolarai",
   },
   robots: {
@@ -89,17 +77,31 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#f97316" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="MySolarAI" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="msapplication-TileColor" content="#f97316" />
-        <meta name="msapplication-config" content="/browserconfig.xml" />
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        <link rel="manifest" href="/site.webmanifest" />
+        <meta name="theme-color" content="#ffffff" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "MySolarAI",
+              description: "AI-powered solar analysis platform for professionals and homeowners",
+              url: "https://mysolarai.com",
+              applicationCategory: "BusinessApplication",
+              operatingSystem: "Web",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "USD",
+              },
+            }),
+          }}
+        />
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
