@@ -1,44 +1,83 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       users: {
         Row: {
           id: string
           email: string
-          subscription_type: "free" | "pro"
-          pro_trial_used: boolean | null
-          single_reports_purchased: number | null
+          full_name: string | null
+          avatar_url: string | null
+          subscription_tier: "free" | "pro" | "enterprise"
+          subscription_status: "active" | "inactive" | "cancelled" | "past_due"
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
-          subscription_status: string | null
+          trial_ends_at: string | null
           created_at: string
           updated_at: string
+          last_sign_in_at: string | null
+          email_confirmed_at: string | null
+          phone: string | null
+          raw_app_meta_data: Json | null
+          raw_user_meta_data: Json | null
+          is_super_admin: boolean
+          banned_until: string | null
+          deleted_at: string | null
+          company: string | null
+          pro_trial_used: boolean
+          single_reports_purchased: number
+          subscription_type: string
         }
         Insert: {
-          id: string
+          id?: string
           email: string
-          subscription_type?: "free" | "pro"
-          pro_trial_used?: boolean | null
-          single_reports_purchased?: number | null
+          full_name?: string | null
+          avatar_url?: string | null
+          subscription_tier?: "free" | "pro" | "enterprise"
+          subscription_status?: "active" | "inactive" | "cancelled" | "past_due"
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
-          subscription_status?: string | null
+          trial_ends_at?: string | null
           created_at?: string
           updated_at?: string
+          last_sign_in_at?: string | null
+          email_confirmed_at?: string | null
+          phone?: string | null
+          raw_app_meta_data?: Json | null
+          raw_user_meta_data?: Json | null
+          is_super_admin?: boolean
+          banned_until?: string | null
+          deleted_at?: string | null
+          company?: string | null
+          pro_trial_used?: boolean
+          single_reports_purchased?: number
+          subscription_type?: string
         }
         Update: {
           id?: string
           email?: string
-          subscription_type?: "free" | "pro"
-          pro_trial_used?: boolean | null
-          single_reports_purchased?: number | null
+          full_name?: string | null
+          avatar_url?: string | null
+          subscription_tier?: "free" | "pro" | "enterprise"
+          subscription_status?: "active" | "inactive" | "cancelled" | "past_due"
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
-          subscription_status?: string | null
+          trial_ends_at?: string | null
           created_at?: string
           updated_at?: string
+          last_sign_in_at?: string | null
+          email_confirmed_at?: string | null
+          phone?: string | null
+          raw_app_meta_data?: Json | null
+          raw_user_meta_data?: Json | null
+          is_super_admin?: boolean
+          banned_until?: string | null
+          deleted_at?: string | null
+          company?: string | null
+          pro_trial_used?: boolean
+          single_reports_purchased?: number
+          subscription_type?: string
         }
         Relationships: []
       }
@@ -48,42 +87,54 @@ export type Database = {
           user_id: string
           project_name: string
           address: string
-          latitude: number | null
-          longitude: number | null
-          system_size: number | null
-          panel_count: number | null
-          estimated_production: number | null
-          estimated_savings: number | null
+          latitude: number
+          longitude: number
+          system_size_kw: number
+          annual_production_kwh: number
+          estimated_cost: number
+          estimated_savings: number
+          payback_period_years: number
+          project_data: Json | null
           created_at: string
-          updated_at: string
+          updated_at: string | null
+          is_archived: boolean
+          tags: string[] | null
         }
         Insert: {
           id?: string
           user_id: string
           project_name: string
           address: string
-          latitude?: number | null
-          longitude?: number | null
-          system_size?: number | null
-          panel_count?: number | null
-          estimated_production?: number | null
-          estimated_savings?: number | null
+          latitude: number
+          longitude: number
+          system_size_kw: number
+          annual_production_kwh: number
+          estimated_cost: number
+          estimated_savings: number
+          payback_period_years: number
+          project_data?: Json | null
           created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          is_archived?: boolean
+          tags?: string[] | null
         }
         Update: {
           id?: string
           user_id?: string
           project_name?: string
           address?: string
-          latitude?: number | null
-          longitude?: number | null
-          system_size?: number | null
-          panel_count?: number | null
-          estimated_production?: number | null
-          estimated_savings?: number | null
+          latitude?: number
+          longitude?: number
+          system_size_kw?: number
+          annual_production_kwh?: number
+          estimated_cost?: number
+          estimated_savings?: number
+          payback_period_years?: number
+          project_data?: Json | null
           created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          is_archived?: boolean
+          tags?: string[] | null
         }
         Relationships: [
           {
@@ -99,69 +150,93 @@ export type Database = {
         Row: {
           id: string
           user_id: string | null
-          address: string
-          latitude: number
-          longitude: number
-          system_size: number
-          panel_count: number
-          panel_wattage: number
-          efficiency_rating: number
-          tilt_angle: number
-          azimuth_angle: number
-          estimated_production: number
-          estimated_savings: number
-          payback_period: number
-          roi_percentage: number
-          co2_offset: number
-          calculation_type: string
+          project_id: string | null
+          calculation_type: string | null
+          input_data: Json | null
+          results: Json | null
           created_at: string
           updated_at: string
+          is_public: boolean
+          calculation_version: string
+          annual_energy_production: number | null
+          annual_savings: number | null
+          payback_period: number | null
+          system_size: number | null
         }
         Insert: {
           id?: string
           user_id?: string | null
-          address: string
-          latitude: number
-          longitude: number
-          system_size: number
-          panel_count: number
-          panel_wattage: number
-          efficiency_rating: number
-          tilt_angle: number
-          azimuth_angle: number
-          estimated_production: number
-          estimated_savings: number
-          payback_period: number
-          roi_percentage: number
-          co2_offset: number
-          calculation_type: string
+          project_id?: string | null
+          calculation_type?: string | null
+          input_data?: Json | null
+          results?: Json | null
           created_at?: string
           updated_at?: string
+          is_public?: boolean
+          calculation_version?: string
+          annual_energy_production?: number | null
+          annual_savings?: number | null
+          payback_period?: number | null
+          system_size?: number | null
         }
         Update: {
           id?: string
           user_id?: string | null
-          address?: string
-          latitude?: number
-          longitude?: number
-          system_size?: number
-          panel_count?: number
-          panel_wattage?: number
-          efficiency_rating?: number
-          tilt_angle?: number
-          azimuth_angle?: number
-          estimated_production?: number
-          estimated_savings?: number
-          payback_period?: number
-          roi_percentage?: number
-          co2_offset?: number
-          calculation_type?: string
+          project_id?: string | null
+          calculation_type?: string | null
+          input_data?: Json | null
+          results?: Json | null
           created_at?: string
           updated_at?: string
+          is_public?: boolean
+          calculation_version?: string
+          annual_energy_production?: number | null
+          annual_savings?: number | null
+          payback_period?: number | null
+          system_size?: number | null
         }
         Relationships: [
           {
             foreignKeyName: "solar_calculations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solar_calculations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "user_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_tracking: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_tracking_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -177,7 +252,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      subscription_tier: "free" | "pro" | "enterprise"
+      subscription_status: "active" | "inactive" | "cancelled" | "past_due"
+      calculation_type: "basic" | "advanced" | "pro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -256,3 +333,19 @@ export type Enums<
   : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
     ? Database["public"]["Enums"][PublicEnumNameOrOptions]
     : never
+
+// Helper types for common operations
+export type User = Tables<"users">
+export type UserProject = Tables<"user_projects">
+export type SolarCalculation = Tables<"solar_calculations">
+export type UsageTracking = Tables<"usage_tracking">
+
+export type UserInsert = TablesInsert<"users">
+export type UserProjectInsert = TablesInsert<"user_projects">
+export type SolarCalculationInsert = TablesInsert<"solar_calculations">
+export type UsageTrackingInsert = TablesInsert<"usage_tracking">
+
+export type UserUpdate = TablesUpdate<"users">
+export type UserProjectUpdate = TablesUpdate<"user_projects">
+export type SolarCalculationUpdate = TablesUpdate<"solar_calculations">
+export type UsageTrackingUpdate = TablesUpdate<"usage_tracking">

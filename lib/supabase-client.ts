@@ -1,24 +1,36 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
-let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export function createClient() {
-  if (supabaseClient) {
-    return supabaseClient
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables")
+}
+
+// Singleton pattern to ensure we only create one client instance
+let supabaseClient: ReturnType<typeof createClient<Database>> | null = null
+
+export function getSupabaseClient() {
+  if (!supabaseClient) {
+    supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        flowType: "pkce",
+      },
+      global: {
+        headers: {
+          "X-Client-Info": "mysolarai-web",
+        },
+      },
+    })
   }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-
-  supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
-
   return supabaseClient
 }
 
-// Legacy export for backward compatibility
-export const supabase = createClient()
+export const supabase = getSupabaseClient()
+
+// Re-export createClient for other modules that need it
+export { createClient }

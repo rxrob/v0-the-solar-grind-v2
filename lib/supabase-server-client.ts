@@ -20,3 +20,6 @@ export async function createServerClient() {
     },
   })
 }
+
+// Export createClient for compatibility
+export { createClient }

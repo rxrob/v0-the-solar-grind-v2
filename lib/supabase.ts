@@ -2,18 +2,18 @@ import { createClient as createSupabaseClient, createBrowserClient } from "@supa
 import type { Database } from "@/types/supabase"
 
 // Environment variables - only public ones accessible on client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables")
+}
 
 // Singleton pattern for Supabase client
 let supabaseInstance: ReturnType<typeof createSupabaseClient<Database>> | null = null
 
 export function getSupabaseClient() {
   if (!supabaseInstance) {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error("Missing Supabase environment variables")
-    }
-
     supabaseInstance = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
@@ -28,7 +28,7 @@ export function getSupabaseClient() {
 
 // Create client function - REQUIRED EXPORT
 export function createClient() {
-  return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
 // Server-side Supabase client - REQUIRED EXPORT
@@ -46,13 +46,13 @@ export function createServiceSupabaseClient() {
     throw new Error("createServiceSupabaseClient can only be called on the server")
   }
 
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!serviceKey) {
     throw new Error("Missing Supabase admin environment variables")
   }
 
-  return createSupabaseClient<Database>(supabaseUrl, supabaseServiceKey, {
+  return createSupabaseClient<Database>(supabaseUrl, serviceKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -61,7 +61,13 @@ export function createServiceSupabaseClient() {
 }
 
 // Default Supabase client instance
-export const supabase = createClient()
+export const supabase = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+})
 
 // Check if Supabase is available
 export function isSupabaseAvailable(): boolean {
@@ -88,8 +94,7 @@ export async function signUp(email: string, password: string) {
     throw new Error("Password must be at least 6 characters")
   }
 
-  const client = createClient()
-  return await client.auth.signUp({
+  return await supabase.auth.signUp({
     email: email.toLowerCase().trim(),
     password,
   })
@@ -104,23 +109,20 @@ export async function signIn(email: string, password: string) {
     throw new Error("Password is required")
   }
 
-  const client = createClient()
-  return await client.auth.signInWithPassword({
+  return await supabase.auth.signInWithPassword({
     email: email.toLowerCase().trim(),
     password,
   })
 }
 
 export async function signOut() {
-  const client = createClient()
-  return await client.auth.signOut()
+  return await supabase.auth.signOut()
 }
 
 export async function getCurrentUser() {
-  const client = createClient()
   const {
     data: { user },
-  } = await client.auth.getUser()
+  } = await supabase.auth.getUser()
   return user
 }
 
@@ -130,8 +132,7 @@ export async function resetPassword(email: string) {
     throw new Error("Valid email is required")
   }
 
-  const client = createClient()
-  return await client.auth.resetPasswordForEmail(email.toLowerCase().trim())
+  return await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim())
 }
 
 export const updatePassword = async (password: string) => {
@@ -140,9 +141,8 @@ export const updatePassword = async (password: string) => {
     throw new Error("Password must be at least 6 characters")
   }
 
-  const client = createClient()
   try {
-    const { data, error } = await client.auth.updateUser({ password })
+    const { data, error } = await supabase.auth.updateUser({ password })
     return { data, error }
   } catch (err: any) {
     console.error("Update password error:", err)
@@ -156,8 +156,7 @@ export async function getUserProfile(userId: string) {
     throw new Error("User ID is required")
   }
 
-  const client = createClient()
-  return await client.from("users").select("*").eq("id", userId).single()
+  return await supabase.from("users").select("*").eq("id", userId).single()
 }
 
 export async function updateUserProfile(userId: string, updates: any) {
@@ -168,8 +167,7 @@ export async function updateUserProfile(userId: string, updates: any) {
     throw new Error("Valid updates object is required")
   }
 
-  const client = createClient()
-  return await client
+  return await supabase
     .from("users")
     .update({
       ...updates,
@@ -179,9 +177,8 @@ export async function updateUserProfile(userId: string, updates: any) {
 }
 
 export async function createUserProfile(userId: string, profileData: any) {
-  const client = createClient()
   try {
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from("users")
       .insert({
         id: userId,
@@ -199,9 +196,8 @@ export async function createUserProfile(userId: string, profileData: any) {
 }
 
 export const createUserProject = async (projectData: any) => {
-  const client = createClient()
   try {
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from("user_projects")
       .insert({
         ...projectData,
@@ -218,9 +214,8 @@ export const createUserProject = async (projectData: any) => {
 }
 
 export const getUserProjects = async (userId: string) => {
-  const client = createClient()
   try {
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from("user_projects")
       .select("*")
       .eq("user_id", userId)
@@ -233,9 +228,8 @@ export const getUserProjects = async (userId: string) => {
 }
 
 export const saveSolarCalculation = async (calculationData: any) => {
-  const client = createClient()
   try {
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from("solar_calculations")
       .insert({
         ...calculationData,
@@ -251,9 +245,8 @@ export const saveSolarCalculation = async (calculationData: any) => {
 }
 
 export const getUserCalculations = async (userId: string) => {
-  const client = createClient()
   try {
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from("solar_calculations")
       .select("*")
       .eq("user_id", userId)
@@ -268,8 +261,7 @@ export const getUserCalculations = async (userId: string) => {
 // Test connection function
 export async function testConnection() {
   try {
-    const client = createClient()
-    const { data, error } = await client.from("users").select("count").limit(1)
+    const { data, error } = await supabase.from("users").select("count").limit(1)
 
     if (error) {
       return { success: false, error: error.message }
@@ -302,8 +294,8 @@ export async function getSupabaseStatus() {
   return {
     connected: connection.success,
     error: connection.error,
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL ? "configured" : "missing",
-    key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "configured" : "missing",
+    url: supabaseUrl ? "configured" : "missing",
+    key: supabaseAnonKey ? "configured" : "missing",
   }
 }
 

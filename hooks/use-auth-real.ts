@@ -1,18 +1,21 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { createClient } from "@/lib/supabase-client"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase-client"
 import type { User } from "@supabase/supabase-js"
 
 interface UserProfile {
   id: string
   email: string
+  full_name?: string
+  phone?: string
+  company?: string
   subscription_type: "free" | "pro"
-  pro_trial_used: boolean | null
-  single_reports_purchased: number | null
-  stripe_customer_id: string | null
+  subscription_status?: string
+  pro_trial_used: boolean
+  single_reports_purchased: number
   created_at: string
-  updated_at: string
+  updated_at?: string
 }
 
 interface AuthState {
@@ -22,22 +25,7 @@ interface AuthState {
   error: string | null
 }
 
-interface AuthActions {
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string; message?: string }>
-  signOut: () => Promise<{ success: boolean; error?: string }>
-  updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>
-  clearError: () => void
-  refreshProfile: () => Promise<void>
-}
-
-export function useAuthReal(): AuthState &
-  AuthActions & {
-    isAuthenticated: boolean
-    isPro: boolean
-    canUseTrial: boolean
-    subscriptionPlan: string
-  } {
+export function useAuthReal() {
   const [state, setState] = useState<AuthState>({
     user: null,
     profile: null,
@@ -45,46 +33,9 @@ export function useAuthReal(): AuthState &
     error: null,
   })
 
-  const supabase = createClient()
-
-  // Clear error function
-  const clearError = useCallback(() => {
-    setState((prev) => ({ ...prev, error: null }))
-  }, [])
-
-  // Load user profile
-  const loadProfile = useCallback(
-    async (userId: string) => {
-      try {
-        const { data: profile, error } = await supabase.from("users").select("*").eq("id", userId).single()
-
-        if (error) {
-          console.error("Profile load error:", error)
-          return null
-        }
-
-        return profile as UserProfile
-      } catch (error) {
-        console.error("Profile load error:", error)
-        return null
-      }
-    },
-    [supabase],
-  )
-
-  // Refresh profile
-  const refreshProfile = useCallback(async () => {
-    if (!state.user) return
-
-    const profile = await loadProfile(state.user.id)
-    setState((prev) => ({ ...prev, profile }))
-  }, [state.user, loadProfile])
-
-  // Initialize auth state
   useEffect(() => {
-    let mounted = true
-
-    const initializeAuth = async () => {
+    // Get initial session
+    const getInitialSession = async () => {
       try {
         const {
           data: { session },
@@ -92,63 +43,29 @@ export function useAuthReal(): AuthState &
         } = await supabase.auth.getSession()
 
         if (error) {
-          console.error("Session error:", error)
-          if (mounted) {
-            setState((prev) => ({ ...prev, error: error.message, loading: false }))
-          }
+          setState((prev) => ({ ...prev, error: error.message, loading: false }))
           return
         }
 
         if (session?.user) {
-          const profile = await loadProfile(session.user.id)
-          if (mounted) {
-            setState({
-              user: session.user,
-              profile,
-              loading: false,
-              error: null,
-            })
-          }
+          await fetchUserProfile(session.user)
         } else {
-          if (mounted) {
-            setState({
-              user: null,
-              profile: null,
-              loading: false,
-              error: null,
-            })
-          }
+          setState((prev) => ({ ...prev, loading: false }))
         }
-      } catch (error: any) {
-        console.error("Auth initialization error:", error)
-        if (mounted) {
-          setState((prev) => ({
-            ...prev,
-            error: error.message || "Authentication error",
-            loading: false,
-          }))
-        }
+      } catch (error) {
+        console.error("Initial session error:", error)
+        setState((prev) => ({ ...prev, error: "Failed to get session", loading: false }))
       }
     }
 
-    initializeAuth()
+    getInitialSession()
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
-
-      console.log("Auth state changed:", event)
-
       if (event === "SIGNED_IN" && session?.user) {
-        const profile = await loadProfile(session.user.id)
-        setState({
-          user: session.user,
-          profile,
-          loading: false,
-          error: null,
-        })
+        await fetchUserProfile(session.user)
       } else if (event === "SIGNED_OUT") {
         setState({
           user: null,
@@ -156,94 +73,94 @@ export function useAuthReal(): AuthState &
           loading: false,
           error: null,
         })
-      } else if (event === "TOKEN_REFRESHED" && session?.user) {
-        const profile = await loadProfile(session.user.id)
-        setState((prev) => ({
-          ...prev,
-          user: session.user,
-          profile,
-          error: null,
-        }))
       }
     })
 
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const fetchUserProfile = async (user: User) => {
+    try {
+      const { data: profile, error } = await supabase.from("users").select("*").eq("id", user.id).single()
+
+      if (error) {
+        console.error("Profile fetch error:", error)
+        setState({
+          user,
+          profile: null,
+          loading: false,
+          error: error.message,
+        })
+        return
+      }
+
+      setState({
+        user,
+        profile,
+        loading: false,
+        error: null,
+      })
+    } catch (error) {
+      console.error("Fetch profile error:", error)
+      setState({
+        user,
+        profile: null,
+        loading: false,
+        error: "Failed to fetch profile",
+      })
     }
-  }, [supabase, loadProfile])
+  }
 
-  // Sign in function
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      try {
-        // Input validation
-        if (!email || !email.includes("@")) {
-          return { success: false, error: "Valid email is required" }
-        }
-        if (!password || password.length < 6) {
-          return { success: false, error: "Password must be at least 6 characters" }
-        }
+  const signIn = async (email: string, password: string) => {
+    try {
+      setState((prev) => ({ ...prev, loading: true, error: null }))
 
-        setState((prev) => ({ ...prev, loading: true, error: null }))
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.toLowerCase().trim(),
-          password,
-        })
-
-        if (error) {
-          setState((prev) => ({ ...prev, error: error.message, loading: false }))
-          return { success: false, error: error.message }
-        }
-
-        return { success: true }
-      } catch (error: any) {
-        const errorMessage = error.message || "Sign in failed"
-        setState((prev) => ({ ...prev, error: errorMessage, loading: false }))
-        return { success: false, error: errorMessage }
+      if (error) {
+        setState((prev) => ({ ...prev, error: error.message, loading: false }))
+        return { error: error.message }
       }
-    },
-    [supabase],
-  )
 
-  // Sign up function
-  const signUp = useCallback(
-    async (email: string, password: string) => {
-      try {
-        // Input validation
-        if (!email || !email.includes("@")) {
-          return { success: false, error: "Valid email is required" }
-        }
-        if (!password || password.length < 6) {
-          return { success: false, error: "Password must be at least 6 characters" }
-        }
+      return { success: true, user: data.user }
+    } catch (error) {
+      console.error("Sign in error:", error)
+      setState((prev) => ({ ...prev, error: "An unexpected error occurred", loading: false }))
+      return { error: "An unexpected error occurred" }
+    }
+  }
 
-        setState((prev) => ({ ...prev, loading: true, error: null }))
+  const signUp = async (email: string, password: string, fullName?: string) => {
+    try {
+      setState((prev) => ({ ...prev, loading: true, error: null }))
 
-        const { error } = await supabase.auth.signUp({
-          email: email.toLowerCase().trim(),
-          password,
-        })
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      })
 
-        if (error) {
-          setState((prev) => ({ ...prev, error: error.message, loading: false }))
-          return { success: false, error: error.message }
-        }
-
-        setState((prev) => ({ ...prev, loading: false }))
-        return { success: true, message: "Check your email to confirm your account" }
-      } catch (error: any) {
-        const errorMessage = error.message || "Sign up failed"
-        setState((prev) => ({ ...prev, error: errorMessage, loading: false }))
-        return { success: false, error: errorMessage }
+      if (error) {
+        setState((prev) => ({ ...prev, error: error.message, loading: false }))
+        return { error: error.message }
       }
-    },
-    [supabase],
-  )
 
-  // Sign out function
-  const signOut = useCallback(async () => {
+      return { success: true, user: data.user }
+    } catch (error) {
+      console.error("Sign up error:", error)
+      setState((prev) => ({ ...prev, error: "An unexpected error occurred", loading: false }))
+      return { error: "An unexpected error occurred" }
+    }
+  }
+
+  const signOut = async () => {
     try {
       setState((prev) => ({ ...prev, loading: true, error: null }))
 
@@ -251,76 +168,108 @@ export function useAuthReal(): AuthState &
 
       if (error) {
         setState((prev) => ({ ...prev, error: error.message, loading: false }))
-        return { success: false, error: error.message }
+        return { error: error.message }
       }
 
       return { success: true }
-    } catch (error: any) {
-      const errorMessage = error.message || "Sign out failed"
-      setState((prev) => ({ ...prev, error: errorMessage, loading: false }))
-      return { success: false, error: errorMessage }
+    } catch (error) {
+      console.error("Sign out error:", error)
+      setState((prev) => ({ ...prev, error: "An unexpected error occurred", loading: false }))
+      return { error: "An unexpected error occurred" }
     }
-  }, [supabase])
+  }
 
-  // Update profile function
-  const updateProfile = useCallback(
-    async (updates: Partial<UserProfile>) => {
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+
+      if (error) {
+        return { error: error.message }
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error("Reset password error:", error)
+      return { error: "An unexpected error occurred" }
+    }
+  }
+
+  const updatePassword = async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password,
+      })
+
+      if (error) {
+        return { error: error.message }
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error("Update password error:", error)
+      return { error: "An unexpected error occurred" }
+    }
+  }
+
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    try {
       if (!state.user) {
-        return { success: false, error: "Not authenticated" }
+        return { error: "User not authenticated" }
       }
 
-      try {
-        setState((prev) => ({ ...prev, loading: true, error: null }))
+      // Update auth user metadata
+      const { error: authError } = await supabase.auth.updateUser({
+        data: updates,
+      })
 
-        // Sanitize updates
-        const allowedFields = ["subscription_type", "pro_trial_used", "single_reports_purchased", "stripe_customer_id"]
-        const sanitizedUpdates = Object.keys(updates)
-          .filter((key) => allowedFields.includes(key))
-          .reduce((obj: any, key) => {
-            obj[key] = updates[key as keyof UserProfile]
-            return obj
-          }, {})
-
-        const { data, error } = await supabase
-          .from("users")
-          .update({
-            ...sanitizedUpdates,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", state.user.id)
-          .select()
-          .single()
-
-        if (error) {
-          setState((prev) => ({ ...prev, error: error.message, loading: false }))
-          return { success: false, error: error.message }
-        }
-
-        setState((prev) => ({ ...prev, profile: data as UserProfile, loading: false }))
-        return { success: true }
-      } catch (error: any) {
-        const errorMessage = error.message || "Profile update failed"
-        setState((prev) => ({ ...prev, error: errorMessage, loading: false }))
-        return { success: false, error: errorMessage }
+      if (authError) {
+        return { error: authError.message }
       }
-    },
-    [supabase, state.user],
-  )
+
+      // Update user profile in database
+      const { error: profileError } = await supabase
+        .from("users")
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", state.user.id)
+
+      if (profileError) {
+        return { error: profileError.message }
+      }
+
+      // Refresh profile
+      await fetchUserProfile(state.user)
+
+      return { success: true }
+    } catch (error) {
+      console.error("Update profile error:", error)
+      return { error: "An unexpected error occurred" }
+    }
+  }
+
+  const refreshProfile = async () => {
+    if (state.user) {
+      await fetchUserProfile(state.user)
+    }
+  }
 
   return {
     ...state,
     signIn,
     signUp,
     signOut,
+    resetPassword,
+    updatePassword,
     updateProfile,
-    clearError,
     refreshProfile,
     isAuthenticated: !!state.user,
-    isPro: state.profile?.subscription_type === "pro",
-    canUseTrial: !state.profile?.pro_trial_used,
-    subscriptionPlan: state.profile?.subscription_type || "free",
+    isPro: state.profile?.subscription_type === "pro" && state.profile?.subscription_status === "active",
+    canUseProFeatures: state.profile?.subscription_type === "pro" && state.profile?.subscription_status === "active",
+    canStartProTrial: !state.profile?.pro_trial_used && state.profile?.subscription_type !== "pro",
+    hasSingleReports: (state.profile?.single_reports_purchased || 0) > 0,
   }
 }
-
-// Legacy export for backward compatibility
-export const useAuth = useAuthReal

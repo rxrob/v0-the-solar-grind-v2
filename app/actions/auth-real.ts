@@ -1,14 +1,16 @@
 "use server"
 
-import { createClient } from "@/lib/supabase-server"
+import { createServerClient } from "@/lib/supabase-server-client"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { process } from "process"
 
 // Input validation schemas
 const emailSchema = z.string().email("Invalid email address")
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters")
 const userIdSchema = z.string().uuid("Invalid user ID")
+const fullNameSchema = z.string().min(1, "Full name must be at least 1 character")
 
 // Rate limiting helper (simple in-memory store for demo)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
@@ -49,7 +51,7 @@ export async function signInWithEmailReal(email: string, password: string) {
       }
     }
 
-    const supabase = createClient()
+    const supabase = await createServerClient()
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: validatedEmail,
@@ -97,16 +99,6 @@ export async function signInWithEmailReal(email: string, password: string) {
     }
   } catch (error: any) {
     console.error("Sign in error:", error)
-    if (error instanceof z.ZodError) {
-      return {
-        success: false,
-        error: error.errors[0].message,
-        user: null,
-        email: null,
-        profile: null,
-        subscriptionPlan: null,
-      }
-    }
     return {
       success: false,
       error: "Sign in failed. Please try again.",
@@ -119,11 +111,12 @@ export async function signInWithEmailReal(email: string, password: string) {
 }
 
 // Sign up - REQUIRED EXPORT
-export async function signUpReal(email: string, password: string) {
+export async function signUpReal(email: string, password: string, fullName: string) {
   try {
     // Input validation
     const validatedEmail = emailSchema.parse(email.toLowerCase().trim())
     const validatedPassword = passwordSchema.parse(password)
+    const validatedFullName = fullNameSchema.parse(fullName)
 
     // Rate limiting
     if (!checkRateLimit(`signup:${validatedEmail}`)) {
@@ -137,11 +130,16 @@ export async function signUpReal(email: string, password: string) {
       }
     }
 
-    const supabase = createClient()
+    const supabase = await createServerClient()
 
     const { data, error } = await supabase.auth.signUp({
       email: validatedEmail,
       password: validatedPassword,
+      options: {
+        data: {
+          full_name: validatedFullName,
+        },
+      },
     })
 
     if (error) {
@@ -156,66 +154,55 @@ export async function signUpReal(email: string, password: string) {
       }
     }
 
-    if (data.user && data.user.email) {
-      // Create user profile
-      try {
-        await supabase.from("users").insert({
-          id: data.user.id,
-          email: data.user.email,
-          subscription_type: "free",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-      } catch (profileError) {
-        console.error("Profile creation error:", profileError)
-        // Don't fail the signup if profile creation fails
-      }
-
-      return {
-        success: true,
-        message: "Check your email to confirm your account",
-        user: data.user,
+    if (data.user) {
+      // Insert user into our custom users table
+      const { error: insertError } = await supabase.from("users").insert({
+        id: data.user.id,
         email: data.user.email,
-        profile: null,
-        subscriptionPlan: "free",
+        full_name: validatedFullName,
+        subscription_type: "free",
+        created_at: new Date().toISOString(),
+      })
+
+      if (insertError) {
+        console.error("Error inserting user:", insertError)
       }
     }
 
-    return {
-      success: true,
-      user: data.user,
-      email: data.user?.email || null,
-      profile: null,
-      subscriptionPlan: "free",
-      data,
-    }
-  } catch (error: any) {
+    return { success: true, data }
+  } catch (error) {
     console.error("Sign up error:", error)
-    if (error instanceof z.ZodError) {
-      return {
-        success: false,
-        error: error.errors[0].message,
-        user: null,
-        email: null,
-        profile: null,
-        subscriptionPlan: null,
-      }
+    return { success: false, error: "An unexpected error occurred" }
+  }
+}
+
+// Sign in with Google - REQUIRED EXPORT
+export async function signInWithGoogleReal() {
+  try {
+    const supabase = await createServerClient()
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
+      },
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
     }
-    return {
-      success: false,
-      error: "Sign up failed. Please try again.",
-      user: null,
-      email: null,
-      profile: null,
-      subscriptionPlan: null,
-    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Google sign in error:", error)
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
 // Sign out - REQUIRED EXPORT
 export async function signOutReal() {
   try {
-    const supabase = createClient()
+    const supabase = await createServerClient()
 
     const { error } = await supabase.auth.signOut()
 
@@ -235,7 +222,7 @@ export async function signOutReal() {
 // Get current user - REQUIRED EXPORT with fixed return type
 export async function getCurrentUserReal() {
   try {
-    const supabase = createClient()
+    const supabase = await createServerClient()
 
     const {
       data: { user },
@@ -254,7 +241,7 @@ export async function getCurrentUserReal() {
       }
     }
 
-    if (user && user.email) {
+    if (user) {
       // Get user profile
       const { data: profile } = await supabase.from("users").select("*").eq("id", user.id).single()
 
@@ -300,9 +287,11 @@ export async function resetPasswordReal(email: string) {
       return { success: false, error: "Too many reset attempts. Please try again later." }
     }
 
-    const supabase = createClient()
+    const supabase = await createServerClient()
 
-    const { error } = await supabase.auth.resetPasswordForEmail(validatedEmail)
+    const { error } = await supabase.auth.resetPasswordForEmail(validatedEmail, {
+      redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
+    })
 
     if (error) {
       console.error("Reset password error:", error.message)
@@ -312,9 +301,6 @@ export async function resetPasswordReal(email: string) {
     return { success: true, message: "Password reset email sent" }
   } catch (error: any) {
     console.error("Reset password error:", error)
-    if (error instanceof z.ZodError) {
-      return { success: false, error: error.errors[0].message }
-    }
     return { success: false, error: "Password reset failed. Please try again." }
   }
 }
@@ -325,7 +311,7 @@ export async function updatePasswordReal(password: string) {
     // Input validation
     const validatedPassword = passwordSchema.parse(password)
 
-    const supabase = createClient()
+    const supabase = await createServerClient()
 
     const { error } = await supabase.auth.updateUser({ password: validatedPassword })
 
@@ -337,9 +323,6 @@ export async function updatePasswordReal(password: string) {
     return { success: true, message: "Password updated successfully" }
   } catch (error: any) {
     console.error("Update password error:", error)
-    if (error instanceof z.ZodError) {
-      return { success: false, error: error.errors[0].message }
-    }
     return { success: false, error: "Password update failed. Please try again." }
   }
 }
@@ -367,7 +350,7 @@ export async function updateUserProfileReal(userId: string, updates: any) {
       return { success: false, error: "No valid fields to update" }
     }
 
-    const supabase = createClient()
+    const supabase = await createServerClient()
 
     const { data, error } = await supabase
       .from("users")
@@ -388,9 +371,6 @@ export async function updateUserProfileReal(userId: string, updates: any) {
     return { success: true, data }
   } catch (error: any) {
     console.error("Update user profile error:", error)
-    if (error instanceof z.ZodError) {
-      return { success: false, error: error.errors[0].message }
-    }
     return { success: false, error: "Profile update failed. Please try again." }
   }
 }
@@ -401,7 +381,7 @@ export async function checkUserPermissions(userId: string) {
     // Input validation
     const validatedUserId = userIdSchema.parse(userId)
 
-    const supabase = createClient()
+    const supabase = await createServerClient()
 
     const { data: profile, error } = await supabase
       .from("users")
@@ -424,9 +404,6 @@ export async function checkUserPermissions(userId: string) {
     return { success: true, permissions }
   } catch (error: any) {
     console.error("Check user permissions error:", error)
-    if (error instanceof z.ZodError) {
-      return { success: false, error: error.errors[0].message }
-    }
     return { success: false, error: "Permission check failed. Please try again." }
   }
 }
@@ -455,9 +432,6 @@ export async function trackUsageReal(userId: string, action: string, metadata?: 
     return { success: true }
   } catch (error: any) {
     console.error("Track usage error:", error)
-    if (error instanceof z.ZodError) {
-      return { success: false, error: error.errors[0].message }
-    }
     return { success: false, error: "Usage tracking failed" }
   }
 }
