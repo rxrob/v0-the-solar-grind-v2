@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
         const customerId = subscription.customer as string
 
         // Get user by customer ID
-        const { data: user } = await supabase.from("users").select("id").eq("customer_id", customerId).single()
+        const { data: user } = await supabase.from("users").select("id").eq("stripe_customer_id", customerId).single()
 
         if (user) {
           await supabase
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         const customerId = subscription.customer as string
 
         // Get user by customer ID
-        const { data: user } = await supabase.from("users").select("id").eq("customer_id", customerId).single()
+        const { data: user } = await supabase.from("users").select("id").eq("stripe_customer_id", customerId).single()
 
         if (user) {
           await supabase
@@ -66,16 +66,42 @@ export async function POST(req: NextRequest) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session
         const userId = session.metadata?.userId
+        const email = session.metadata?.email
+        const purchaseType = session.metadata?.purchaseType
 
-        if (userId && session.mode === "payment") {
-          // Handle one-time payment (single report purchase)
-          await supabase
-            .from("users")
-            .update({
-              single_reports_purchased: supabase.raw("single_reports_purchased + 1"),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", userId)
+        if (purchaseType === "single_report" && (userId || email)) {
+          // Handle single report purchase
+          if (userId) {
+            await supabase
+              .from("users")
+              .update({
+                single_reports_purchased: supabase.raw("COALESCE(single_reports_purchased, 0) + 1"),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", userId)
+          } else if (email) {
+            // Create or update user record for email-only purchases
+            const { data: existingUser } = await supabase.from("users").select("id").eq("email", email).single()
+
+            if (existingUser) {
+              await supabase
+                .from("users")
+                .update({
+                  single_reports_purchased: supabase.raw("COALESCE(single_reports_purchased, 0) + 1"),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("email", email)
+            } else {
+              await supabase.from("users").insert({
+                email,
+                account_type: "single_report",
+                single_reports_purchased: 1,
+                stripe_customer_id: session.customer as string,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+            }
+          }
         }
         break
       }

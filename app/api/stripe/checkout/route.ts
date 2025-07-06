@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe"
-import { createClient } from "@supabase/supabase-js"
 import { absoluteUrl } from "@/lib/utils"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,43 +8,6 @@ export async function POST(req: NextRequest) {
 
     if (!email || !type) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
-    }
-
-    // Get or create Stripe customer
-    let customerId: string | undefined
-
-    try {
-      const existingCustomers = await stripe.customers.list({
-        email: email,
-        limit: 1,
-      })
-
-      if (existingCustomers.data.length > 0) {
-        customerId = existingCustomers.data[0].id
-      } else {
-        const customer = await stripe.customers.create({
-          email: email,
-        })
-        customerId = customer.id
-      }
-    } catch (error) {
-      console.error("Error managing Stripe customer:", error)
-      return NextResponse.json({ error: "Failed to manage customer" }, { status: 500 })
-    }
-
-    // Update user with Stripe customer ID if userId is provided
-    if (userId && customerId) {
-      try {
-        await supabase.from("users").update({ stripe_customer_id: customerId }).eq("id", userId)
-      } catch (error) {
-        console.error("Error updating user with Stripe customer ID:", error)
-      }
     }
 
     const priceId =
@@ -68,7 +28,7 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      customer: customerId,
+      customer_email: email,
       success_url: absoluteUrl("/dashboard?success=true"),
       cancel_url: absoluteUrl("/dashboard?canceled=true"),
     }

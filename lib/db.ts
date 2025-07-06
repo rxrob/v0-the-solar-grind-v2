@@ -1,165 +1,340 @@
-import { createServiceSupabaseClient } from "@/lib/supabase"
+import { createClient } from "@supabase/supabase-js"
 
-// Server-side database client using service role
-export const db = createServiceSupabaseClient()
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// Database helper functions
-export async function getUserById(userId: string) {
-  const { data, error } = await db.from("users").select("*").eq("id", userId).single()
+export const db = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+})
 
-  if (error) {
-    console.error("Error fetching user:", error)
-    return null
-  }
+// User operations
+export async function createUser(userData: {
+  id: string
+  email: string
+  full_name?: string
+  subscription_type?: string
+  stripe_customer_id?: string
+}) {
+  try {
+    const { data, error } = await db.from("users").insert(userData).select().single()
 
-  return data
-}
+    if (error) {
+      console.error("Error creating user:", error)
+      return { success: false, error }
+    }
 
-export async function updateUserSubscription(userId: string, subscriptionData: any) {
-  const { data, error } = await db
-    .from("users")
-    .update({
-      subscription_status: subscriptionData.status,
-      subscription_id: subscriptionData.id,
-      customer_id: subscriptionData.customer,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", userId)
-    .select()
-    .single()
-
-  if (error) {
-    console.error("Error updating user subscription:", error)
-    return null
-  }
-
-  return data
-}
-
-export async function createUser(userData: any) {
-  const { data, error } = await db
-    .from("users")
-    .insert({
-      ...userData,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single()
-
-  if (error) {
+    return { success: true, data }
+  } catch (error) {
     console.error("Error creating user:", error)
-    return null
+    return { success: false, error }
   }
+}
 
-  return data
+export async function getUserById(id: string) {
+  try {
+    const { data, error } = await db.from("users").select("*").eq("id", id).single()
+
+    if (error) {
+      console.error("Error getting user by ID:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error getting user by ID:", error)
+    return { success: false, error }
+  }
+}
+
+export async function getUserByEmail(email: string) {
+  try {
+    const { data, error } = await db.from("users").select("*").eq("email", email).single()
+
+    if (error) {
+      console.error("Error getting user by email:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error getting user by email:", error)
+    return { success: false, error }
+  }
+}
+
+export async function updateUser(
+  id: string,
+  updates: Partial<{
+    full_name: string
+    subscription_type: string
+    stripe_customer_id: string
+    stripe_subscription_id: string
+    subscription_status: string
+    trial_ends_at: string
+    current_period_end: string
+    single_reports_purchased: number
+    calculations_used: number
+    calculations_limit: number
+  }>,
+) {
+  try {
+    const { data, error } = await db.from("users").update(updates).eq("id", id).select().single()
+
+    if (error) {
+      console.error("Error updating user:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error updating user:", error)
+    return { success: false, error }
+  }
+}
+
+export async function updateUserByEmail(
+  email: string,
+  updates: Partial<{
+    subscription_type: string
+    stripe_customer_id: string
+    stripe_subscription_id: string
+    subscription_status: string
+    trial_ends_at: string
+    current_period_end: string
+    single_reports_purchased: number
+    calculations_used: number
+    calculations_limit: number
+  }>,
+) {
+  try {
+    const { data, error } = await db.from("users").update(updates).eq("email", email).select().single()
+
+    if (error) {
+      console.error("Error updating user by email:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error updating user by email:", error)
+    return { success: false, error }
+  }
+}
+
+// Project operations
+export async function createProject(projectData: {
+  user_id: string
+  name: string
+  address: string
+  latitude?: number
+  longitude?: number
+  system_size?: number
+  panel_count?: number
+  estimated_annual_production?: number
+  estimated_savings?: number
+}) {
+  try {
+    const { data, error } = await db.from("user_projects").insert(projectData).select().single()
+
+    if (error) {
+      console.error("Error creating project:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error creating project:", error)
+    return { success: false, error }
+  }
 }
 
 export async function getUserProjects(userId: string) {
-  const { data, error } = await db
-    .from("user_projects")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
+  try {
+    const { data, error } = await db
+      .from("user_projects")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
 
-  if (error) {
-    console.error("Error fetching user projects:", error)
-    return []
+    if (error) {
+      console.error("Error getting user projects:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error getting user projects:", error)
+    return { success: false, error }
   }
-
-  return data || []
 }
 
-export async function createProject(projectData: any) {
-  const { data, error } = await db
-    .from("user_projects")
-    .insert({
-      ...projectData,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single()
+export async function updateProject(
+  id: string,
+  updates: Partial<{
+    name: string
+    address: string
+    latitude: number
+    longitude: number
+    system_size: number
+    panel_count: number
+    estimated_annual_production: number
+    estimated_savings: number
+  }>,
+) {
+  try {
+    const { data, error } = await db.from("user_projects").update(updates).eq("id", id).select().single()
 
-  if (error) {
-    console.error("Error creating project:", error)
-    return null
+    if (error) {
+      console.error("Error updating project:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error updating project:", error)
+    return { success: false, error }
   }
-
-  return data
 }
 
-export async function saveSolarCalculation(calculationData: any) {
-  const { data, error } = await db
-    .from("solar_calculations")
-    .insert({
-      ...calculationData,
-      created_at: new Date().toISOString(),
-    })
-    .select()
-    .single()
+export async function deleteProject(id: string) {
+  try {
+    const { error } = await db.from("user_projects").delete().eq("id", id)
 
-  if (error) {
-    console.error("Error saving solar calculation:", error)
-    return null
+    if (error) {
+      console.error("Error deleting project:", error)
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting project:", error)
+    return { success: false, error }
   }
+}
 
-  return data
+// Solar calculation operations
+export async function createSolarCalculation(calculationData: {
+  user_id: string
+  project_id?: string
+  address: string
+  system_size: number
+  panel_count: number
+  estimated_annual_production: number
+  estimated_savings: number
+  calculation_type: string
+  input_data: any
+  result_data: any
+}) {
+  try {
+    const { data, error } = await db.from("solar_calculations").insert(calculationData).select().single()
+
+    if (error) {
+      console.error("Error creating solar calculation:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error creating solar calculation:", error)
+    return { success: false, error }
+  }
 }
 
 export async function getUserCalculations(userId: string) {
-  const { data, error } = await db
-    .from("solar_calculations")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Error fetching user calculations:", error)
-    return []
-  }
-
-  return data || []
-}
-
-export async function incrementUsageCount(userId: string, usageType: string) {
-  const { data, error } = await db.rpc("increment_usage_count", {
-    user_id: userId,
-    usage_type: usageType,
-  })
-
-  if (error) {
-    console.error("Error incrementing usage count:", error)
-    return false
-  }
-
-  return true
-}
-
-export async function getUserUsage(userId: string) {
-  const { data, error } = await db
-    .from("users")
-    .select("calculations_used, reports_generated")
-    .eq("id", userId)
-    .single()
-
-  if (error) {
-    console.error("Error fetching user usage:", error)
-    return { calculations_used: 0, reports_generated: 0 }
-  }
-
-  return data || { calculations_used: 0, reports_generated: 0 }
-}
-
-// Test database connection
-export async function testDatabaseConnection() {
   try {
-    const { data, error } = await db.from("users").select("count").limit(1)
-    return { success: !error, error: error?.message }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Connection failed",
+    const { data, error } = await db
+      .from("solar_calculations")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error getting user calculations:", error)
+      return { success: false, error }
     }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error getting user calculations:", error)
+    return { success: false, error }
+  }
+}
+
+// Usage tracking
+export async function incrementUserCalculations(userId: string) {
+  try {
+    const { data, error } = await db.rpc("increment_user_calculations", { user_id: userId })
+
+    if (error) {
+      console.error("Error incrementing user calculations:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error incrementing user calculations:", error)
+    return { success: false, error }
+  }
+}
+
+export async function getUserUsageStats(userId: string) {
+  try {
+    const { data, error } = await db
+      .from("users")
+      .select("calculations_used, calculations_limit, subscription_type, single_reports_purchased")
+      .eq("id", userId)
+      .single()
+
+    if (error) {
+      console.error("Error getting user usage stats:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error getting user usage stats:", error)
+    return { success: false, error }
+  }
+}
+
+// Admin operations
+export async function getAllUsers() {
+  try {
+    const { data, error } = await db.from("users").select("*").order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error getting all users:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error getting all users:", error)
+    return { success: false, error }
+  }
+}
+
+export async function getSystemStats() {
+  try {
+    const [usersResult, projectsResult, calculationsResult] = await Promise.all([
+      db.from("users").select("id", { count: "exact" }),
+      db.from("user_projects").select("id", { count: "exact" }),
+      db.from("solar_calculations").select("id", { count: "exact" }),
+    ])
+
+    return {
+      success: true,
+      data: {
+        totalUsers: usersResult.count || 0,
+        totalProjects: projectsResult.count || 0,
+        totalCalculations: calculationsResult.count || 0,
+      },
+    }
+  } catch (error) {
+    console.error("Error getting system stats:", error)
+    return { success: false, error }
   }
 }
