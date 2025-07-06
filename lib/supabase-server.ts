@@ -6,14 +6,17 @@ export async function createClient() {
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value
+      getAll() {
+        return cookieStore.getAll()
       },
-      set(name: string, value: string, options: any) {
-        cookieStore.set(name, value, options)
-      },
-      remove(name: string, options: any) {
-        cookieStore.set(name, "", options)
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+        } catch {
+          // The `setAll` method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing
+          // user sessions.
+        }
       },
     },
   })
@@ -24,14 +27,17 @@ export async function createSupabaseServerClient() {
 
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value
+      getAll() {
+        return cookieStore.getAll()
       },
-      set(name: string, value: string, options: any) {
-        cookieStore.set(name, value, options)
-      },
-      remove(name: string, options: any) {
-        cookieStore.set(name, "", options)
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+        } catch {
+          // The `setAll` method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing
+          // user sessions.
+        }
       },
     },
   })
@@ -43,16 +49,13 @@ export async function testServerConnection() {
     const { data, error } = await supabase.from("users").select("count").limit(1)
 
     if (error) {
-      console.error("Server connection test failed:", error)
+      console.error("Supabase connection test failed:", error)
       return { success: false, error: error.message }
     }
 
     return { success: true, data }
   } catch (error) {
-    console.error("Server connection test error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
+    console.error("Supabase connection test error:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }

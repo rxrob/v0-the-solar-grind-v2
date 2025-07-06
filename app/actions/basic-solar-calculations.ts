@@ -1,97 +1,112 @@
 "use server"
 
 import { createClient } from "@/lib/supabase-server"
-import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
+import { trackUsage, checkUsageLimit } from "./usage-tracking"
 
-interface SolarCalculationInput {
-  address: string
+interface BasicSolarInput {
   monthlyBill: number
-  roofArea?: number
-  sunHours?: number
-  userId?: string
+  roofArea: number
+  sunHours: number
+  location: string
+  electricityRate?: number
 }
 
-interface SolarCalculationResult {
+interface BasicSolarResult {
+  systemSize: number
+  panelsNeeded: number
+  estimatedCost: number
+  annualSavings: number
+  paybackPeriod: number
+  co2Reduction: number
+  monthlyProduction: number
+  roofUtilization: number
+}
+
+export async function calculateBasicSolar(input: BasicSolarInput): Promise<{
   success: boolean
+  data?: BasicSolarResult
   error?: string
-  data?: {
-    systemSize: number
-    panelsNeeded: number
-    estimatedCost: number
-    annualSavings: number
-    paybackPeriod: number
-    co2Reduction: number
-    monthlyProduction: number
-    roofAreaUsed: number
-  }
-}
-
-export async function calculateBasicSolar(input: SolarCalculationInput): Promise<SolarCalculationResult> {
+}> {
   try {
     const supabase = await createClient()
+    const cookieStore = await cookies()
+
+    // Get user from session
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "Authentication required" }
+    }
+
+    // Check usage limits for free users
+    const usageCheck = await checkUsageLimit(user.id)
+    if (!usageCheck.success) {
+      return { success: false, error: usageCheck.error }
+    }
 
     // Basic solar calculations
-    const averageElectricityRate = 0.13 // $0.13 per kWh
-    const monthlyUsage = input.monthlyBill / averageElectricityRate
-    const annualUsage = monthlyUsage * 12
+    const electricityRate = input.electricityRate || 0.12 // Default $0.12/kWh
+    const annualConsumption = (input.monthlyBill / electricityRate) * 12 // kWh per year
+    const dailyConsumption = annualConsumption / 365
 
-    // System sizing (assuming 4 hours of peak sun per day if not provided)
-    const peakSunHours = input.sunHours || 4
-    const systemSize = annualUsage / (peakSunHours * 365) // kW
+    // System sizing (accounting for system efficiency ~85%)
+    const systemSize = dailyConsumption / input.sunHours / 0.85 // kW
 
     // Panel calculations (assuming 400W panels)
     const panelWattage = 0.4 // kW per panel
     const panelsNeeded = Math.ceil(systemSize / panelWattage)
 
-    // Cost calculations
-    const costPerWatt = 3.5 // $3.50 per watt installed
+    // Cost estimation ($2.50-3.50 per watt installed)
+    const costPerWatt = 3.0
     const estimatedCost = systemSize * 1000 * costPerWatt
 
-    // Savings calculations
-    const annualProduction = systemSize * peakSunHours * 365
-    const annualSavings = annualProduction * averageElectricityRate
+    // Savings calculation
+    const annualProduction = systemSize * input.sunHours * 365 * 0.85 // kWh
+    const annualSavings = annualProduction * electricityRate
+    const monthlyProduction = annualProduction / 12
+
+    // Payback period
     const paybackPeriod = estimatedCost / annualSavings
 
-    // Environmental impact
-    const co2ReductionPerKwh = 0.92 // lbs CO2 per kWh
-    const co2Reduction = annualProduction * co2ReductionPerKwh
+    // Environmental impact (0.92 lbs CO2 per kWh)
+    const co2Reduction = annualProduction * 0.92 // lbs CO2 per year
 
-    // Roof area (assuming 20 sq ft per panel)
-    const roofAreaUsed = panelsNeeded * 20
+    // Roof utilization (assuming 20 sq ft per panel)
+    const panelArea = panelsNeeded * 20
+    const roofUtilization = (panelArea / input.roofArea) * 100
 
-    const calculationData = {
+    const result: BasicSolarResult = {
       systemSize: Math.round(systemSize * 100) / 100,
       panelsNeeded,
       estimatedCost: Math.round(estimatedCost),
       annualSavings: Math.round(annualSavings),
       paybackPeriod: Math.round(paybackPeriod * 10) / 10,
       co2Reduction: Math.round(co2Reduction),
-      monthlyProduction: Math.round(annualProduction / 12),
-      roofAreaUsed,
+      monthlyProduction: Math.round(monthlyProduction),
+      roofUtilization: Math.round(roofUtilization * 10) / 10,
     }
 
-    // Save calculation to database if user is provided
-    if (input.userId) {
-      const { error: saveError } = await supabase.from("solar_calculations").insert({
-        user_id: input.userId,
-        calculation_type: "basic",
-        input_data: input,
-        result_data: calculationData,
-        created_at: new Date().toISOString(),
-      })
+    // Save calculation to database
+    const { error: saveError } = await supabase.from("solar_calculations").insert({
+      user_id: user.id,
+      calculation_type: "basic",
+      input_data: input,
+      result_data: result,
+      created_at: new Date().toISOString(),
+    })
 
-      if (saveError) {
-        console.error("Error saving calculation:", saveError)
-        // Don't fail the calculation if saving fails
-      }
-
-      revalidatePath("/dashboard")
+    if (saveError) {
+      console.error("Error saving calculation:", saveError)
     }
 
-    return {
-      success: true,
-      data: calculationData,
-    }
+    // Track usage
+    await trackUsage(user.id, "basic_calculation")
+
+    return { success: true, data: result }
   } catch (error) {
     console.error("Basic solar calculation error:", error)
     return {
@@ -101,7 +116,7 @@ export async function calculateBasicSolar(input: SolarCalculationInput): Promise
   }
 }
 
-export async function getSavedCalculations(userId: string) {
+export async function getUserCalculations(userId: string) {
   try {
     const supabase = await createClient()
 
@@ -110,51 +125,18 @@ export async function getSavedCalculations(userId: string) {
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
+      .limit(10)
 
     if (error) {
-      console.error("Error getting saved calculations:", error)
-      return {
-        success: false,
-        error: error.message,
-        data: [],
-      }
+      return { success: false, error: error.message }
     }
 
-    return {
-      success: true,
-      data: data || [],
-    }
+    return { success: true, data }
   } catch (error) {
-    console.error("Get saved calculations error:", error)
+    console.error("Get user calculations error:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to get calculations",
-      data: [],
-    }
-  }
-}
-
-export async function deleteCalculation(calculationId: string, userId: string) {
-  try {
-    const supabase = await createClient()
-
-    const { error } = await supabase.from("solar_calculations").delete().eq("id", calculationId).eq("user_id", userId)
-
-    if (error) {
-      console.error("Error deleting calculation:", error)
-      return {
-        success: false,
-        error: error.message,
-      }
-    }
-
-    revalidatePath("/dashboard")
-    return { success: true }
-  } catch (error) {
-    console.error("Delete calculation error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to delete calculation",
+      error: error instanceof Error ? error.message : "Failed to fetch calculations",
     }
   }
 }
