@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase-client"
+import { getCurrentUserReal } from "@/app/actions/auth-real"
 import type { User } from "@supabase/supabase-js"
 
 interface UserProfile {
@@ -36,6 +37,7 @@ export function useAuthReal(): AuthState &
     isAuthenticated: boolean
     isPro: boolean
     canUseTrial: boolean
+    subscriptionPlan: string
   } {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -306,6 +308,29 @@ export function useAuthReal(): AuthState &
     [supabase, state.user],
   )
 
+  // Legacy initialization logic
+  useEffect(() => {
+    async function getUser() {
+      try {
+        setState((prev) => ({ ...prev, loading: true }))
+        const result = await getCurrentUserReal()
+
+        if (result.success) {
+          setState((prev) => ({ ...prev, user: result.user, error: null }))
+        } else {
+          setState((prev) => ({ ...prev, user: null, error: result.error }))
+        }
+      } catch (err) {
+        console.error("Auth hook error:", err)
+        setState((prev) => ({ ...prev, user: null, error: "Failed to get user" }))
+      } finally {
+        setState((prev) => ({ ...prev, loading: false }))
+      }
+    }
+
+    getUser()
+  }, [])
+
   return {
     ...state,
     signIn,
@@ -317,6 +342,7 @@ export function useAuthReal(): AuthState &
     isAuthenticated: !!state.user,
     isPro: state.profile?.subscription_type === "pro",
     canUseTrial: !state.profile?.pro_trial_used,
+    subscriptionPlan: state.profile?.subscription_type || "free",
   }
 }
 

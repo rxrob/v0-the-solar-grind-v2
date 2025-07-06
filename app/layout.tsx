@@ -4,22 +4,28 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import { Toaster as Sonner } from "@/components/ui/sonner"
+import { Toaster as SonnerToaster } from "@/components/ui/sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "MySolarAI - AI-Powered Solar Analysis",
+  title: {
+    default: "MySolarAI - AI-Powered Solar Analysis & Calculator",
+    template: "%s | MySolarAI",
+  },
   description:
-    "Get instant, accurate solar energy assessments for any property using advanced AI, satellite imagery, and real-time data. Make informed decisions about your solar investment.",
+    "Get instant, accurate solar calculations with our advanced AI technology. Analyze your property, calculate savings, and generate professional reports in minutes.",
   keywords: [
-    "solar",
-    "solar panels",
-    "solar energy",
     "solar calculator",
+    "solar analysis",
+    "solar panels",
     "renewable energy",
-    "AI",
-    "satellite imagery",
+    "AI solar",
+    "solar savings",
+    "solar installation",
+    "solar ROI",
+    "solar reports",
+    "NREL data",
   ],
   authors: [{ name: "MySolarAI Team" }],
   creator: "MySolarAI",
@@ -34,28 +40,28 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "MySolarAI - AI-Powered Solar Analysis",
-    description:
-      "Get instant, accurate solar energy assessments for any property using advanced AI, satellite imagery, and real-time data.",
+    type: "website",
+    locale: "en_US",
     url: "/",
+    title: "MySolarAI - AI-Powered Solar Analysis & Calculator",
+    description:
+      "Get instant, accurate solar calculations with our advanced AI technology. Analyze your property, calculate savings, and generate professional reports in minutes.",
     siteName: "MySolarAI",
     images: [
       {
-        url: "/images/mysolarai-design.png",
+        url: "/images/og-image.png",
         width: 1200,
         height: 630,
-        alt: "MySolarAI - Solar Analysis Platform",
+        alt: "MySolarAI - AI-Powered Solar Analysis",
       },
     ],
-    locale: "en_US",
-    type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "MySolarAI - AI-Powered Solar Analysis",
+    title: "MySolarAI - AI-Powered Solar Analysis & Calculator",
     description:
-      "Get instant, accurate solar energy assessments for any property using advanced AI, satellite imagery, and real-time data.",
-    images: ["/images/mysolarai-design.png"],
+      "Get instant, accurate solar calculations with our advanced AI technology. Analyze your property, calculate savings, and generate professional reports in minutes.",
+    images: ["/images/twitter-image.png"],
     creator: "@mysolarai",
   },
   robots: {
@@ -83,11 +89,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-        <link rel="manifest" href="/site.webmanifest" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#f97316" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -100,7 +105,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />
-          <Sonner />
+          <SonnerToaster />
         </ThemeProvider>
       </body>
     </html>
