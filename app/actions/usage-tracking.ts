@@ -1,6 +1,6 @@
 "use server"
 
-import { createPagesServerClient } from "@supabase/auth-helpers-nextjs"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 
 interface UsageTrackingResult {
@@ -11,8 +11,8 @@ interface UsageTrackingResult {
 
 export async function trackCalculationUsage(calculationType: "basic" | "advanced"): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
     const {
       data: { user },
@@ -96,8 +96,8 @@ export async function trackCalculationUsage(calculationType: "basic" | "advanced
 
 export async function getUserUsageStats(): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
     const {
       data: { user },
@@ -164,8 +164,8 @@ export async function getUserUsageStats(): Promise<UsageTrackingResult> {
 
 export async function resetMonthlyUsage(): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
     // This would typically be called by a cron job or scheduled function
     // Reset calculations_used for all free users at the beginning of each month
@@ -202,8 +202,8 @@ export async function resetMonthlyUsage(): Promise<UsageTrackingResult> {
 
 export async function trackReportGeneration(reportType: "basic" | "advanced" | "single"): Promise<UsageTrackingResult> {
   try {
-    const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
     const {
       data: { user },

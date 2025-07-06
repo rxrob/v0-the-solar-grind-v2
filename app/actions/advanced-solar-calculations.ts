@@ -1,6 +1,6 @@
 "use server"
 
-import { createPagesServerClient } from "@supabase/auth-helpers-nextjs"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 
 interface AdvancedSolarInput {
@@ -52,8 +52,8 @@ interface AdvancedSolarResult {
 
 export async function calculateAdvancedSolarSystem(input: AdvancedSolarInput): Promise<AdvancedSolarResult> {
   try {
-    const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
     // Get current user and check subscription
     const {
@@ -313,8 +313,8 @@ function calculateLifetimeSavings(annualSavings: number, years: number, degradat
 
 export async function getAdvancedCalculationHistory() {
   try {
-    const cookieStore = await cookies()
-    const supabase = createPagesServerClient({ cookies: () => cookieStore })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
     const {
       data: { user },
