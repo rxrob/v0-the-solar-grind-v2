@@ -47,6 +47,7 @@ const clientEnvSchema = z.object({
   NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID: z.string().min(1),
   NEXT_PUBLIC_BASE_URL: z.string().url(),
   NEXT_PUBLIC_AXIOM_INGEST_ENDPOINT: z.string().url().optional(),
+  // Note: Google Maps API key is NOT included in client schema for security
 })
 
 // Validate server environment
@@ -108,11 +109,18 @@ export function getServerEnv() {
 
 // Check if specific environment variables are available
 export function checkEnvVars(vars: string[]) {
-  const missing = vars.filter((varName) => !process.env[varName])
+  const missing = vars.filter((varName) => {
+    const value = process.env[varName]
+    return !value || (typeof value === "string" && value.length === 0)
+  })
+
   return {
     allPresent: missing.length === 0,
     missing,
-    present: vars.filter((varName) => !!process.env[varName]),
+    present: vars.filter((varName) => {
+      const value = process.env[varName]
+      return value && typeof value === "string" && value.length > 0
+    }),
   }
 }
 
@@ -154,5 +162,33 @@ export function getEnvStatus() {
     allPresent,
     totalMissing,
     groups: status,
+  }
+}
+
+// Validate environment
+export function validateEnv() {
+  try {
+    return serverEnvSchema.parse(process.env)
+  } catch (error) {
+    console.error("Environment validation failed:", error)
+    throw new Error("Invalid environment variables")
+  }
+}
+
+// Check required environment variables
+export function checkRequiredEnvVars() {
+  const required = [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "STRIPE_SECRET_KEY",
+    "NREL_API_KEY",
+    "GOOGLE_MAPS_API_KEY",
+  ]
+
+  const missing = required.filter((key) => !process.env[key])
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(", ")}`)
   }
 }

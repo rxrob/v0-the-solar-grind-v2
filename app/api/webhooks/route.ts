@@ -1,60 +1,84 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { headers } from "next/headers"
 import { stripe } from "@/lib/stripe"
-import { createClient } from "@supabase/supabase-js"
+import { createServiceSupabaseClient } from "@/lib/supabase"
+import type Stripe from "stripe"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text()
-    const signature = (await headers()).get("stripe-signature")
+    const signature = req.headers.get("stripe-signature")!
 
-    if (!signature) {
-      return NextResponse.json({ error: "No signature" }, { status: 400 })
+    let event: Stripe.Event
+
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    } catch (err) {
+      console.error("Webhook signature verification failed:", err)
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
     }
 
-    const event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!)
+    const supabase = createServiceSupabaseClient()
 
     switch (event.type) {
-      case "checkout.session.completed":
-        const session = event.data.object
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
 
-        // Update user subscription status
-        if (session.customer_email) {
-          const { error } = await supabase
+        // Get user by customer ID
+        const { data: user } = await supabase.from("users").select("id").eq("customer_id", customerId).single()
+
+        if (user) {
+          await supabase
             .from("users")
             .update({
-              subscription_status: "active",
-              stripe_customer_id: session.customer as string,
+              subscription_status: subscription.status,
+              subscription_id: subscription.id,
               updated_at: new Date().toISOString(),
             })
-            .eq("email", session.customer_email)
-
-          if (error) {
-            console.error("Error updating user subscription:", error)
-          }
+            .eq("id", user.id)
         }
         break
+      }
 
-      case "customer.subscription.updated":
-      case "customer.subscription.deleted":
-        const subscription = event.data.object
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
 
-        const status = subscription.status === "active" ? "active" : "inactive"
+        // Get user by customer ID
+        const { data: user } = await supabase.from("users").select("id").eq("customer_id", customerId).single()
 
-        const { error } = await supabase
-          .from("users")
-          .update({
-            subscription_status: status,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("stripe_customer_id", subscription.customer as string)
-
-        if (error) {
-          console.error("Error updating subscription status:", error)
+        if (user) {
+          await supabase
+            .from("users")
+            .update({
+              subscription_status: "canceled",
+              subscription_id: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", user.id)
         }
         break
+      }
+
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session
+        const userId = session.metadata?.userId
+
+        if (userId && session.mode === "payment") {
+          // Handle one-time payment (single report purchase)
+          await supabase
+            .from("users")
+            .update({
+              single_reports_purchased: supabase.raw("single_reports_purchased + 1"),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", userId)
+        }
+        break
+      }
 
       default:
         console.log(`Unhandled event type: ${event.type}`)
@@ -63,6 +87,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true })
   } catch (error) {
     console.error("Webhook error:", error)
-    return NextResponse.json({ error: "Webhook handler failed" }, { status: 400 })
+    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 })
   }
 }
