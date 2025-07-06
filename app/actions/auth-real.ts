@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerSupabaseClient } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase-server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
@@ -42,7 +42,7 @@ export async function signInWithEmailReal(email: string, password: string) {
       return { success: false, error: "Too many sign-in attempts. Please try again later." }
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: validatedEmail,
@@ -95,7 +95,7 @@ export async function signUpReal(email: string, password: string) {
       return { success: false, error: "Too many sign-up attempts. Please try again later." }
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
 
     const { data, error } = await supabase.auth.signUp({
       email: validatedEmail,
@@ -138,7 +138,7 @@ export async function signUpReal(email: string, password: string) {
 // Sign out - REQUIRED EXPORT
 export async function signOutReal() {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
 
     const { error } = await supabase.auth.signOut()
 
@@ -158,7 +158,7 @@ export async function signOutReal() {
 // Get current user - REQUIRED EXPORT with fixed return type
 export async function getCurrentUserReal() {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
 
     const {
       data: { user },
@@ -176,7 +176,7 @@ export async function getCurrentUserReal() {
       }
     }
 
-    if (user) {
+    if (user && user.email) {
       // Get user profile
       const { data: profile } = await supabase.from("users").select("*").eq("id", user.id).single()
 
@@ -219,7 +219,7 @@ export async function resetPasswordReal(email: string) {
       return { success: false, error: "Too many reset attempts. Please try again later." }
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
 
     const { error } = await supabase.auth.resetPasswordForEmail(validatedEmail)
 
@@ -244,7 +244,7 @@ export async function updatePasswordReal(password: string) {
     // Input validation
     const validatedPassword = passwordSchema.parse(password)
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
 
     const { error } = await supabase.auth.updateUser({ password: validatedPassword })
 
@@ -286,7 +286,7 @@ export async function updateUserProfileReal(userId: string, updates: any) {
       return { success: false, error: "No valid fields to update" }
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
 
     const { data, error } = await supabase
       .from("users")
@@ -320,7 +320,7 @@ export async function checkUserPermissions(userId: string) {
     // Input validation
     const validatedUserId = userIdSchema.parse(userId)
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
 
     const { data: profile, error } = await supabase
       .from("users")

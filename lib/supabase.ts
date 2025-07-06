@@ -27,8 +27,8 @@ export function getSupabaseClient() {
 }
 
 // Create client function - REQUIRED EXPORT
-export function createClient() {
-  return getSupabaseClient()
+export const createClient = () => {
+  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey)
 }
 
 // Server-side Supabase client - REQUIRED EXPORT
@@ -37,16 +37,7 @@ export function createServerSupabaseClient() {
     throw new Error("createServerSupabaseClient can only be called on the server")
   }
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-
-  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  })
+  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey)
 }
 
 // Admin Supabase client (server-only)

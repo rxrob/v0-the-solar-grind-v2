@@ -29,14 +29,6 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
@@ -64,14 +56,6 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 0 0% 98%;
-    --sidebar-primary-foreground: 240 5.9% 10%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -81,6 +65,12 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
 }
 
@@ -129,67 +119,91 @@
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Loading states */
-.loading-skeleton {
-  @apply animate-pulse bg-gray-200 rounded;
-}
-
-.dark .loading-skeleton {
-  @apply bg-gray-700;
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
 }
 
 /* Custom scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-gray-100 rounded-full;
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full hover:bg-gray-400;
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
 }
 
-.dark .custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-gray-800;
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-gray-600 hover:bg-gray-500;
+/* Focus styles */
+.focus-visible:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
-/* Form styles */
-.form-input {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+/* Loading spinner */
+.spinner {
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
 }
 
-.dark .form-input {
-  @apply border-gray-600 bg-gray-700 text-white;
-}
-
-/* Button hover effects */
-.btn-hover-lift {
-  @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5;
-}
-
-/* Card hover effects */
-.card-hover {
-  @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Gradient text */
 .gradient-text {
-  @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* Glass morphism effect */
-.glass {
-  @apply bg-white/80 backdrop-blur-sm border border-white/20;
+/* Card hover effects */
+.card-hover {
+  transition: all 0.3s ease;
 }
 
-.dark .glass {
-  @apply bg-gray-900/80 border-gray-700/20;
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Button animations */
+.btn-animate {
+  transition: all 0.2s ease;
+}
+
+.btn-animate:hover {
+  transform: translateY(-1px);
+}
+
+.btn-animate:active {
+  transform: translateY(0);
+}
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
 }
 
 /* Print styles */
@@ -197,117 +211,4 @@
   .no-print {
     display: none !important;
   }
-
-  .print-break {
-    page-break-before: always;
-  }
-
-  .print-avoid-break {
-    page-break-inside: avoid;
-  }
-}
-
-/* Responsive utilities */
-@media (max-width: 640px) {
-  .mobile-full {
-    @apply w-full;
-  }
-}
-
-/* Focus styles for accessibility */
-.focus-visible:focus-visible {
-  @apply outline-none ring-2 ring-blue-500 ring-offset-2;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .high-contrast {
-    @apply border-2 border-black;
-  }
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .animate-fade-in,
-  .animate-slide-in,
-  .animate-pulse-slow {
-    animation: none;
-  }
-
-  .transition-all,
-  .transition-colors,
-  .transition-transform {
-    transition: none;
-  }
-}
-
-/* Custom utility classes */
-.text-balance {
-  text-wrap: balance;
-}
-
-.text-pretty {
-  text-wrap: pretty;
-}
-
-/* Solar-specific styles */
-.solar-gradient {
-  @apply bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500;
-}
-
-.energy-gradient {
-  @apply bg-gradient-to-r from-green-400 via-blue-500 to-purple-600;
-}
-
-/* Chart and visualization styles */
-.chart-container {
-  @apply w-full h-64 md:h-80 lg:h-96;
-}
-
-.chart-tooltip {
-  @apply bg-white border border-gray-200 rounded-lg shadow-lg p-2 text-sm;
-}
-
-.dark .chart-tooltip {
-  @apply bg-gray-800 border-gray-700 text-white;
-}
-
-/* Status indicators */
-.status-online {
-  @apply bg-green-500;
-}
-
-.status-offline {
-  @apply bg-red-500;
-}
-
-.status-warning {
-  @apply bg-yellow-500;
-}
-
-.status-indicator {
-  @apply w-2 h-2 rounded-full animate-pulse;
-}
-
-/* Loading spinner */
-.spinner {
-  @apply animate-spin rounded-full border-2 border-gray-300 border-t-blue-600;
-}
-
-/* Error states */
-.error-text {
-  @apply text-red-600 text-sm mt-1;
-}
-
-.dark .error-text {
-  @apply text-red-400;
-}
-
-/* Success states */
-.success-text {
-  @apply text-green-600 text-sm mt-1;
-}
-
-.dark .success-text {
-  @apply text-green-400;
 }
