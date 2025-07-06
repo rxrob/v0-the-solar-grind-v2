@@ -1,60 +1,28 @@
 "use server"
 
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { revalidatePath } from "next/cache"
-
-export async function signUp(email: string, password: string, fullName?: string) {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
-
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
-      data: {
-        full_name: fullName || "",
-      },
-    },
-  })
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  // Create user profile in our users table
-  if (data.user) {
-    const { error: profileError } = await supabase.from("users").insert({
-      id: data.user.id,
-      email: data.user.email,
-      full_name: fullName || "",
-      subscription_type: "free",
-      subscription_status: "active",
-      created_at: new Date().toISOString(),
-    })
-
-    if (profileError) {
-      console.error("Profile creation error:", profileError)
-    }
-  }
-
-  // Check if user needs email verification
-  if (data.user && !data.user.email_confirmed_at) {
-    return {
-      success: true,
-      needsVerification: true,
-      user: data.user,
-    }
-  }
-
-  return { success: true, data }
-}
 
 export async function signInWithEmail(email: string, password: string) {
   const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name: string, options: any) {
+          cookieStore.set({ name, value: "", ...options })
+        },
+      },
+    },
+  )
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -62,221 +30,185 @@ export async function signInWithEmail(email: string, password: string) {
   })
 
   if (error) {
-    return { success: false, error: error.message }
+    return { error: error.message }
   }
 
-  revalidatePath("/", "layout")
-  return { success: true, user: data.user }
+  redirect("/dashboard")
+}
+
+export async function signUpWithEmail(email: string, password: string, fullName?: string) {
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name: string, options: any) {
+          cookieStore.set({ name, value: "", ...options })
+        },
+      },
+    },
+  )
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+      },
+    },
+  })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  // Create user profile in our users table
+  if (data.user) {
+    const { error: profileError } = await supabase.from("users").insert({
+      id: data.user.id,
+      email: data.user.email,
+      full_name: fullName,
+      subscription_type: "free",
+      subscription_status: "active",
+      calculations_used: 0,
+      monthly_calculation_limit: 3,
+      pro_trial_used: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    if (profileError) {
+      console.error("Error creating user profile:", profileError)
+    }
+  }
+
+  return { data }
 }
 
 export async function signOut() {
   const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name: string, options: any) {
+          cookieStore.set({ name, value: "", ...options })
+        },
+      },
+    },
+  )
 
-  const { error } = await supabase.auth.signOut()
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  revalidatePath("/", "layout")
-  redirect("/login")
+  await supabase.auth.signOut()
+  redirect("/")
 }
 
-export async function getCurrentUser() {
+export async function getUser() {
   const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+      },
+    },
+  )
 
   const {
     data: { user },
     error,
   } = await supabase.auth.getUser()
 
-  if (error) {
-    return { success: false, error: error.message, user: null }
+  if (error || !user) {
+    return null
   }
 
-  if (!user) {
-    return { success: true, user: null }
-  }
+  // Get additional user data from our users table
+  const { data: userData, error: userError } = await supabase.from("users").select("*").eq("id", user.id).single()
 
-  // Get user profile from our users table
-  const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
-
-  if (profileError) {
-    console.error("Error fetching user profile:", profileError)
-    return {
-      success: true,
-      user: {
-        ...user,
-        subscriptionPlan: "free",
-        subscriptionStatus: "active",
-        emailVerified: !!user.email_confirmed_at,
-      },
-    }
+  if (userError) {
+    console.error("Error fetching user data:", userError)
+    return user
   }
 
   return {
-    success: true,
-    user: {
-      ...user,
-      subscriptionPlan: profile?.subscription_type || "free",
-      subscriptionStatus: profile?.subscription_status || "active",
-      emailVerified: !!user.email_confirmed_at,
-      profile,
-    },
+    ...user,
+    ...userData,
   }
 }
 
 export async function resetPassword(email: string) {
   const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+      },
+    },
+  )
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
   })
 
   if (error) {
-    return { success: false, error: error.message }
+    return { error: error.message }
   }
 
-  return { success: true, message: "Password reset email sent" }
+  return { success: true }
 }
 
 export async function updatePassword(password: string) {
   const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name: string, options: any) {
+          cookieStore.set({ name, value: "", ...options })
+        },
+      },
+    },
+  )
 
   const { error } = await supabase.auth.updateUser({
     password,
   })
 
   if (error) {
-    return { success: false, error: error.message }
+    return { error: error.message }
   }
 
-  return { success: true, message: "Password updated successfully" }
+  return { success: true }
 }
 
-export async function signInWithGoogle() {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
-    },
-  })
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  if (data.url) {
-    redirect(data.url)
-  }
-
-  return { success: true, data }
-}
-
-export async function handleAuthCallback(code: string) {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
-
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  // Create user profile if it doesn't exist
-  if (data.user) {
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", data.user.id)
-      .single()
-
-    if (profileError && profileError.code === "PGRST116") {
-      // User doesn't exist, create profile
-      const { error: insertError } = await supabase.from("users").insert({
-        id: data.user.id,
-        email: data.user.email,
-        full_name: data.user.user_metadata?.full_name || "",
-        subscription_type: "free",
-        subscription_status: "active",
-        created_at: new Date().toISOString(),
-      })
-
-      if (insertError) {
-        console.error("Profile creation error:", insertError)
-      }
-    }
-  }
-
-  // Check if user needs email verification
-  if (data.user && !data.user.email_confirmed_at) {
-    return {
-      success: true,
-      needsVerification: true,
-      user: data.user,
-    }
-  }
-
-  return { success: true, user: data.user }
-}
-
-export async function resendVerificationEmail(email: string) {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
-
-  const { error } = await supabase.auth.resend({
-    type: "signup",
-    email,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
-    },
-  })
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  return { success: true, message: "Verification email sent" }
-}
-
-export async function getUserSubscriptionStatus() {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    return { success: false, error: "User not authenticated" }
-  }
-
-  // Get user subscription status from database
-  const { data: userData, error: dbError } = await supabase
-    .from("users")
-    .select("subscription_status, subscription_type, stripe_customer_id")
-    .eq("id", user.id)
-    .single()
-
-  if (dbError) {
-    return { success: false, error: dbError.message }
-  }
-
-  return {
-    success: true,
-    user: {
-      ...user,
-      subscription_status: userData?.subscription_status || "free",
-      subscription_type: userData?.subscription_type || "free",
-      stripe_customer_id: userData?.stripe_customer_id,
-    },
-  }
-}
+// Add this export alias at the end of the file
+export const getCurrentUser = getUser
