@@ -13,6 +13,7 @@ export async function GET() {
       anonKey: supabaseAnonKey ? "Set" : "Missing",
       serviceKey: supabaseServiceKey ? "Set" : "Missing",
       lastChecked: new Date().toISOString(),
+      connectionTest: null as any,
     }
 
     // Test connection if configured

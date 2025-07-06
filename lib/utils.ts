@@ -26,9 +26,8 @@ export function formatPercentage(num: number, decimals = 1): string {
 export function slugify(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/[^\w ]+/g, "")
+    .replace(/ +/g, "-")
 }
 
 export function truncate(text: string, length: number): string {
@@ -188,5 +187,12 @@ export function absoluteUrl(path: string): string {
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000"
 
-  return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`
+  // Ensure the base URL has the correct protocol
+  const url = baseUrl.startsWith("http") ? baseUrl : `https://${baseUrl}`
+
+  // Remove trailing slash from base URL and leading slash from path if both exist
+  const cleanBaseUrl = url.replace(/\/$/, "")
+  const cleanPath = path.startsWith("/") ? path : `/${path}`
+
+  return `${cleanBaseUrl}${cleanPath}`
 }
