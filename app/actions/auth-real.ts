@@ -4,44 +4,6 @@ import { createClient } from "@/lib/supabase-server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
-// Sign up with email and password
-export async function signUpReal(email: string, password: string) {
-  const supabase = createClient()
-
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    // Create user profile
-    if (data.user) {
-      const { error: profileError } = await supabase.from("users").insert([
-        {
-          id: data.user.id,
-          email: data.user.email,
-          subscription_type: "free",
-          subscription_status: "active",
-          created_at: new Date().toISOString(),
-        },
-      ])
-
-      if (profileError) {
-        console.error("Profile creation error:", profileError)
-      }
-    }
-
-    return { success: true, data }
-  } catch (error) {
-    console.error("Sign up error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Sign up failed" }
-  }
-}
-
 // Sign in with email and password
 export async function signInWithEmailReal(email: string, password: string) {
   const supabase = createClient()
@@ -56,11 +18,82 @@ export async function signInWithEmailReal(email: string, password: string) {
       return { success: false, error: error.message }
     }
 
-    revalidatePath("/", "layout")
-    return { success: true, data }
+    if (data.user) {
+      // Check if user profile exists, create if not
+      const { data: profile, error: profileError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", data.user.id)
+        .single()
+
+      if (profileError && profileError.code === "PGRST116") {
+        // User profile doesn't exist, create it
+        const { error: createError } = await supabase.from("users").insert({
+          id: data.user.id,
+          email: data.user.email!,
+          full_name: data.user.user_metadata?.full_name || "",
+          subscription_type: "free",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        if (createError) {
+          console.error("Error creating user profile:", createError)
+        }
+      }
+
+      revalidatePath("/", "layout")
+      return { success: true, user: data.user }
+    }
+
+    return { success: false, error: "No user returned" }
   } catch (error) {
     console.error("Sign in error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Sign in failed" }
+    return { success: false, error: "An unexpected error occurred" }
+  }
+}
+
+// Sign up with email and password
+export async function signUpReal(email: string, password: string, fullName?: string) {
+  const supabase = createClient()
+
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName || "",
+        },
+      },
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    if (data.user) {
+      // Create user profile
+      const { error: profileError } = await supabase.from("users").insert({
+        id: data.user.id,
+        email: data.user.email!,
+        full_name: fullName || "",
+        subscription_type: "free",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+
+      if (profileError) {
+        console.error("Error creating user profile:", profileError)
+      }
+
+      return { success: true, user: data.user, session: data.session }
+    }
+
+    return { success: false, error: "No user returned" }
+  } catch (error) {
+    console.error("Sign up error:", error)
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
@@ -79,7 +112,7 @@ export async function signOutReal() {
     redirect("/")
   } catch (error) {
     console.error("Sign out error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Sign out failed" }
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
@@ -94,25 +127,13 @@ export async function getCurrentUserReal() {
     } = await supabase.auth.getUser()
 
     if (error) {
-      return { success: false, error: error.message, user: null }
+      return { user: null, error: error.message }
     }
 
-    // Get user profile
-    if (user) {
-      const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
-
-      if (profileError) {
-        console.error("Profile fetch error:", profileError)
-        return { success: true, user, profile: null }
-      }
-
-      return { success: true, user, profile }
-    }
-
-    return { success: true, user: null, profile: null }
+    return { user, error: null }
   } catch (error) {
     console.error("Get current user error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Failed to get user", user: null }
+    return { user: null, error: "An unexpected error occurred" }
   }
 }
 
@@ -121,7 +142,7 @@ export async function resetPasswordReal(email: string) {
   const supabase = createClient()
 
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
     })
 
@@ -129,10 +150,10 @@ export async function resetPasswordReal(email: string) {
       return { success: false, error: error.message }
     }
 
-    return { success: true, message: "Password reset email sent" }
+    return { success: true, data }
   } catch (error) {
     console.error("Reset password error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Password reset failed" }
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
@@ -141,16 +162,18 @@ export async function updatePasswordReal(password: string) {
   const supabase = createClient()
 
   try {
-    const { error } = await supabase.auth.updateUser({ password })
+    const { data, error } = await supabase.auth.updateUser({
+      password,
+    })
 
     if (error) {
       return { success: false, error: error.message }
     }
 
-    return { success: true, message: "Password updated successfully" }
+    return { success: true, user: data.user }
   } catch (error) {
     console.error("Update password error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Password update failed" }
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
@@ -159,17 +182,25 @@ export async function updateUserProfileReal(userId: string, updates: any) {
   const supabase = createClient()
 
   try {
-    const { data, error } = await supabase.from("users").update(updates).eq("id", userId).select().single()
+    const { data, error } = await supabase
+      .from("users")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select()
+      .single()
 
     if (error) {
       return { success: false, error: error.message }
     }
 
-    revalidatePath("/", "layout")
-    return { success: true, data }
+    revalidatePath("/dashboard")
+    return { success: true, user: data }
   } catch (error) {
-    console.error("Update profile error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Profile update failed" }
+    console.error("Update user profile error:", error)
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
@@ -178,78 +209,78 @@ export async function checkUserPermissions(userId: string) {
   const supabase = createClient()
 
   try {
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("subscription_type, subscription_status, calculations_used, reports_generated, api_calls_made")
-      .eq("id", userId)
-      .single()
+    const { data: user, error } = await supabase.from("users").select("*").eq("id", userId).single()
 
     if (error) {
-      return { success: false, error: error.message, permissions: null }
+      return {
+        success: false,
+        error: error.message,
+        permissions: {
+          canAccessPro: false,
+          canGenerateReports: false,
+          calculationsRemaining: 0,
+          reportsRemaining: 0,
+        },
+      }
     }
 
-    const permissions = {
-      canUseAdvancedCalculator: user.subscription_type === "pro" && user.subscription_status === "active",
-      canGenerateReports: user.subscription_type === "pro" && user.subscription_status === "active",
-      canAccessProFeatures: user.subscription_type === "pro" && user.subscription_status === "active",
-      calculationsUsed: user.calculations_used || 0,
-      reportsGenerated: user.reports_generated || 0,
-      apiCallsMade: user.api_calls_made || 0,
-      subscriptionType: user.subscription_type,
-      subscriptionStatus: user.subscription_status,
-    }
+    const isPro = user.subscription_type === "pro"
+    const calculationsUsed = user.calculations_used || 0
+    const reportsUsed = user.reports_used || 0
 
-    return { success: true, permissions }
+    return {
+      success: true,
+      user,
+      permissions: {
+        canAccessPro: isPro,
+        canGenerateReports: isPro || reportsUsed < 1,
+        calculationsRemaining: isPro ? -1 : Math.max(0, 5 - calculationsUsed),
+        reportsRemaining: isPro ? -1 : Math.max(0, 1 - reportsUsed),
+        subscriptionType: user.subscription_type,
+        calculationsUsed,
+        reportsUsed,
+      },
+    }
   } catch (error) {
-    console.error("Check permissions error:", error)
+    console.error("Check user permissions error:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Permission check failed",
-      permissions: null,
+      error: "An unexpected error occurred",
+      permissions: {
+        canAccessPro: false,
+        canGenerateReports: false,
+        calculationsRemaining: 0,
+        reportsRemaining: 0,
+      },
     }
   }
 }
 
 // Track usage
-export async function trackUsageReal(userId: string, type: "calculation" | "report" | "api_call") {
+export async function trackUsageReal(userId: string, type: "calculation" | "report") {
   const supabase = createClient()
 
   try {
-    const field =
-      type === "calculation" ? "calculations_used" : type === "report" ? "reports_generated" : "api_calls_made"
+    const field = type === "calculation" ? "calculations_used" : "reports_used"
 
-    const { data, error } = await supabase.rpc("increment_usage", {
-      user_id: userId,
-      usage_type: field,
-    })
+    const { data, error } = await supabase
+      .from("users")
+      .update({
+        [field]: supabase.rpc("increment_usage", { user_id: userId, usage_type: type }),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select()
+      .single()
 
     if (error) {
-      // Fallback to manual increment if RPC doesn't exist
-      const { data: currentUser, error: fetchError } = await supabase
-        .from("users")
-        .select(field)
-        .eq("id", userId)
-        .single()
-
-      if (fetchError) {
-        return { success: false, error: fetchError.message }
-      }
-
-      const currentValue = currentUser[field] || 0
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({ [field]: currentValue + 1 })
-        .eq("id", userId)
-
-      if (updateError) {
-        return { success: false, error: updateError.message }
-      }
+      return { success: false, error: error.message }
     }
 
-    return { success: true, data }
+    return { success: true, user: data }
   } catch (error) {
     console.error("Track usage error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Usage tracking failed" }
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
@@ -258,5 +289,3 @@ export const getCurrentUser = getCurrentUserReal
 export const signOut = signOutReal
 export const resetPassword = resetPasswordReal
 export const updatePassword = updatePasswordReal
-export const signInWithEmail = signInWithEmailReal
-export const signUp = signUpReal

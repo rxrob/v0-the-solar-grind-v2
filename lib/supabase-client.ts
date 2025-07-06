@@ -1,47 +1,55 @@
 import { createBrowserClient } from "@supabase/ssr"
+import type { Database } from "@/types/supabase"
 
-let supabaseClient: ReturnType<typeof createBrowserClient> | null = null
+let client: ReturnType<typeof createBrowserClient<Database>> | null = null
 
 export function createClient() {
-  if (!supabaseClient) {
+  if (!client) {
     console.log("Creating new Supabase client")
-    supabaseClient = createBrowserClient(
+    client = createBrowserClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     )
   } else {
     console.log("Reusing existing Supabase client")
   }
-
-  return supabaseClient
+  return client
 }
 
-// Singleton instance
+// Singleton client instance
 export const supabase = createClient()
 
 // Get client status
 export function getSupabaseClientStatus() {
   return {
-    hasClient: !!supabaseClient,
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL ? "Configured" : "Missing",
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "Configured" : "Missing",
+    hasClient: !!client,
+    configured: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || "Not configured",
+    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "Configured" : "Not configured",
   }
 }
 
 // Test client connection
 export async function testClientConnection() {
   try {
-    const client = createClient()
-    const { data, error } = await client.from("users").select("count").limit(1)
+    const supabase = createClient()
+    const { data, error } = await supabase.from("users").select("count").limit(1)
 
     if (error) {
-      console.error("Client connection test failed:", error)
       return { success: false, error: error.message }
     }
 
-    return { success: true, data }
+    return { success: true, message: "Client connection successful" }
   } catch (error) {
-    console.error("Client connection test error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown client error",
+    }
   }
+}
+
+// Reset client (for testing)
+export function resetClient() {
+  client = null
+  console.log("Supabase client reset")
 }

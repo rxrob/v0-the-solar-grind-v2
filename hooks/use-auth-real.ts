@@ -7,24 +7,23 @@ import type { User } from "@supabase/supabase-js"
 interface UserProfile {
   id: string
   email: string
+  full_name: string
   subscription_type: "free" | "pro"
-  subscription_status: "active" | "inactive" | "cancelled"
   calculations_used: number
-  reports_generated: number
-  api_calls_made: number
+  reports_used: number
+  stripe_customer_id?: string
   created_at: string
   updated_at: string
 }
 
 interface UserPermissions {
-  canUseAdvancedCalculator: boolean
+  canAccessPro: boolean
   canGenerateReports: boolean
-  canAccessProFeatures: boolean
+  calculationsRemaining: number
+  reportsRemaining: number
+  subscriptionType: "free" | "pro"
   calculationsUsed: number
-  reportsGenerated: number
-  apiCallsMade: number
-  subscriptionType: string
-  subscriptionStatus: string
+  reportsUsed: number
 }
 
 export function useAuthReal() {
@@ -36,43 +35,75 @@ export function useAuthReal() {
 
   const supabase = createClient()
 
+  // Load user profile and permissions
+  const loadUserData = async (userId: string) => {
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .single()
+
+      if (profileError) {
+        console.error("Error loading user profile:", profileError)
+        setError(profileError.message)
+        return
+      }
+
+      setProfile(profileData)
+
+      // Calculate permissions
+      const isPro = profileData.subscription_type === "pro"
+      const calculationsUsed = profileData.calculations_used || 0
+      const reportsUsed = profileData.reports_used || 0
+
+      setPermissions({
+        canAccessPro: isPro,
+        canGenerateReports: isPro || reportsUsed < 1,
+        calculationsRemaining: isPro ? -1 : Math.max(0, 5 - calculationsUsed),
+        reportsRemaining: isPro ? -1 : Math.max(0, 1 - reportsUsed),
+        subscriptionType: profileData.subscription_type,
+        calculationsUsed,
+        reportsUsed,
+      })
+    } catch (error) {
+      console.error("Error loading user data:", error)
+      setError("Failed to load user data")
+    }
+  }
+
+  // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    const initializeAuth = async () => {
       try {
         const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
+          data: { user: initialUser },
+        } = await supabase.auth.getUser()
 
-        if (error) {
-          console.error("Session error:", error)
-          setError(error.message)
-        } else if (session?.user) {
-          setUser(session.user)
-          await loadUserProfile(session.user.id)
+        setUser(initialUser)
+
+        if (initialUser) {
+          await loadUserData(initialUser.id)
         }
-      } catch (err) {
-        console.error("Initial session error:", err)
-        setError(err instanceof Error ? err.message : "Failed to get session")
+      } catch (error) {
+        console.error("Error initializing auth:", error)
+        setError("Failed to initialize authentication")
       } finally {
         setLoading(false)
       }
     }
 
-    getInitialSession()
+    initializeAuth()
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.email)
+      setUser(session?.user ?? null)
 
       if (session?.user) {
-        setUser(session.user)
-        await loadUserProfile(session.user.id)
+        await loadUserData(session.user.id)
       } else {
-        setUser(null)
         setProfile(null)
         setPermissions(null)
       }
@@ -83,47 +114,10 @@ export function useAuthReal() {
     return () => subscription.unsubscribe()
   }, [])
 
-  const loadUserProfile = async (userId: string) => {
-    try {
-      // Load user profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", userId)
-        .single()
-
-      if (profileError) {
-        console.error("Profile load error:", profileError)
-        setError(profileError.message)
-        return
-      }
-
-      setProfile(profileData)
-
-      // Calculate permissions
-      const userPermissions: UserPermissions = {
-        canUseAdvancedCalculator:
-          profileData.subscription_type === "pro" && profileData.subscription_status === "active",
-        canGenerateReports: profileData.subscription_type === "pro" && profileData.subscription_status === "active",
-        canAccessProFeatures: profileData.subscription_type === "pro" && profileData.subscription_status === "active",
-        calculationsUsed: profileData.calculations_used || 0,
-        reportsGenerated: profileData.reports_generated || 0,
-        apiCallsMade: profileData.api_calls_made || 0,
-        subscriptionType: profileData.subscription_type,
-        subscriptionStatus: profileData.subscription_status,
-      }
-
-      setPermissions(userPermissions)
-      setError(null)
-    } catch (err) {
-      console.error("Load profile error:", err)
-      setError(err instanceof Error ? err.message : "Failed to load profile")
-    }
-  }
-
-  const refreshProfile = async () => {
+  // Refresh user data
+  const refreshUserData = async () => {
     if (user) {
-      await loadUserProfile(user.id)
+      await loadUserData(user.id)
     }
   }
 
@@ -133,8 +127,8 @@ export function useAuthReal() {
     permissions,
     loading,
     error,
-    refreshProfile,
+    refreshUserData,
     isAuthenticated: !!user,
-    isPro: permissions?.canAccessProFeatures || false,
+    isPro: permissions?.subscriptionType === "pro",
   }
 }

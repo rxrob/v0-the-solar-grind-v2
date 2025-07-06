@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClientBase, type SupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/supabase"
 import { createBrowserClient } from "@supabase/ssr"
+import { createClient as createSupabaseClientBase } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
 
 // Environment variables with proper validation
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -8,16 +8,16 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 // Create client function - REQUIRED EXPORT
-export function createClient(): SupabaseClient<Database> {
+export function createClient() {
   return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
 }
 
-// Create Supabase client function
-export function createSupabaseClient(): SupabaseClient<Database> {
+// Create Supabase client function - REQUIRED EXPORT
+export function createSupabaseClient() {
   return createClient()
 }
 
-// Check if Supabase is available (required for deployment)
+// Check if Supabase is available - REQUIRED EXPORT
 export function isSupabaseAvailable(): boolean {
   try {
     return !!(supabaseUrl && supabaseAnonKey)
@@ -26,30 +26,7 @@ export function isSupabaseAvailable(): boolean {
   }
 }
 
-// Use the singleton client for all operations
-export function createSupabaseClientInstance() {
-  return createClient()
-}
-
-// Legacy export - now uses singleton
-export const supabase = createClient()
-
-// Admin client for server operations (separate from browser client)
-export const supabaseAdmin = (() => {
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    console.warn("Supabase admin not configured")
-    return null
-  }
-
-  try {
-    return createSupabaseClientBase<Database>(supabaseUrl, supabaseServiceRoleKey)
-  } catch (error) {
-    console.error("Failed to create Supabase admin client:", error)
-    return null
-  }
-})()
-
-// Server-side client with service role (separate from browser client)
+// Server-side client with service role - REQUIRED EXPORT
 export const createServerSupabaseClient = () => {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     console.warn("Supabase server not configured")
@@ -64,7 +41,25 @@ export const createServerSupabaseClient = () => {
   }
 }
 
-// Authentication functions using the singleton client
+// Legacy export - singleton client
+export const supabase = createClient()
+
+// Admin client for server operations
+export const supabaseAdmin = (() => {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    console.warn("Supabase admin not configured")
+    return null
+  }
+
+  try {
+    return createSupabaseClientBase<Database>(supabaseUrl, supabaseServiceRoleKey)
+  } catch (error) {
+    console.error("Failed to create Supabase admin client:", error)
+    return null
+  }
+})()
+
+// Authentication functions
 export async function signUp(email: string, password: string) {
   const supabase = createClient()
   return await supabase.auth.signUp({ email, password })
@@ -95,10 +90,6 @@ export async function resetPassword(email: string) {
 
 export const updatePassword = async (password: string) => {
   const supabase = createClient()
-  if (!supabase) {
-    return { data: null, error: { message: "Supabase connection unavailable" } }
-  }
-
   try {
     const { data, error } = await supabase.auth.updateUser({ password })
     return { data, error }
@@ -108,7 +99,7 @@ export const updatePassword = async (password: string) => {
   }
 }
 
-// Database functions using the singleton client
+// Database functions
 export async function getUserProfile(userId: string) {
   const supabase = createClient()
   return await supabase.from("users").select("*").eq("id", userId).single()
@@ -121,10 +112,6 @@ export async function updateUserProfile(userId: string, updates: any) {
 
 export async function createUserProfile(userId: string, profileData: any) {
   const supabase = createClient()
-  if (!supabase) {
-    return { data: null, error: { message: "Supabase connection unavailable" } }
-  }
-
   try {
     const { data, error } = await supabase
       .from("users")
@@ -145,10 +132,6 @@ export async function createUserProfile(userId: string, profileData: any) {
 
 export const createUserProject = async (projectData: any) => {
   const supabase = createClient()
-  if (!supabase) {
-    return { data: null, error: { message: "Supabase connection unavailable" } }
-  }
-
   try {
     const { data, error } = await supabase
       .from("user_projects")
@@ -168,10 +151,6 @@ export const createUserProject = async (projectData: any) => {
 
 export const getUserProjects = async (userId: string) => {
   const supabase = createClient()
-  if (!supabase) {
-    return { data: null, error: { message: "Supabase connection unavailable" } }
-  }
-
   try {
     const { data, error } = await supabase
       .from("user_projects")
@@ -187,10 +166,6 @@ export const getUserProjects = async (userId: string) => {
 
 export const saveSolarCalculation = async (calculationData: any) => {
   const supabase = createClient()
-  if (!supabase) {
-    return { data: null, error: { message: "Supabase connection unavailable" } }
-  }
-
   try {
     const { data, error } = await supabase
       .from("solar_calculations")
@@ -209,10 +184,6 @@ export const saveSolarCalculation = async (calculationData: any) => {
 
 export const getUserCalculations = async (userId: string) => {
   const supabase = createClient()
-  if (!supabase) {
-    return { data: null, error: { message: "Supabase connection unavailable" } }
-  }
-
   try {
     const { data, error } = await supabase
       .from("solar_calculations")
@@ -229,12 +200,15 @@ export const getUserCalculations = async (userId: string) => {
 // Configuration utilities
 export function getSupabaseConfig() {
   return {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-    configured: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    url: supabaseUrl || "Not configured",
+    anonKey: supabaseAnonKey ? "Configured" : "Not configured",
+    serviceKey: supabaseServiceRoleKey ? "Configured" : "Not configured",
+    isAvailable: isSupabaseAvailable(),
+    connectionStatus: isSupabaseAvailable() ? "Ready" : "Needs configuration",
   }
 }
 
+// Test connection function
 export async function testConnection() {
   try {
     const supabase = createClient()
@@ -244,9 +218,12 @@ export async function testConnection() {
       return { success: false, error: error.message }
     }
 
-    return { success: true, data }
+    return { success: true, message: "Connection successful" }
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
   }
 }
 
