@@ -174,7 +174,7 @@ export async function performAdvancedSolarCalculation(params: SolarCalculationPa
 
     // Energy production calculations
     const annualProduction = pvWattsData.ac_annual || params.systemSize * 1400
-    const monthlyProduction = pvWattsData.ac_monthly || Array(12).fill(annualProduction / 12)
+    const monthlyProduction: number[] = pvWattsData.ac_monthly || Array(12).fill(annualProduction / 12)
     const dailyAverage = annualProduction / 365
     const peakProduction = params.systemSize * 0.85 // 85% of rated capacity
 
@@ -277,7 +277,7 @@ export async function performAdvancedSolarCalculation(params: SolarCalculationPa
       },
       energyProduction: {
         annualProduction: Math.round(annualProduction),
-        monthlyProduction: monthlyProduction.map((p) => Math.round(p)),
+        monthlyProduction: monthlyProduction.map((p: number) => Math.round(p)),
         dailyAverage: Math.round(dailyAverage * 100) / 100,
         peakProduction: Math.round(peakProduction * 100) / 100,
       },
