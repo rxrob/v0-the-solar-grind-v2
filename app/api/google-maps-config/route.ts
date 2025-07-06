@@ -2,19 +2,20 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    // Only return configuration status, not actual keys
-    const hasGoogleMapsKey = !!process.env.GOOGLE_MAPS_API_KEY
+    // Only check for server-side keys, don't expose any sensitive information
+    const hasServerMapsKey = !!process.env.GOOGLE_MAPS_API_KEY
     const hasGeocodingKey = !!process.env.GOOGLE_GEOCODING_API_KEY
     const hasElevationKey = !!process.env.GOOGLE_ELEVATION_API_KEY
 
     return NextResponse.json({
       success: true,
-      config: {
-        googleMaps: hasGoogleMapsKey ? "Configured" : "Missing",
-        geocoding: hasGeocodingKey ? "Configured" : "Missing",
-        elevation: hasElevationKey ? "Configured" : "Missing",
-        isConfigured: hasGoogleMapsKey && hasGeocodingKey && hasElevationKey,
+      services: {
+        maps: hasServerMapsKey ? "configured" : "missing",
+        geocoding: hasGeocodingKey ? "configured" : "missing",
+        elevation: hasElevationKey ? "configured" : "missing",
       },
+      allConfigured: hasServerMapsKey && hasGeocodingKey && hasElevationKey,
+      message: "Google Maps configuration status checked",
     })
   } catch (error) {
     console.error("Google Maps config error:", error)
@@ -22,12 +23,12 @@ export async function GET() {
       {
         success: false,
         error: "Failed to check Google Maps configuration",
-        config: {
-          googleMaps: "Error",
-          geocoding: "Error",
-          elevation: "Error",
-          isConfigured: false,
+        services: {
+          maps: "error",
+          geocoding: "error",
+          elevation: "error",
         },
+        allConfigured: false,
       },
       { status: 500 },
     )

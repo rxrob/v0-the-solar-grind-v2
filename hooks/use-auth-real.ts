@@ -1,214 +1,140 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase-client"
+import { createClient } from "@/lib/supabase-client"
 import type { User } from "@supabase/supabase-js"
-import { getCurrentUserReal, checkUserPermissions } from "@/app/actions/auth-real"
 
 interface UserProfile {
   id: string
   email: string
-  full_name: string
-  subscription_type: string
+  subscription_type: "free" | "pro"
+  subscription_status: "active" | "inactive" | "cancelled"
   calculations_used: number
-  reports_used: number
+  reports_generated: number
+  api_calls_made: number
   created_at: string
   updated_at: string
 }
 
 interface UserPermissions {
-  canAccessPro: boolean
+  canUseAdvancedCalculator: boolean
   canGenerateReports: boolean
-  calculationsRemaining: number
-  reportsRemaining: number
-  subscriptionType: string
+  canAccessProFeatures: boolean
   calculationsUsed: number
-  reportsUsed: number
-}
-
-interface AuthState {
-  user: User | null
-  profile: UserProfile | null
-  permissions: UserPermissions | null
-  loading: boolean
-  error: string | null
+  reportsGenerated: number
+  apiCallsMade: number
+  subscriptionType: string
+  subscriptionStatus: string
 }
 
 export function useAuthReal() {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    profile: null,
-    permissions: null,
-    loading: true,
-    error: null,
-  })
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [permissions, setPermissions] = useState<UserPermissions | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Load initial auth state
+  const supabase = createClient()
+
   useEffect(() => {
-    async function loadAuthState() {
+    // Get initial session
+    const getInitialSession = async () => {
       try {
-        setAuthState((prev) => ({ ...prev, loading: true, error: null }))
-
-        // Get current user and profile
-        const { user, profile, error } = await getCurrentUserReal()
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
 
         if (error) {
-          setAuthState((prev) => ({
-            ...prev,
-            loading: false,
-            error,
-          }))
-          return
+          console.error("Session error:", error)
+          setError(error.message)
+        } else if (session?.user) {
+          setUser(session.user)
+          await loadUserProfile(session.user.id)
         }
-
-        if (user && profile) {
-          // Get user permissions
-          const permissionsResult = await checkUserPermissions(user.id)
-
-          setAuthState({
-            user,
-            profile,
-            permissions: permissionsResult.success ? permissionsResult.permissions : null,
-            loading: false,
-            error: permissionsResult.success ? null : permissionsResult.error,
-          })
-        } else {
-          setAuthState({
-            user: null,
-            profile: null,
-            permissions: null,
-            loading: false,
-            error: null,
-          })
-        }
-      } catch (error) {
-        console.error("Error loading auth state:", error)
-        setAuthState((prev) => ({
-          ...prev,
-          loading: false,
-          error: error instanceof Error ? error.message : "Failed to load auth state",
-        }))
+      } catch (err) {
+        console.error("Initial session error:", err)
+        setError(err instanceof Error ? err.message : "Failed to get session")
+      } finally {
+        setLoading(false)
       }
     }
 
-    loadAuthState()
-  }, [])
+    getInitialSession()
 
-  // Listen for auth changes
-  useEffect(() => {
+    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.id)
+      console.log("Auth state changed:", event, session?.user?.email)
 
-      if (event === "SIGNED_OUT" || !session?.user) {
-        setAuthState({
-          user: null,
-          profile: null,
-          permissions: null,
-          loading: false,
-          error: null,
-        })
-      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        try {
-          setAuthState((prev) => ({ ...prev, loading: true }))
-
-          // Get updated user and profile
-          const { user, profile, error } = await getCurrentUserReal()
-
-          if (error) {
-            setAuthState((prev) => ({
-              ...prev,
-              loading: false,
-              error,
-            }))
-            return
-          }
-
-          if (user && profile) {
-            // Get updated permissions
-            const permissionsResult = await checkUserPermissions(user.id)
-
-            setAuthState({
-              user,
-              profile,
-              permissions: permissionsResult.success ? permissionsResult.permissions : null,
-              loading: false,
-              error: permissionsResult.success ? null : permissionsResult.error,
-            })
-          }
-        } catch (error) {
-          console.error("Error updating auth state:", error)
-          setAuthState((prev) => ({
-            ...prev,
-            loading: false,
-            error: error instanceof Error ? error.message : "Failed to update auth state",
-          }))
-        }
+      if (session?.user) {
+        setUser(session.user)
+        await loadUserProfile(session.user.id)
+      } else {
+        setUser(null)
+        setProfile(null)
+        setPermissions(null)
       }
+
+      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  // Refresh permissions
-  const refreshPermissions = async () => {
-    if (!authState.user) return
-
+  const loadUserProfile = async (userId: string) => {
     try {
-      const permissionsResult = await checkUserPermissions(authState.user.id)
+      // Load user profile
+      const { data: profileData, error: profileError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .single()
 
-      setAuthState((prev) => ({
-        ...prev,
-        permissions: permissionsResult.success ? permissionsResult.permissions : prev.permissions,
-        error: permissionsResult.success ? null : permissionsResult.error,
-      }))
-    } catch (error) {
-      console.error("Error refreshing permissions:", error)
-      setAuthState((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : "Failed to refresh permissions",
-      }))
-    }
-  }
-
-  // Refresh profile
-  const refreshProfile = async () => {
-    if (!authState.user) return
-
-    try {
-      const { user, profile, error } = await getCurrentUserReal()
-
-      if (error) {
-        setAuthState((prev) => ({ ...prev, error }))
+      if (profileError) {
+        console.error("Profile load error:", profileError)
+        setError(profileError.message)
         return
       }
 
-      setAuthState((prev) => ({
-        ...prev,
-        user: user || prev.user,
-        profile: profile || prev.profile,
-        error: null,
-      }))
+      setProfile(profileData)
 
-      // Also refresh permissions
-      await refreshPermissions()
-    } catch (error) {
-      console.error("Error refreshing profile:", error)
-      setAuthState((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : "Failed to refresh profile",
-      }))
+      // Calculate permissions
+      const userPermissions: UserPermissions = {
+        canUseAdvancedCalculator:
+          profileData.subscription_type === "pro" && profileData.subscription_status === "active",
+        canGenerateReports: profileData.subscription_type === "pro" && profileData.subscription_status === "active",
+        canAccessProFeatures: profileData.subscription_type === "pro" && profileData.subscription_status === "active",
+        calculationsUsed: profileData.calculations_used || 0,
+        reportsGenerated: profileData.reports_generated || 0,
+        apiCallsMade: profileData.api_calls_made || 0,
+        subscriptionType: profileData.subscription_type,
+        subscriptionStatus: profileData.subscription_status,
+      }
+
+      setPermissions(userPermissions)
+      setError(null)
+    } catch (err) {
+      console.error("Load profile error:", err)
+      setError(err instanceof Error ? err.message : "Failed to load profile")
+    }
+  }
+
+  const refreshProfile = async () => {
+    if (user) {
+      await loadUserProfile(user.id)
     }
   }
 
   return {
-    ...authState,
-    refreshPermissions,
+    user,
+    profile,
+    permissions,
+    loading,
+    error,
     refreshProfile,
-    isAuthenticated: !!authState.user,
-    isPro: authState.permissions?.subscriptionType === "pro",
-    canAccessPro: authState.permissions?.canAccessPro || false,
-    canGenerateReports: authState.permissions?.canGenerateReports || false,
+    isAuthenticated: !!user,
+    isPro: permissions?.canAccessProFeatures || false,
   }
 }

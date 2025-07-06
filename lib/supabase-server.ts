@@ -1,61 +1,45 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import type { Database } from "@/types/supabase"
 
-// Environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-// REQUIRED EXPORT - createClient as named export
 export function createClient() {
   const cookieStore = cookies()
 
-  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value
+      getAll() {
+        return cookieStore.getAll()
       },
-      set(name: string, value: string, options: CookieOptions) {
+      setAll(cookiesToSet) {
         try {
-          cookieStore.set({ name, value, ...options })
-        } catch (error) {
-          // The `set` method was called from a Server Component.
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+        } catch {
+          // The `setAll` method was called from a Server Component.
           // This can be ignored if you have middleware refreshing
           // user sessions.
-          console.error("Error setting cookie:", error)
-        }
-      },
-      remove(name: string, options: CookieOptions) {
-        try {
-          cookieStore.set({ name, value: "", ...options })
-        } catch (error) {
-          // The `delete` method was called from a Server Component.
-          // This can be ignored if you have middleware refreshing
-          // user sessions.
-          console.error("Error removing cookie:", error)
         }
       },
     },
   })
 }
 
-// Create server client with cookies - REQUIRED EXPORT
 export function createSupabaseServerClient() {
   return createClient()
 }
 
-// Create service client for admin operations
-export function createSupabaseServiceClient() {
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    throw new Error("Missing Supabase service role key")
+// Service client for admin operations
+export function createServiceClient() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for service client")
   }
 
-  return createSupabaseClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
+  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    cookies: {
+      getAll() {
+        return []
+      },
+      setAll() {
+        // No-op for service client
+      },
     },
   })
 }
@@ -64,54 +48,34 @@ export function createSupabaseServiceClient() {
 export async function testServerConnection() {
   try {
     const supabase = createClient()
-    const { data, error } = await supabase.auth.getSession()
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, message: "Server connection successful" }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
-  }
-}
-
-// Test database connection with service client
-export async function testDatabaseConnection() {
-  try {
-    const supabase = createSupabaseServiceClient()
     const { data, error } = await supabase.from("users").select("count").limit(1)
 
     if (error) {
+      console.error("Server connection test failed:", error)
       return { success: false, error: error.message }
     }
 
-    return { success: true, message: "Database connection successful" }
+    return { success: true, data }
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+    console.error("Server connection test error:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+  }
+}
+
+// Test database connection
+export async function testDatabaseConnection() {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.rpc("version")
+
+    if (error) {
+      console.error("Database connection test failed:", error)
+      return { success: false, error: error.message }
     }
+
+    return { success: true, version: data }
+  } catch (error) {
+    console.error("Database connection test error:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }
-
-// Get server configuration status
-export function getSupabaseServerConfig() {
-  return {
-    url: supabaseUrl ? "Configured" : "Missing",
-    anonKey: supabaseAnonKey ? "Configured" : "Missing",
-    serviceKey: supabaseServiceRoleKey ? "Configured" : "Missing",
-    isConfigured: !!(supabaseUrl && supabaseAnonKey && supabaseServiceRoleKey),
-  }
-}
-
-// Check if server Supabase is configured
-export function isSupabaseServerConfigured() {
-  return !!(supabaseUrl && supabaseAnonKey && supabaseServiceRoleKey)
-}
-
-// Default export
-export default createClient

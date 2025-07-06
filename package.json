@@ -1,5 +1,5 @@
 {
-  "name": "solar-grind-v2",
+  "name": "the-solar-grind-v2",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^0.0.66",
-    "@fal-ai/serverless": "^0.14.3",
+    "@google/maps": "^1.1.3",
+    "@googlemaps/js-api-loader": "^1.16.8",
     "@hookform/resolvers": "^3.9.0",
     "@neondatabase/serverless": "latest",
     "@radix-ui/react-accordion": "latest",
@@ -32,6 +33,7 @@
     "@radix-ui/react-scroll-area": "latest",
     "@radix-ui/react-select": "latest",
     "@radix-ui/react-separator": "latest",
+    "@radix-ui/react-sheet": "^1.1.0",
     "@radix-ui/react-slider": "latest",
     "@radix-ui/react-slot": "latest",
     "@radix-ui/react-switch": "latest",
@@ -40,6 +42,7 @@
     "@radix-ui/react-toggle": "latest",
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
+    "@react-pdf/renderer": "^4.0.0",
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
@@ -60,10 +63,11 @@
     "react": "^19",
     "react-day-picker": "latest",
     "react-dom": "^19",
+    "react-google-recaptcha": "^3.1.0",
     "react-hook-form": "latest",
     "react-resizable-panels": "latest",
     "recharts": "latest",
-    "resend": "^4.0.0",
+    "resend": "^4.0.1",
     "sonner": "latest",
     "stripe": "latest",
     "tailwind-merge": "^2.5.5",
@@ -75,11 +79,11 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "autoprefixer": "^10.4.20",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "15.0.3",
+    "@types/react-google-recaptcha": "^2.1.9",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "15.1.0",
     "postcss": "^8.5",
-    "tailwindcss": "^3.4.13",
+    "tailwindcss": "^3.4.17",
     "typescript": "^5"
   }
 }

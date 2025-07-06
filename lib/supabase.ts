@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClientBase, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
+import { createBrowserClient } from "@supabase/ssr"
 
 // Environment variables with proper validation
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -8,10 +9,7 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 // Create client function - REQUIRED EXPORT
 export function createClient(): SupabaseClient<Database> {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-  return createSupabaseClientBase<Database>(supabaseUrl, supabaseAnonKey)
+  return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
 }
 
 // Create Supabase client function
@@ -67,106 +65,32 @@ export const createServerSupabaseClient = () => {
 }
 
 // Authentication functions using the singleton client
-export const signIn = async (email: string, password: string) => {
+export async function signUp(email: string, password: string) {
   const supabase = createClient()
-  if (!supabase) {
-    return {
-      data: null,
-      error: { message: "Supabase connection unavailable - check your configuration" },
-    }
-  }
-
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    return { data, error }
-  } catch (err: any) {
-    console.error("Sign in error:", err)
-    return {
-      data: null,
-      error: { message: `Network error: ${err.message || "Connection failed"}` },
-    }
-  }
+  return await supabase.auth.signUp({ email, password })
 }
 
-export const signUp = async (email: string, password: string, fullName?: string) => {
+export async function signIn(email: string, password: string) {
   const supabase = createClient()
-  if (!supabase) {
-    return {
-      data: null,
-      error: { message: "Supabase connection unavailable - check your configuration" },
-    }
-  }
-
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: fullName
-        ? {
-            data: {
-              full_name: fullName,
-            },
-          }
-        : undefined,
-    })
-    return { data, error }
-  } catch (err: any) {
-    console.error("Sign up error:", err)
-    return { data: null, error: { message: `Network error: ${err.message || "Connection failed"}` } }
-  }
+  return await supabase.auth.signInWithPassword({ email, password })
 }
 
-export const signOut = async () => {
+export async function signOut() {
   const supabase = createClient()
-  if (!supabase) {
-    return { error: { message: "Supabase connection unavailable" } }
-  }
-
-  try {
-    const { error } = await supabase.auth.signOut()
-    return { error }
-  } catch (err: any) {
-    console.error("Sign out error:", err)
-    return { error: { message: `Network error: ${err.message || "Connection failed"}` } }
-  }
+  return await supabase.auth.signOut()
 }
 
-export const getCurrentUser = async () => {
+export async function getCurrentUser() {
   const supabase = createClient()
-  if (!supabase) {
-    return { user: null, error: { message: "Supabase connection unavailable" } }
-  }
-
-  try {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-    return { user, error }
-  } catch (err: any) {
-    console.error("Get user error:", err)
-    return { user: null, error: { message: `Network error: ${err.message || "Connection failed"}` } }
-  }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return user
 }
 
-export const resetPassword = async (email: string) => {
+export async function resetPassword(email: string) {
   const supabase = createClient()
-  if (!supabase) {
-    return { data: null, error: { message: "Supabase connection unavailable" } }
-  }
-
-  try {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-    return { data, error }
-  } catch (err: any) {
-    console.error("Reset password error:", err)
-    return { data: null, error: { message: `Network error: ${err.message || "Connection failed"}` } }
-  }
+  return await supabase.auth.resetPasswordForEmail(email)
 }
 
 export const updatePassword = async (password: string) => {
@@ -187,40 +111,12 @@ export const updatePassword = async (password: string) => {
 // Database functions using the singleton client
 export async function getUserProfile(userId: string) {
   const supabase = createClient()
-  if (!supabase) {
-    return { data: null, error: { message: "Supabase connection unavailable" } }
-  }
-
-  try {
-    const { data, error } = await supabase.from("users").select("*").eq("id", userId).single()
-    return { data, error }
-  } catch (err: any) {
-    console.error("Get user profile error:", err)
-    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
-  }
+  return await supabase.from("users").select("*").eq("id", userId).single()
 }
 
 export async function updateUserProfile(userId: string, updates: any) {
   const supabase = createClient()
-  if (!supabase) {
-    return { data: null, error: { message: "Supabase connection unavailable" } }
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("users")
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId)
-      .select()
-      .single()
-    return { data, error }
-  } catch (err: any) {
-    console.error("Update user profile error:", err)
-    return { data: null, error: { message: `Database error: ${err.message || "Connection failed"}` } }
-  }
+  return await supabase.from("users").update(updates).eq("id", userId)
 }
 
 export async function createUserProfile(userId: string, profileData: any) {
@@ -331,43 +227,26 @@ export const getUserCalculations = async (userId: string) => {
 }
 
 // Configuration utilities
-export const getSupabaseConfigUtil = () => {
+export function getSupabaseConfig() {
   return {
-    url: supabaseUrl || "Not configured",
-    anonKey: supabaseAnonKey ? "Configured" : "Not configured",
-    serviceKey: supabaseServiceRoleKey ? "Configured" : "Not configured",
-    isAvailable: isSupabaseAvailable(),
-    connectionStatus: isSupabaseAvailable() ? "Ready" : "Needs configuration",
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+    configured: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
   }
 }
 
-// Test connection function
-export const testSupabaseConnection = async () => {
-  const supabase = createClient()
-  if (!supabase) {
-    return {
-      success: false,
-      error: "Supabase client not available - check environment variables",
-    }
-  }
-
+export async function testConnection() {
   try {
+    const supabase = createClient()
     const { data, error } = await supabase.from("users").select("count").limit(1)
+
     if (error) {
-      return {
-        success: false,
-        error: `Database connection failed: ${error.message}`,
-      }
+      return { success: false, error: error.message }
     }
-    return {
-      success: true,
-      message: "Supabase connection successful",
-    }
-  } catch (err: any) {
-    return {
-      success: false,
-      error: `Connection test failed: ${err.message || "Unknown error"}`,
-    }
+
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }
 
