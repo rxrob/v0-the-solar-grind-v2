@@ -1,58 +1,39 @@
 import { NextResponse } from "next/server"
-import Stripe from "stripe"
+import { stripe } from "@/lib/stripe"
 
 export async function GET() {
   try {
-    // Check if Stripe keys are configured
-    const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY
-    const secretKey = process.env.STRIPE_SECRET_KEY
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
-
-    if (!publishableKey || !secretKey) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Stripe keys not configured",
-          details: {
-            publishableKey: !!publishableKey,
-            secretKey: !!secretKey,
-            webhookSecret: !!webhookSecret,
-          },
-        },
-        { status: 500 },
-      )
+    const checks = {
+      stripe_secret_key: !!process.env.STRIPE_SECRET_KEY,
+      stripe_publishable_key: !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+      stripe_webhook_secret: !!process.env.STRIPE_WEBHOOK_SECRET,
+      stripe_pro_monthly_price_id: !!process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
+      stripe_single_report_price_id: !!process.env.NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID,
+      api_version: "2025-06-30.basil",
     }
 
-    // Initialize Stripe with the correct API version
-    const stripe = new Stripe(secretKey, {
-      apiVersion: "2025-06-30.basil",
-    })
+    // Test Stripe connection
+    let stripe_connection_test = false
+    let stripe_error = null
 
-    // Test the connection
-    const account = await stripe.accounts.retrieve()
+    try {
+      await stripe.accounts.retrieve()
+      stripe_connection_test = true
+    } catch (error) {
+      stripe_error = error instanceof Error ? error.message : "Unknown error"
+    }
 
     return NextResponse.json({
-      success: true,
-      data: {
-        accountId: account.id,
-        country: account.country,
-        defaultCurrency: account.default_currency,
-        detailsSubmitted: account.details_submitted,
-        payoutsEnabled: account.payouts_enabled,
-        chargesEnabled: account.charges_enabled,
-      },
-      environment: {
-        publishableKey: publishableKey.substring(0, 12) + "...",
-        secretKey: secretKey.substring(0, 12) + "...",
-        webhookSecret: !!webhookSecret,
-      },
+      ...checks,
+      stripe_connection_test,
+      stripe_error,
+      all_configured: Object.values(checks).every(Boolean) && stripe_connection_test,
     })
   } catch (error) {
-    console.error("Stripe environment check error:", error)
     return NextResponse.json(
       {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : "Failed to check environment",
+        api_version: "2025-06-30.basil",
       },
       { status: 500 },
     )

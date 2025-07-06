@@ -181,3 +181,12 @@ export function pick<T extends Record<string, any>, K extends keyof T>(obj: T, k
   })
   return result
 }
+
+export function absoluteUrl(path: string): string {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000"
+
+  return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`
+}
