@@ -1,63 +1,130 @@
 "use server"
 
-import { createServerClient } from "@/lib/supabase-server-client"
-import { cookies } from "next/headers"
+import { createServerClient } from "@supabase/auth-helpers-nextjs"
 import { redirect } from "next/navigation"
-import { signInWithEmailReal, signUpReal, signOutReal, getCurrentUserReal } from "./auth-real"
+import { revalidatePath } from "next/cache"
 
-export async function signUp(formData: FormData) {
-  const email = formData.get("email") as string
-  const password = formData.get("password") as string
-  const fullName = formData.get("fullName") as string
+export async function signUp(email: string, password: string, fullName?: string) {
+  const supabase = createServerClient()
 
-  if (!email || !password) {
-    return { error: "Email and password are required" }
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
+      data: {
+        full_name: fullName || "",
+      },
+    },
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
   }
 
-  const result = await signUpReal(email, password, fullName)
+  // Create user profile in our users table
+  if (data.user) {
+    const { error: profileError } = await supabase.from("users").insert({
+      id: data.user.id,
+      email: data.user.email,
+      full_name: fullName || "",
+      subscription_type: "free",
+      subscription_status: "active",
+      created_at: new Date().toISOString(),
+    })
 
-  if (result.success) {
-    if ("needsVerification" in result && result.needsVerification) {
-      return {
-        success: true,
-        needsVerification: true,
-        message: "Please check your email to verify your account",
-      }
+    if (profileError) {
+      console.error("Profile creation error:", profileError)
     }
-    redirect("/dashboard")
-  } else {
-    return { error: result.error }
   }
+
+  // Check if user needs email verification
+  if (data.user && !data.user.email_confirmed_at) {
+    return {
+      success: true,
+      needsVerification: true,
+      user: data.user,
+    }
+  }
+
+  return { success: true, data }
 }
 
-export async function signIn(formData: FormData) {
-  const email = formData.get("email") as string
-  const password = formData.get("password") as string
+export async function signInWithEmail(email: string, password: string) {
+  const supabase = createServerClient()
 
-  if (!email || !password) {
-    return { error: "Email and password are required" }
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
   }
 
-  const result = await signInWithEmailReal(email, password)
-
-  if (result.success) {
-    redirect("/dashboard")
-  } else {
-    return { error: result.error }
-  }
+  revalidatePath("/", "layout")
+  return { success: true, user: data.user }
 }
 
 export async function signOut() {
-  await signOutReal()
+  const supabase = createServerClient()
+
+  const { error } = await supabase.auth.signOut()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/", "layout")
+  redirect("/login")
 }
 
 export async function getCurrentUser() {
-  return await getCurrentUserReal()
+  const supabase = createServerClient()
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+
+  if (error) {
+    return { success: false, error: error.message, user: null }
+  }
+
+  if (!user) {
+    return { success: true, user: null }
+  }
+
+  // Get user profile from our users table
+  const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
+
+  if (profileError) {
+    console.error("Error fetching user profile:", profileError)
+    return {
+      success: true,
+      user: {
+        ...user,
+        subscriptionPlan: "free",
+        subscriptionStatus: "active",
+        emailVerified: !!user.email_confirmed_at,
+      },
+    }
+  }
+
+  return {
+    success: true,
+    user: {
+      ...user,
+      subscriptionPlan: profile?.subscription_type || "free",
+      subscriptionStatus: profile?.subscription_status || "active",
+      emailVerified: !!user.email_confirmed_at,
+      profile,
+    },
+  }
 }
 
 export async function resetPassword(email: string) {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient()
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
@@ -71,8 +138,7 @@ export async function resetPassword(email: string) {
 }
 
 export async function updatePassword(password: string) {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient()
 
   const { error } = await supabase.auth.updateUser({
     password,
@@ -86,8 +152,7 @@ export async function updatePassword(password: string) {
 }
 
 export async function signInWithGoogle() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient()
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -100,17 +165,45 @@ export async function signInWithGoogle() {
     return { success: false, error: error.message }
   }
 
+  if (data.url) {
+    redirect(data.url)
+  }
+
   return { success: true, data }
 }
 
 export async function handleAuthCallback(code: string) {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient()
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
     return { success: false, error: error.message }
+  }
+
+  // Create user profile if it doesn't exist
+  if (data.user) {
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", data.user.id)
+      .single()
+
+    if (profileError && profileError.code === "PGRST116") {
+      // User doesn't exist, create profile
+      const { error: insertError } = await supabase.from("users").insert({
+        id: data.user.id,
+        email: data.user.email,
+        full_name: data.user.user_metadata?.full_name || "",
+        subscription_type: "free",
+        subscription_status: "active",
+        created_at: new Date().toISOString(),
+      })
+
+      if (insertError) {
+        console.error("Profile creation error:", insertError)
+      }
+    }
   }
 
   // Check if user needs email verification
@@ -126,8 +219,7 @@ export async function handleAuthCallback(code: string) {
 }
 
 export async function resendVerificationEmail(email: string) {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient()
 
   const { error } = await supabase.auth.resend({
     type: "signup",
@@ -144,26 +236,36 @@ export async function resendVerificationEmail(email: string) {
   return { success: true, message: "Verification email sent" }
 }
 
-export async function checkAuthCallback(searchParams: { code?: string; error?: string }) {
-  if (searchParams.error) {
-    return { success: false, error: searchParams.error }
+export async function getUserSubscriptionStatus() {
+  const supabase = createServerClient()
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return { success: false, error: "User not authenticated" }
   }
 
-  if (searchParams.code) {
-    const result = await handleAuthCallback(searchParams.code)
+  // Get user subscription status from database
+  const { data: userData, error: dbError } = await supabase
+    .from("users")
+    .select("subscription_status, subscription_type, stripe_customer_id")
+    .eq("id", user.id)
+    .single()
 
-    if (!result.success) {
-      return result
-    }
-
-    // Check if user needs verification
-    if ("needsVerification" in result && result.needsVerification) {
-      redirect("/verify-email")
-    }
-
-    // Redirect to dashboard or intended page
-    redirect("/dashboard")
+  if (dbError) {
+    return { success: false, error: dbError.message }
   }
 
-  return { success: false, error: "No authorization code provided" }
+  return {
+    success: true,
+    user: {
+      ...user,
+      subscription_status: userData?.subscription_status || "free",
+      subscription_type: userData?.subscription_type || "free",
+      stripe_customer_id: userData?.stripe_customer_id,
+    },
+  }
 }
