@@ -1,87 +1,70 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { stripe } from "@/lib/stripe"
-import { createClient } from "@supabase/supabase-js"
-import { absoluteUrl } from "@/lib/utils"
+import { NextResponse } from "next/server"
+import Stripe from "stripe"
+import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2023-10-16",
+})
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { email, type, userId } = await req.json()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies },
+    )
 
-    if (!email || !type) {
-      return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
-    }
+    const { productType } = await req.json()
 
-    // Get or create Stripe customer
-    let customerId: string | undefined
+    let sessionConfig: Stripe.Checkout.SessionCreateParams
 
-    try {
-      const existingCustomers = await stripe.customers.list({
-        email: email,
-        limit: 1,
-      })
-
-      if (existingCustomers.data.length > 0) {
-        customerId = existingCustomers.data[0].id
-      } else {
-        const customer = await stripe.customers.create({
-          email: email,
-        })
-        customerId = customer.id
-      }
-    } catch (error) {
-      console.error("Error managing Stripe customer:", error)
-      return NextResponse.json({ error: "Failed to manage customer" }, { status: 500 })
-    }
-
-    // Update user with Stripe customer ID if userId is provided
-    if (userId && customerId) {
-      try {
-        await supabase.from("users").update({ stripe_customer_id: customerId }).eq("id", userId)
-      } catch (error) {
-        console.error("Error updating user with Stripe customer ID:", error)
-      }
-    }
-
-    const priceId =
-      type === "pro"
-        ? process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID
-        : process.env.NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID
-
-    if (!priceId) {
-      return NextResponse.json({ error: "Price ID not configured" }, { status: 500 })
-    }
-
-    const sessionParams: any = {
-      payment_method_types: ["card"],
-      mode: type === "pro" ? "subscription" : "payment",
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
+    if (productType === "single-report") {
+      sessionConfig = {
+        payment_method_types: ["card"],
+        mode: "payment",
+        line_items: [
+          {
+            price: process.env.STRIPE_SINGLE_REPORT_PRICE_ID!,
+            quantity: 1,
+          },
+        ],
+        success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing`,
+        metadata: {
+          user_id: user.id,
+          product_type: "single-report",
         },
-      ],
-      customer: customerId,
-      success_url: absoluteUrl("/dashboard?success=true"),
-      cancel_url: absoluteUrl("/dashboard?canceled=true"),
-    }
-
-    // Add metadata for single report purchases
-    if (type === "single_report" && userId) {
-      sessionParams.metadata = {
-        user_id: userId,
-        report_type: "single_report",
+      }
+    } else {
+      // Pro subscription
+      sessionConfig = {
+        payment_method_types: ["card"],
+        mode: "subscription",
+        line_items: [
+          {
+            price: process.env.STRIPE_PRO_MONTHLY_PRICE_ID!,
+            quantity: 1,
+          },
+        ],
+        success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing`,
+        metadata: {
+          user_id: user.id,
+          product_type: "pro-subscription",
+        },
       }
     }
 
-    const session = await stripe.checkout.sessions.create(sessionParams)
+    const session = await stripe.checkout.sessions.create(sessionConfig)
 
     return NextResponse.json({ url: session.url })
   } catch (error) {

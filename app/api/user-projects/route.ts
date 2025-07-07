@@ -31,13 +31,28 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("Error fetching projects:", error)
-      return NextResponse.json({ error: "Failed to fetch projects" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Failed to fetch projects",
+          details: error.message,
+        },
+        { status: 500 },
+      )
     }
 
-    return NextResponse.json({ projects: projects || [] })
+    return NextResponse.json({
+      projects: projects || [],
+      count: projects?.length || 0,
+    })
   } catch (error) {
     console.error("Error in user-projects API:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
 
@@ -83,17 +98,33 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .select()
-      .single()
+      .maybeSingle() // Fixed: Changed from .single() to .maybeSingle()
 
     if (error) {
       console.error("Error creating project:", error)
-      return NextResponse.json({ error: "Failed to create project" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Failed to create project",
+          details: error.message,
+        },
+        { status: 500 },
+      )
+    }
+
+    if (!project) {
+      return NextResponse.json({ error: "Project creation failed - no data returned" }, { status: 500 })
     }
 
     return NextResponse.json({ project })
   } catch (error) {
     console.error("Error in user-projects POST:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
 
@@ -116,17 +147,33 @@ export async function PUT(request: NextRequest) {
       .eq("id", id)
       .eq("user_email", userEmail)
       .select()
-      .single()
+      .maybeSingle() // Fixed: Changed from .single() to .maybeSingle()
 
     if (error) {
       console.error("Error updating project:", error)
-      return NextResponse.json({ error: "Failed to update project" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Failed to update project",
+          details: error.message,
+        },
+        { status: 500 },
+      )
+    }
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found or access denied" }, { status: 404 })
     }
 
     return NextResponse.json({ project })
   } catch (error) {
     console.error("Error in user-projects PUT:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
 
@@ -145,12 +192,24 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error("Error deleting project:", error)
-      return NextResponse.json({ error: "Failed to delete project" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Failed to delete project",
+          details: error.message,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error in user-projects DELETE:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

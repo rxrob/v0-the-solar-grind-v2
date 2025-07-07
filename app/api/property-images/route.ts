@@ -36,17 +36,30 @@ export async function GET(request: NextRequest) {
       const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
 
       try {
-        const geocodeResponse = await fetch(geocodeUrl)
+        const geocodeResponse = await fetch(geocodeUrl, {
+          headers: {
+            "User-Agent": "MySolarAI/1.0",
+          },
+        })
+
+        if (!geocodeResponse.ok) {
+          throw new Error(`Geocoding API error: ${geocodeResponse.status}`)
+        }
+
         const geocodeData = await geocodeResponse.json()
 
         if (geocodeData.status === "OK" && geocodeData.results.length > 0) {
           coordinates = geocodeData.results[0].geometry.location
         } else {
-          throw new Error("Geocoding failed")
+          throw new Error(`Geocoding failed: ${geocodeData.status}`)
         }
       } catch (error) {
+        console.error("Geocoding error:", error)
         return NextResponse.json(
-          { error: "Failed to geocode address", details: error instanceof Error ? error.message : "Unknown error" },
+          {
+            error: "Failed to geocode address",
+            details: error instanceof Error ? error.message : "Unknown error",
+          },
           { status: 400 },
         )
       }
@@ -68,9 +81,16 @@ export async function GET(request: NextRequest) {
 
     let streetViewAvailable = false
     try {
-      const metadataResponse = await fetch(streetViewMetadataUrl)
-      const metadataData = await metadataResponse.json()
-      streetViewAvailable = metadataData.status === "OK"
+      const metadataResponse = await fetch(streetViewMetadataUrl, {
+        headers: {
+          "User-Agent": "MySolarAI/1.0",
+        },
+      })
+
+      if (metadataResponse.ok) {
+        const metadataData = await metadataResponse.json()
+        streetViewAvailable = metadataData.status === "OK"
+      }
     } catch (error) {
       console.warn("Failed to check street view availability:", error)
     }

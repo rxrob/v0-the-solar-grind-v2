@@ -32,13 +32,28 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("Database error:", error)
-      return NextResponse.json({ error: "Failed to fetch calculations" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Failed to fetch calculations",
+          details: error.message,
+        },
+        { status: 500 },
+      )
     }
 
-    return NextResponse.json({ calculations: data || [] })
+    return NextResponse.json({
+      calculations: data || [],
+      count: data?.length || 0,
+    })
   } catch (error) {
     console.error("API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
 
@@ -47,16 +62,45 @@ export async function POST(request: NextRequest) {
     const supabase = createSupabaseClient()
     const body = await request.json()
 
-    const { data, error } = await supabase.from("solar_calculations").insert([body]).select()
+    if (!body.user_id) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from("solar_calculations")
+      .insert([
+        {
+          ...body,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ])
+      .select()
 
     if (error) {
       console.error("Database error:", error)
-      return NextResponse.json({ error: "Failed to save calculation" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Failed to save calculation",
+          details: error.message,
+        },
+        { status: 500 },
+      )
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: "No data returned from insert" }, { status: 500 })
     }
 
     return NextResponse.json({ calculation: data[0] })
   } catch (error) {
     console.error("API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

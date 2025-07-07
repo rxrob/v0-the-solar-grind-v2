@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { BasicSolarCalculator } from "@/components/basic-solar-calculator"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -5,16 +6,25 @@ import { Badge } from "@/components/ui/badge"
 import { Crown, Zap, FileText, Users, TrendingUp, MapPin } from "lucide-react"
 import Link from "next/link"
 
+// Force static generation for better performance
+export const dynamic = "force-static"
+export const revalidate = 1800 // Revalidate every 30 minutes
+
+export const metadata: Metadata = {
+  title: "Solar Calculator - Free Solar Analysis Tool",
+  description:
+    "Calculate your solar potential with our free solar calculator. Get instant estimates for solar panel costs, savings, and payback period.",
+}
+
 export default function CalculatorPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Solar Calculator</h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Get instant solar estimates for any property. Enter basic information to see potential savings and system
-            requirements.
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Free Solar Calculator</h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Get instant estimates for your solar potential. Enter your location and energy usage to see how much you
+            could save with solar panels.
           </p>
         </div>
 

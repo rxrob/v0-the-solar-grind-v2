@@ -6,7 +6,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Calculator, Crown, FileText, AlertCircle, Clock } from "lucide-react"
+import { CheckCircle, Calculator, Crown, FileText, AlertCircle, Clock, Loader2 } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
 interface PaymentFlow {
   mode: string
@@ -88,7 +89,17 @@ export default function SuccessPage() {
         console.log("   - Calling API: /api/verify-session")
         console.log("   - Session ID:", sessionId)
 
-        const response = await fetch(`/api/verify-session?session_id=${sessionId}`)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+        const response = await fetch(`/api/verify-session?session_id=${sessionId}`, {
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        clearTimeout(timeoutId)
 
         console.log("📡 API Response:")
         console.log("   - Status:", response.status)
@@ -96,10 +107,10 @@ export default function SuccessPage() {
         console.log("   - Headers:", Object.fromEntries(response.headers.entries()))
 
         if (!response.ok) {
-          const errorData = await response.json()
+          const errorData = await response.json().catch(() => ({ error: "Failed to parse error response" }))
           console.error("❌ Verification failed:")
           console.error("   - Error Data:", errorData)
-          throw new Error(errorData.error || "Failed to verify session")
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
         }
 
         const data = await response.json()
@@ -192,12 +203,29 @@ export default function SuccessPage() {
         }
 
         setSessionData(data)
+
+        // Show success toast
+        toast({
+          title: "Payment Successful!",
+          description: data.payment_flow?.is_one_time
+            ? "Your single report access is ready"
+            : "Welcome to Solar Grind Pro!",
+        })
       } catch (error) {
         console.error("💥 Error verifying session:")
         console.error("   - Error Type:", error instanceof Error ? error.constructor.name : typeof error)
         console.error("   - Error Message:", error instanceof Error ? error.message : String(error))
         console.error("   - Stack Trace:", error instanceof Error ? error.stack : "No stack trace")
-        setError(error instanceof Error ? error.message : "Unknown error")
+
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+        setError(errorMessage)
+
+        // Show error toast
+        toast({
+          title: "Payment Verification Failed",
+          description: errorMessage,
+          variant: "destructive",
+        })
       } finally {
         setLoading(false)
         console.log("🏁 Session verification process completed")
@@ -212,9 +240,9 @@ export default function SuccessPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Verifying your payment...</p>
-          <p className="text-sm text-gray-500 mt-2">Session ID: {sessionId?.slice(-8)}</p>
+          <Loader2 className="h-12 w-12 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-gray-600 mb-2">Verifying your payment...</p>
+          <p className="text-sm text-gray-500">Session ID: {sessionId?.slice(-8)}</p>
         </div>
       </div>
     )

@@ -8,12 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { MapPin, Settings, Eye, Camera, Zap, ArrowLeft } from "lucide-react"
+import { VisualRoofAnalysis } from "@/components/visual-roof-analysis"
 import { AddressAutocomplete } from "@/components/address-autocomplete"
 import Link from "next/link"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
-import { VisualAnalysisClient } from "@/components/visual-analysis-client"
 
 const presetLocations = [
   { name: "San Francisco, CA", lat: 37.7749, lng: -122.4194, address: "San Francisco, CA" },
@@ -23,31 +20,7 @@ const presetLocations = [
   { name: "Miami, FL", lat: 25.7617, lng: -80.1918, address: "Miami, FL" },
 ]
 
-export default async function VisualAnalysisPage() {
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies },
-  )
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_pro, subscription_status")
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  if (!profile?.is_pro || profile?.subscription_status !== "active") {
-    redirect("/pricing")
-  }
-
+export function VisualAnalysisClient() {
   const [address, setAddress] = useState("")
   const [coordinates, setCoordinates] = useState({ lat: 37.7749, lng: -122.4194 })
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -192,7 +165,7 @@ export default async function VisualAnalysisPage() {
         </Card>
 
         {/* Visual Analysis Component */}
-        <VisualAnalysisClient key={analysisKey} address={address} coordinates={coordinates} />
+        <VisualRoofAnalysis key={analysisKey} address={address} coordinates={coordinates} />
       </div>
     </div>
   )

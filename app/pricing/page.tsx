@@ -1,8 +1,19 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Star } from "lucide-react"
+
+// Static page optimization
+export const dynamic = "force-static"
+export const revalidate = 3600 // Revalidate every hour
+
+export const metadata: Metadata = {
+  title: "Pricing - Solar Calculator Pro",
+  description:
+    "Choose the perfect plan for your solar analysis needs. Free basic calculations or Pro features with advanced analytics.",
+}
 
 export default function PricingPage() {
   return (

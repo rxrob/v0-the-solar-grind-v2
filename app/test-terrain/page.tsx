@@ -8,7 +8,19 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/hooks/use-toast"
-import { MapPin, Loader2, CheckCircle, Sun, Home, Zap, Cloud, ArrowLeft, Shield, Calculator } from "lucide-react"
+import {
+  MapPin,
+  Loader2,
+  CheckCircle,
+  Sun,
+  Home,
+  Zap,
+  Cloud,
+  ArrowLeft,
+  Shield,
+  Calculator,
+  AlertCircle,
+} from "lucide-react"
 import Link from "next/link"
 
 interface Coordinates {
@@ -48,12 +60,9 @@ export default function TestTerrainPage() {
   const [elevation, setElevation] = useState<number | null>(null)
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
   const [visualAnalysisResults, setVisualAnalysisResults] = useState<VisualAnalysisResult | null>(null)
-  const [isLoadingVisual, setIsLoadingVisual] = useState(false)
   const [climateData, setClimateData] = useState<ClimateData | null>(null)
-  const [isLoadingClimate, setIsLoadingClimate] = useState(false)
   const [climateDataComplete, setClimateDataComplete] = useState(false)
   const [systemSizingResults, setSystemSizingResults] = useState<SystemSizingResult | null>(null)
-  const [isLoadingSystemSizing, setIsLoadingSystemSizing] = useState(false)
   const [systemSizingComplete, setSystemSizingComplete] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -70,26 +79,40 @@ export default function TestTerrainPage() {
     }
 
     setIsLoadingAddress(true)
+    setError("")
 
     try {
-      // Simulate geocoding API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Call geocoding API
+      const response = await fetch(`/api/geocoding?address=${encodeURIComponent(address)}`)
 
-      // Mock coordinates for demonstration
-      const mockCoordinates = {
-        lat: 40.7128 + (Math.random() - 0.5) * 0.1,
-        lng: -74.006 + (Math.random() - 0.5) * 0.1,
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Failed to geocode address" }))
+        throw new Error(errorData.error || `Geocoding failed: ${response.status}`)
       }
 
-      setCoordinates(`${mockCoordinates.lat},${mockCoordinates.lng}`)
+      const data = await response.json()
+
+      if (!data.success || !data.results || data.results.length === 0) {
+        throw new Error("No results found for the provided address")
+      }
+
+      const result = data.results[0]
+      const { lat, lng } = result.geometry.location
+
+      setCoordinates(`${lat},${lng}`)
+
       toast({
         title: "Address Validated",
-        description: `Successfully geocoded: ${address}`,
+        description: `Successfully geocoded: ${result.formatted_address}`,
       })
     } catch (error) {
+      console.error("Geocoding error:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to validate address"
+      setError(errorMessage)
+
       toast({
         title: "Geocoding Failed",
-        description: "Unable to validate address. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -110,15 +133,35 @@ export default function TestTerrainPage() {
       }
 
       const response = await fetch(`/api/elevation?lat=${lat}&lng=${lng}`)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Failed to fetch elevation" }))
+        throw new Error(errorData.error || `Elevation API failed: ${response.status}`)
+      }
+
       const data = await response.json()
 
-      if (data.results && data.results.length > 0) {
-        setElevation(data.results[0].elevation)
-      } else {
-        throw new Error("No elevation data found")
+      if (!data.success || !data.results || data.results.length === 0) {
+        throw new Error("No elevation data found for the specified coordinates")
       }
+
+      const elevationData = data.results[0]
+      setElevation(elevationData.elevation)
+
+      toast({
+        title: "Elevation Retrieved",
+        description: `Elevation: ${elevationData.elevation.toFixed(2)}m (${elevationData.elevation_feet.toFixed(2)}ft)`,
+      })
     } catch (err: any) {
-      setError(err.message || "Failed to fetch elevation data")
+      console.error("Elevation error:", err)
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch elevation data"
+      setError(errorMessage)
+
+      toast({
+        title: "Elevation Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
@@ -226,6 +269,16 @@ export default function TestTerrainPage() {
                 </div>
               </div>
             )}
+
+            {error && (
+              <div className="mt-4 p-4 bg-red-800/20 border border-red-600/50 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                  <span className="font-semibold text-red-400">Error</span>
+                </div>
+                <p className="text-red-300 mt-1">{error}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -247,26 +300,27 @@ export default function TestTerrainPage() {
                   value={coordinates}
                   onChange={(e) => setCoordinates(e.target.value)}
                   placeholder="40.7589,-111.8883"
+                  className="bg-gray-700 border-gray-600 text-white"
                 />
               </div>
 
               <Button onClick={testElevation} disabled={loading}>
-                {loading ? "Testing..." : "Test Elevation API"}
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  "Test Elevation API"
+                )}
               </Button>
 
               {elevation !== null && (
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <h3 className="font-semibold text-green-800">Elevation Data</h3>
-                  <p className="text-green-700">
+                <div className="p-4 bg-green-800/20 border border-green-600/50 rounded-lg">
+                  <h3 className="font-semibold text-green-400 mb-2">Elevation Data</h3>
+                  <p className="text-green-300">
                     Elevation: {elevation.toFixed(2)} meters ({(elevation * 3.28084).toFixed(2)} feet)
                   </p>
-                </div>
-              )}
-
-              {error && (
-                <div className="p-4 bg-red-50 rounded-lg">
-                  <h3 className="font-semibold text-red-800">Error</h3>
-                  <p className="text-red-700">{error}</p>
                 </div>
               )}
 

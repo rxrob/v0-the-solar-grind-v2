@@ -1,330 +1,203 @@
-"use client"
-
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Eye, MapPin, Compass } from "lucide-react"
-import { AddressAutocomplete } from "@/components/address-autocomplete"
-import Image from "next/image"
+import { Crown, Calculator, Zap, FileText, TrendingUp, Shield } from "lucide-react"
+import Link from "next/link"
 
-interface ImageStatus {
-  loading: boolean
-  loaded: boolean
-  error: string | null
-  url: string | null
-  apiUrl?: string
-}
+export default async function TestProCalculatorPage() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: () => cookieStore },
+  )
 
-export default function TestProCalculatorPage() {
-  const [selectedAddress, setSelectedAddress] = useState("")
-  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null)
-  const [placeId, setPlaceId] = useState("")
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  const [roofImage, setRoofImage] = useState<ImageStatus>({
-    loading: false,
-    loaded: false,
-    error: null,
-    url: null,
-  })
-
-  const [streetViews, setStreetViews] = useState<Record<string, ImageStatus>>({
-    north: { loading: false, loaded: false, error: null, url: null },
-    east: { loading: false, loaded: false, error: null, url: null },
-    south: { loading: false, loaded: false, error: null, url: null },
-    west: { loading: false, loaded: false, error: null, url: null },
-  })
-
-  const handleAddressSelect = (address: string, coords: { lat: number; lng: number }, placeIdValue: string) => {
-    setSelectedAddress(address)
-    setCoordinates(coords)
-    setPlaceId(placeIdValue)
-    console.log("🏠 Address selected:", { address, coords, placeIdValue })
+  if (!user) {
+    redirect("/login")
   }
 
-  const loadPropertyImages = async () => {
-    if (!coordinates) {
-      console.error("No coordinates available")
-      return
-    }
+  const { data: profile } = await supabase
+    .from("users")
+    .select("subscription_type, subscription_status")
+    .eq("id", user.id)
+    .maybeSingle()
 
-    // Load roof close-up
-    setRoofImage({ loading: true, loaded: false, error: null, url: null })
+  const isPro = profile?.subscription_type === "pro" && profile?.subscription_status === "active"
 
-    try {
-      const roofApiUrl = `/api/aerial-view?lat=${coordinates.lat}&lng=${coordinates.lng}&zoom=21&size=640x640`
-      const roofResponse = await fetch(roofApiUrl)
-
-      if (roofResponse.ok) {
-        const roofBlob = await roofResponse.blob()
-        const roofUrl = URL.createObjectURL(roofBlob)
-        setRoofImage({ loading: false, loaded: true, error: null, url: roofUrl, apiUrl: roofApiUrl })
-      } else {
-        setRoofImage({ loading: false, loaded: false, error: "Failed to load roof image", url: null })
-      }
-    } catch (error) {
-      setRoofImage({
-        loading: false,
-        loaded: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-        url: null,
-      })
-    }
-
-    // Load street views from 4 directions
-    const directions = [
-      { key: "north", heading: 0, name: "North View" },
-      { key: "east", heading: 90, name: "East View" },
-      { key: "south", heading: 180, name: "South View" },
-      { key: "west", heading: 270, name: "West View" },
-    ]
-
-    for (const direction of directions) {
-      setStreetViews((prev) => ({
-        ...prev,
-        [direction.key]: { loading: true, loaded: false, error: null, url: null },
-      }))
-
-      try {
-        const streetApiUrl = `/api/street-view?lat=${coordinates.lat}&lng=${coordinates.lng}&heading=${direction.heading}&pitch=10&fov=90&size=400x300`
-        const streetResponse = await fetch(streetApiUrl)
-
-        if (streetResponse.ok) {
-          const streetBlob = await streetResponse.blob()
-          const streetUrl = URL.createObjectURL(streetBlob)
-          setStreetViews((prev) => ({
-            ...prev,
-            [direction.key]: { loading: false, loaded: true, error: null, url: streetUrl, apiUrl: streetApiUrl },
-          }))
-        } else {
-          setStreetViews((prev) => ({
-            ...prev,
-            [direction.key]: { loading: false, loaded: false, error: "Failed to load street view", url: null },
-          }))
-        }
-      } catch (error) {
-        setStreetViews((prev) => ({
-          ...prev,
-          [direction.key]: {
-            loading: false,
-            loaded: false,
-            error: error instanceof Error ? error.message : "Unknown error",
-            url: null,
-          },
-        }))
-      }
-    }
-  }
-
-  const getStatusBadge = (status: ImageStatus) => {
-    if (status.loading) return <Badge variant="secondary">Loading...</Badge>
-    if (status.loaded) return <Badge className="bg-green-500">Loaded</Badge>
-    if (status.error) return <Badge variant="destructive">Error</Badge>
-    return <Badge variant="outline">Not Loaded</Badge>
+  if (!isPro) {
+    redirect("/pricing")
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      <div className="space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-6">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">Pro Solar Calculator Test</h1>
-          <p className="text-gray-600">Test Google Maps integration and property image loading</p>
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center gap-2">
+            <Crown className="h-8 w-8 text-yellow-500" />
+            <h1 className="text-4xl font-bold text-gray-900">Pro Calculator Suite</h1>
+            <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">PRO ACCESS</Badge>
+          </div>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            Advanced solar analysis tools powered by AI and satellite data for professional-grade results.
+          </p>
         </div>
 
-        {/* Address Input */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Property Address</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AddressAutocomplete
-              onAddressSelect={handleAddressSelect}
-              placeholder="Enter property address (e.g., 1600 Amphitheatre Parkway, Mountain View, CA)"
-              label="Property Address"
-            />
-          </CardContent>
-        </Card>
-
-        {/* Selected Address Details */}
-        {selectedAddress && coordinates && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-blue-600" />
-              Selected Property Details
-            </h3>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card className="bg-white">
-                <CardContent className="pt-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-blue-700">Address</p>
-                    <p className="text-sm text-gray-900 break-all">{selectedAddress}</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white">
-                <CardContent className="pt-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-blue-700">Coordinates</p>
-                    <p className="text-sm text-gray-900 font-mono">
-                      {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white">
-                <CardContent className="pt-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-blue-700">Place ID</p>
-                    <p className="text-sm text-gray-900 font-mono break-all">{placeId}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {/* Load Images Button */}
-        {coordinates && (
-          <div className="flex justify-center">
-            <Button onClick={loadPropertyImages} size="lg" className="bg-blue-600 hover:bg-blue-700">
-              <Eye className="h-5 w-5 mr-2" />
-              Load 5 Property Images
-            </Button>
-          </div>
-        )}
-
-        {/* Roof Close-up */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Roof Close-up (Eagle View)
-              </CardTitle>
-              {getStatusBadge(roofImage)}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {roofImage.url ? (
-              <div className="space-y-4">
-                <div className="relative w-full max-w-2xl mx-auto">
-                  <Image
-                    src={roofImage.url || "/placeholder.svg"}
-                    alt="Roof close-up view"
-                    width={640}
-                    height={640}
-                    className="w-full h-auto rounded-lg border"
-                  />
-                </div>
-                {process.env.NODE_ENV === "development" && roofImage.apiUrl && (
-                  <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                    <p className="font-mono break-all">API URL: {roofImage.apiUrl}</p>
-                  </div>
-                )}
-              </div>
-            ) : roofImage.loading ? (
-              <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <p className="text-gray-600">Loading roof view...</p>
-                </div>
-              </div>
-            ) : roofImage.error ? (
-              <div className="w-full h-64 bg-red-50 rounded-lg flex items-center justify-center">
-                <p className="text-red-600">Error: {roofImage.error}</p>
-              </div>
-            ) : (
-              <div className="w-full h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-                <p className="text-gray-500">Click "Load 5 Property Images" to view roof</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Street Views Grid */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Compass className="h-5 w-5" />
-              Directional Street Views (Shading Analysis)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { key: "north", name: "North View (0°)", description: "View from north side" },
-                { key: "east", name: "East View (90°)", description: "Morning sun direction" },
-                { key: "south", name: "South View (180°)", description: "Peak sun direction" },
-                { key: "west", name: "West View (270°)", description: "Evening sun direction" },
-              ].map((direction) => {
-                const status = streetViews[direction.key]
-                return (
-                  <div key={direction.key} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">{direction.name}</h4>
-                      {getStatusBadge(status)}
-                    </div>
-                    <p className="text-sm text-gray-600">{direction.description}</p>
-                    {status.url ? (
-                      <div className="space-y-2">
-                        <Image
-                          src={status.url || "/placeholder.svg"}
-                          alt={direction.name}
-                          width={400}
-                          height={300}
-                          className="w-full h-auto rounded-lg border"
-                        />
-                        {process.env.NODE_ENV === "development" && status.apiUrl && (
-                          <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                            <p className="font-mono break-all">API URL: {status.apiUrl}</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : status.loading ? (
-                      <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                          <p className="text-sm text-gray-600">Loading...</p>
-                        </div>
-                      </div>
-                    ) : status.error ? (
-                      <div className="w-full h-48 bg-red-50 rounded-lg flex items-center justify-center">
-                        <p className="text-sm text-red-600">Error: {status.error}</p>
-                      </div>
-                    ) : (
-                      <div className="w-full h-48 bg-gray-50 rounded-lg flex items-center justify-center">
-                        <p className="text-sm text-gray-500">Not loaded</p>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Debug Information */}
-        {process.env.NODE_ENV === "development" && (
-          <Card>
+        {/* Pro Features Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Smart Analysis */}
+          <Card className="border-2 border-blue-200 hover:border-blue-300 transition-colors">
             <CardHeader>
-              <CardTitle>Debug Information</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-6 w-6 text-blue-600" />
+                Smart Solar Analysis
+              </CardTitle>
+              <CardDescription>AI-powered comprehensive analysis with multiple data sources</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm font-mono">
-                <p>Google Maps Ready: {typeof window !== "undefined" && window.googleMapsReady ? "✅ Yes" : "❌ No"}</p>
-                <p>Google Object Available: {typeof window !== "undefined" && window.google ? "✅ Yes" : "❌ No"}</p>
-                <p>
-                  Places API Available:{" "}
-                  {typeof window !== "undefined" && window.google?.maps?.places ? "✅ Yes" : "❌ No"}
-                </p>
-                <p>Selected Address: {selectedAddress || "None"}</p>
-                <p>Coordinates: {coordinates ? `${coordinates.lat}, ${coordinates.lng}` : "None"}</p>
-                <p>Place ID: {placeId || "None"}</p>
-              </div>
+            <CardContent className="space-y-4">
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Satellite imagery analysis
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Shading analysis
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Weather pattern integration
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Custom equipment recommendations
+                </li>
+              </ul>
+              <Button asChild className="w-full bg-blue-600 hover:bg-blue-700">
+                <Link href="/pro-calculator">
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Launch Calculator
+                </Link>
+              </Button>
             </CardContent>
           </Card>
-        )}
+
+          {/* Visual Analysis */}
+          <Card className="border-2 border-green-200 hover:border-green-300 transition-colors">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-6 w-6 text-green-600" />
+                Visual Roof Analysis
+              </CardTitle>
+              <CardDescription>3D roof modeling and panel placement optimization</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  3D roof reconstruction
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Optimal panel placement
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Obstruction detection
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Production heatmaps
+                </li>
+              </ul>
+              <Button asChild className="w-full bg-green-600 hover:bg-green-700">
+                <Link href="/visual-analysis">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Start Analysis
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Professional Reports */}
+          <Card className="border-2 border-purple-200 hover:border-purple-300 transition-colors">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-6 w-6 text-purple-600" />
+                Professional Reports
+              </CardTitle>
+              <CardDescription>Detailed PDF reports for clients and stakeholders</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Branded PDF reports
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Financial projections
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Environmental impact
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Equipment specifications
+                </li>
+              </ul>
+              <Button asChild className="w-full bg-purple-600 hover:bg-purple-700">
+                <Link href="/reports">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Generate Report
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Pro Dashboard Access */}
+        <Card className="bg-gradient-to-r from-blue-600 to-green-600 text-white">
+          <CardContent className="p-8">
+            <div className="text-center space-y-4">
+              <TrendingUp className="h-12 w-12 mx-auto" />
+              <h2 className="text-2xl font-bold">Pro Dashboard</h2>
+              <p className="text-blue-100 max-w-2xl mx-auto">
+                Access your complete project history, client management tools, and advanced analytics.
+              </p>
+              <Button asChild size="lg" variant="secondary">
+                <Link href="/dashboard/pro">View Pro Dashboard</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* User Info */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Email</p>
+                <p className="font-medium">{user.email}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Subscription</p>
+                <Badge className="bg-green-100 text-green-800">Pro Active</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

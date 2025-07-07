@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,49 +18,61 @@ interface Report {
   status: "generated" | "pending" | "error"
 }
 
-export default function ReportsPage() {
-  const [reports, setReports] = useState<Report[]>([])
-  const [loading, setLoading] = useState(true)
+export default async function ProReportsPage() {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies },
+  )
 
-  useEffect(() => {
-    fetchReports()
-  }, [])
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  const fetchReports = async () => {
-    // Simulate API call
-    setTimeout(() => {
-      setReports([
-        {
-          id: "1",
-          title: "Solar Analysis Report - Smith Residence",
-          client: "John Smith",
-          location: "Los Angeles, CA",
-          systemSize: 8.5,
-          createdAt: "2024-01-15",
-          status: "generated",
-        },
-        {
-          id: "2",
-          title: "Solar Proposal - Johnson Home",
-          client: "Sarah Johnson",
-          location: "Phoenix, AZ",
-          systemSize: 6.8,
-          createdAt: "2024-01-10",
-          status: "generated",
-        },
-        {
-          id: "3",
-          title: "Commercial Solar Study - Brown Corp",
-          client: "Brown Corporation",
-          location: "San Diego, CA",
-          systemSize: 45.2,
-          createdAt: "2024-01-05",
-          status: "pending",
-        },
-      ])
-      setLoading(false)
-    }, 1000)
+  if (!user) {
+    redirect("/login")
   }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_pro, subscription_status")
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (!profile?.is_pro || profile?.subscription_status !== "active") {
+    redirect("/pricing")
+  }
+
+  // Mock data - in production, fetch from database
+  const reports: Report[] = [
+    {
+      id: "1",
+      title: "Solar Analysis Report - Smith Residence",
+      client: "John Smith",
+      location: "Los Angeles, CA",
+      systemSize: 8.5,
+      createdAt: "2024-01-15",
+      status: "generated",
+    },
+    {
+      id: "2",
+      title: "Solar Proposal - Johnson Home",
+      client: "Sarah Johnson",
+      location: "Phoenix, AZ",
+      systemSize: 6.8,
+      createdAt: "2024-01-10",
+      status: "generated",
+    },
+    {
+      id: "3",
+      title: "Commercial Solar Study - Brown Corp",
+      client: "Brown Corporation",
+      location: "San Diego, CA",
+      systemSize: 45.2,
+      createdAt: "2024-01-05",
+      status: "pending",
+    },
+  ]
 
   const handleDownload = (reportId: string) => {
     // Simulate download
@@ -78,10 +92,6 @@ export default function ReportsPage() {
     } as const
 
     return <Badge variant={variants[status as keyof typeof variants]}>{status}</Badge>
-  }
-
-  if (loading) {
-    return <div>Loading reports...</div>
   }
 
   return (

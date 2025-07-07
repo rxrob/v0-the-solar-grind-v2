@@ -1,369 +1,242 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { headers } from "next/headers"
 import Stripe from "stripe"
-import { createClient } from "@supabase/supabase-js"
+import { createServiceSupabaseClient } from "@/lib/supabase"
+import { NextResponse } from "next/server"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-06-30.basil",
+  apiVersion: "2024-06-20",
 })
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const body = await req.text()
-    const signature = req.headers.get("stripe-signature")!
+    const headersList = await headers()
+    const sig = headersList.get("stripe-signature") as string
 
     let event: Stripe.Event
 
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+      event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
     } catch (err: any) {
       console.error("❌ Webhook signature verification failed:", err.message)
-      return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
+      return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 })
     }
 
-    console.log(`🔔 Received webhook: ${event.type}`)
+    console.log("✅ Received webhook event:", event.type)
+
+    const supabase = createServiceSupabaseClient()
 
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session
-        await handleCheckoutSessionCompleted(session)
-        break
-      }
+        console.log("💳 Processing checkout session:", session.id)
 
-      case "customer.subscription.created": {
-        const subscription = event.data.object as Stripe.Subscription
-        await handleSubscriptionCreated(subscription)
-        break
-      }
+        const userEmail = session.customer_email
+        const customerId = session.customer as string
+        const subscriptionId = session.subscription as string
+        const metadata = session.metadata
 
-      case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription
-        await handleSubscriptionUpdated(subscription)
-        break
-      }
-
-      case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription
-        await handleSubscriptionDeleted(subscription)
-        break
-      }
-
-      case "invoice.payment_succeeded": {
-        const invoice = event.data.object as Stripe.Invoice
-        await handleInvoicePaymentSucceeded(invoice)
-        break
-      }
-
-      case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice
-        await handleInvoicePaymentFailed(invoice)
-        break
-      }
-
-      default:
-        console.log(`🤷‍♀️ Unhandled event type: ${event.type}`)
-    }
-
-    return NextResponse.json({ received: true })
-  } catch (error) {
-    console.error("❌ Webhook error:", error)
-    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 })
-  }
-}
-
-async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  try {
-    console.log("🛒 Processing checkout session completed:", session.id)
-
-    const customerEmail = session.customer_email
-    const customerId = session.customer as string
-    const metadata = session.metadata || {}
-
-    // Handle subscription checkout
-    if (session.mode === "subscription") {
-      if (customerEmail) {
-        const { data: user, error } = await supabase.from("users").select("*").eq("email", customerEmail).single()
-
-        if (error) {
-          console.error("❌ Error finding user by email:", error)
-          return
+        if (!userEmail) {
+          console.error("❌ No customer email in session")
+          break
         }
 
-        if (user) {
+        // Find user by email
+        const { data: user, error: userError } = await supabase
+          .from("users")
+          .select("id, subscription_type")
+          .eq("email", userEmail)
+          .maybeSingle()
+
+        if (userError) {
+          console.error("❌ Error finding user:", userError)
+          break
+        }
+
+        if (!user) {
+          console.error("❌ User not found for email:", userEmail)
+          break
+        }
+
+        // Check if this is a Pro subscription or single report purchase
+        if (subscriptionId) {
+          // Pro subscription
           const { error: updateError } = await supabase
             .from("users")
             .update({
               subscription_type: "pro",
-              stripe_customer_id: customerId,
               subscription_status: "active",
+              stripe_customer_id: customerId,
+              stripe_subscription_id: subscriptionId,
+              updated_at: new Date().toISOString(),
             })
             .eq("id", user.id)
 
           if (updateError) {
             console.error("❌ Error updating user subscription:", updateError)
           } else {
-            console.log(`✅ Upgraded user ${customerEmail} to PRO subscription`)
+            console.log("✅ User upgraded to Pro:", user.id)
           }
-        }
-      }
-    }
+        } else if (metadata?.product_type === "single_report") {
+          // Single report purchase
+          const reportsToAdd = Number.parseInt(metadata.quantity || "1", 10)
 
-    // Handle single report purchase
-    if (session.mode === "payment") {
-      const userId = metadata.user_id
-      const reportType = metadata.report_type || "single_report"
-
-      if (userId) {
-        const { data: user, error } = await supabase.from("users").select("*").eq("id", userId).single()
-
-        if (error) {
-          console.error("❌ Error finding user by ID:", error)
-          return
-        }
-
-        if (user) {
-          const currentReports = user.single_reports_purchased || 0
-          const { error: updateError } = await supabase
-            .from("users")
-            .update({
-              single_reports_purchased: currentReports + 1,
-              stripe_customer_id: customerId,
-            })
-            .eq("id", userId)
+          // Use raw SQL to increment the counter
+          const { error: updateError } = await supabase.rpc("increment_reports", {
+            user_id: user.id,
+            increment_amount: reportsToAdd,
+          })
 
           if (updateError) {
-            console.error("❌ Error updating user single reports:", updateError)
+            console.error("❌ Error adding report credits:", updateError)
+            // Fallback to regular update
+            const { data: currentUser } = await supabase
+              .from("users")
+              .select("single_reports_purchased")
+              .eq("id", user.id)
+              .single()
+
+            if (currentUser) {
+              await supabase
+                .from("users")
+                .update({
+                  single_reports_purchased: (currentUser.single_reports_purchased || 0) + reportsToAdd,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", user.id)
+            }
           } else {
-            console.log(`✅ Added single report to user ${userId}`)
+            console.log(`✅ Added ${reportsToAdd} report credits to user:`, user.id)
           }
         }
-      } else if (customerEmail) {
-        // Fallback to email-based lookup for legacy purchases
-        const { data: user, error } = await supabase.from("users").select("*").eq("email", customerEmail).single()
-
-        if (error) {
-          console.error("❌ Error finding user by email:", error)
-          return
-        }
-
-        if (user) {
-          const currentReports = user.single_reports_purchased || 0
-          const { error: updateError } = await supabase
-            .from("users")
-            .update({
-              single_reports_purchased: currentReports + 1,
-              stripe_customer_id: customerId,
-            })
-            .eq("id", user.id)
-
-          if (updateError) {
-            console.error("❌ Error updating user single reports:", updateError)
-          } else {
-            console.log(`✅ Added single report to user ${customerEmail}`)
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error("❌ Error handling checkout session completed:", error)
-  }
-}
-
-async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
-  try {
-    console.log("📝 Processing subscription created:", subscription.id)
-
-    const customerId = subscription.customer as string
-    const customer = await stripe.customers.retrieve(customerId)
-
-    if (customer.deleted) {
-      console.error("❌ Customer was deleted")
-      return
-    }
-
-    const customerEmail = customer.email
-
-    if (customerEmail) {
-      const { data: user, error } = await supabase.from("users").select("*").eq("email", customerEmail).single()
-
-      if (error) {
-        console.error("❌ Error finding user by email:", error)
-        return
+        break
       }
 
-      if (user) {
-        const { error: updateError } = await supabase
+      case "customer.subscription.created": {
+        const subscription = event.data.object as Stripe.Subscription
+        console.log("🔄 Subscription created:", subscription.id)
+
+        const customerId = subscription.customer as string
+
+        const { error } = await supabase
           .from("users")
           .update({
             subscription_type: "pro",
-            stripe_customer_id: customerId,
-            stripe_subscription_id: subscription.id,
-            subscription_status: subscription.status,
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-          })
-          .eq("id", user.id)
-
-        if (updateError) {
-          console.error("❌ Error updating user subscription:", updateError)
-        } else {
-          console.log(`✅ Created subscription for user ${customerEmail}`)
-        }
-      }
-    }
-  } catch (error) {
-    console.error("❌ Error handling subscription created:", error)
-  }
-}
-
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  try {
-    console.log("🔄 Processing subscription updated:", subscription.id)
-
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("stripe_subscription_id", subscription.id)
-      .single()
-
-    if (error) {
-      console.error("❌ Error finding user by subscription ID:", error)
-      return
-    }
-
-    if (user) {
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({
-          subscription_status: subscription.status,
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        })
-        .eq("id", user.id)
-
-      if (updateError) {
-        console.error("❌ Error updating user subscription:", updateError)
-      } else {
-        console.log(`✅ Updated subscription for user ${user.email}`)
-      }
-    }
-  } catch (error) {
-    console.error("❌ Error handling subscription updated:", error)
-  }
-}
-
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  try {
-    console.log("🗑️ Processing subscription deleted:", subscription.id)
-
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("stripe_subscription_id", subscription.id)
-      .single()
-
-    if (error) {
-      console.error("❌ Error finding user by subscription ID:", error)
-      return
-    }
-
-    if (user) {
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({
-          subscription_type: "free",
-          subscription_status: "canceled",
-          stripe_subscription_id: null,
-          current_period_end: null,
-        })
-        .eq("id", user.id)
-
-      if (updateError) {
-        console.error("❌ Error updating user subscription:", updateError)
-      } else {
-        console.log(`✅ Canceled subscription for user ${user.email}`)
-      }
-    }
-  } catch (error) {
-    console.error("❌ Error handling subscription deleted:", error)
-  }
-}
-
-async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-  try {
-    console.log("💰 Processing invoice payment succeeded:", invoice.id)
-
-    const customerId = invoice.customer as string
-    const subscriptionId = invoice.subscription as string
-
-    if (subscriptionId) {
-      const { data: user, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("stripe_subscription_id", subscriptionId)
-        .single()
-
-      if (error) {
-        console.error("❌ Error finding user by subscription ID:", error)
-        return
-      }
-
-      if (user) {
-        const { error: updateError } = await supabase
-          .from("users")
-          .update({
             subscription_status: "active",
+            stripe_subscription_id: subscription.id,
+            updated_at: new Date().toISOString(),
           })
-          .eq("id", user.id)
+          .eq("stripe_customer_id", customerId)
 
-        if (updateError) {
-          console.error("❌ Error updating user subscription status:", updateError)
+        if (error) {
+          console.error("❌ Error updating subscription:", error)
         } else {
-          console.log(`✅ Payment succeeded for user ${user.email}`)
+          console.log("✅ Subscription activated for customer:", customerId)
         }
-      }
-    }
-  } catch (error) {
-    console.error("❌ Error handling invoice payment succeeded:", error)
-  }
-}
-
-async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  try {
-    console.log("❌ Processing invoice payment failed:", invoice.id)
-
-    const customerId = invoice.customer as string
-    const subscriptionId = invoice.subscription as string
-
-    if (subscriptionId) {
-      const { data: user, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("stripe_subscription_id", subscriptionId)
-        .single()
-
-      if (error) {
-        console.error("❌ Error finding user by subscription ID:", error)
-        return
+        break
       }
 
-      if (user) {
-        const { error: updateError } = await supabase
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription
+        console.log("🔄 Subscription updated:", subscription.id)
+
+        const status =
+          subscription.status === "active"
+            ? "active"
+            : subscription.status === "canceled"
+              ? "canceled"
+              : subscription.status === "past_due"
+                ? "past_due"
+                : "inactive"
+
+        const { error } = await supabase
           .from("users")
           .update({
-            subscription_status: "past_due",
+            subscription_status: status,
+            updated_at: new Date().toISOString(),
           })
-          .eq("id", user.id)
+          .eq("stripe_subscription_id", subscription.id)
 
-        if (updateError) {
-          console.error("❌ Error updating user subscription status:", updateError)
+        if (error) {
+          console.error("❌ Error updating subscription status:", error)
         } else {
-          console.log(`⚠️ Payment failed for user ${user.email}`)
+          console.log("✅ Subscription status updated:", status)
         }
+        break
       }
+
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription
+        console.log("❌ Subscription canceled:", subscription.id)
+
+        const { error } = await supabase
+          .from("users")
+          .update({
+            subscription_type: "free",
+            subscription_status: "canceled",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("stripe_subscription_id", subscription.id)
+
+        if (error) {
+          console.error("❌ Error canceling subscription:", error)
+        } else {
+          console.log("✅ Subscription canceled for:", subscription.id)
+        }
+        break
+      }
+
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as Stripe.Invoice
+        console.log("💰 Payment succeeded for invoice:", invoice.id)
+
+        if (invoice.subscription) {
+          const { error } = await supabase
+            .from("users")
+            .update({
+              subscription_status: "active",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("stripe_subscription_id", invoice.subscription)
+
+          if (error) {
+            console.error("❌ Error reactivating subscription:", error)
+          } else {
+            console.log("✅ Subscription reactivated after payment")
+          }
+        }
+        break
+      }
+
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice
+        console.log("💸 Payment failed for invoice:", invoice.id)
+
+        if (invoice.subscription) {
+          const { error } = await supabase
+            .from("users")
+            .update({
+              subscription_status: "past_due",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("stripe_subscription_id", invoice.subscription)
+
+          if (error) {
+            console.error("❌ Error marking subscription past due:", error)
+          } else {
+            console.log("⚠️ Subscription marked as past due")
+          }
+        }
+        break
+      }
+
+      default:
+        console.log("ℹ️ Unhandled event type:", event.type)
     }
+
+    return NextResponse.json({ received: true }, { status: 200 })
   } catch (error) {
-    console.error("❌ Error handling invoice payment failed:", error)
+    console.error("❌ Webhook processing error:", error)
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 })
   }
 }
