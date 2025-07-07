@@ -687,6 +687,11 @@ export function generateEnhancedSolarReport(data: EnhancedReportData): string {
                         `
                             : ""
                         }
+                        <tr>
+                            <td><strong>Electricity Rate</strong></td>
+                            <td>$${electricityRate}/kWh</td>
+                            <td>Current average rate</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -695,97 +700,117 @@ export function generateEnhancedSolarReport(data: EnhancedReportData): string {
               propertyDetails
                 ? `
             <div class="section">
-                <h2>Site Assessment</h2>
-                <div class="performance-section">
-                    <div class="section-title">Property Analysis</div>
-                    <div class="metrics-grid">
-                        ${
-                          propertyDetails.sqft
-                            ? `
-                        <div class="metric-card">
-                            <div class="metric-value">${propertyDetails.sqft.toLocaleString()}</div>
-                            <div class="metric-label">Property Size (sq ft)</div>
-                            <div class="metric-description">Total property square footage</div>
-                        </div>
-                        `
-                            : ""
-                        }
-                        ${
-                          propertyDetails.residents
-                            ? `
-                        <div class="metric-card">
-                            <div class="metric-value">${propertyDetails.residents}</div>
-                            <div class="metric-label">Residents</div>
-                            <div class="metric-description">Number of people in household</div>
-                        </div>
-                        `
-                            : ""
-                        }
-                        ${
-                          propertyDetails.roofType
-                            ? `
-                        <div class="metric-card">
-                            <div class="metric-value">${propertyDetails.roofType.replace("_", " ").toUpperCase()}</div>
-                            <div class="metric-label">Roof Type</div>
-                            <div class="metric-description">Roof material and structure</div>
-                        </div>
-                        `
-                            : ""
-                        }
-                        ${
-                          propertyDetails.roofCondition
-                            ? `
-                        <div class="metric-card">
-                            <div class="metric-value">${propertyDetails.roofCondition.toUpperCase()}</div>
-                            <div class="metric-label">Roof Condition</div>
-                            <div class="metric-description">Current roof state assessment</div>
-                        </div>
-                        `
-                            : ""
-                        }
-                        ${
-                          propertyDetails.shadingLevel
-                            ? `
-                        <div class="metric-card">
-                            <div class="metric-value">${propertyDetails.shadingLevel.toUpperCase()}</div>
-                            <div class="metric-label">Shading Level</div>
-                            <div class="metric-description">Site shading analysis</div>
-                        </div>
-                        `
-                            : ""
-                        }
-                        ${
-                          propertyDetails.roofAge
-                            ? `
-                        <div class="metric-card">
-                            <div class="metric-value">${propertyDetails.roofAge}</div>
-                            <div class="metric-label">Roof Age</div>
-                            <div class="metric-description">Years since roof installation</div>
-                        </div>
-                        `
-                            : ""
-                        }
+                <h2>Property Assessment</h2>
+                <div class="metrics-grid">
+                    ${
+                      propertyDetails.sqft
+                        ? `
+                    <div class="metric-card">
+                        <div class="metric-value">${propertyDetails.sqft.toLocaleString()}</div>
+                        <div class="metric-label">Property Size (sq ft)</div>
+                        <div class="metric-description">Total property square footage</div>
                     </div>
-                    
-                    <div class="section-title" style="margin-top: 30px;">Additional Considerations</div>
-                    <div class="metrics-grid">
-                        <div class="metric-card">
-                            <div class="metric-value">${hasPool ? "YES" : "NO"}</div>
-                            <div class="metric-label">Swimming Pool</div>
-                            <div class="metric-description">Pool equipment increases energy usage</div>
+                    `
+                        : ""
+                    }
+                    ${
+                      propertyDetails.residents
+                        ? `
+                    <div class="metric-card">
+                        <div class="metric-value">${propertyDetails.residents}</div>
+                        <div class="metric-label">Residents</div>
+                        <div class="metric-description">Number of people in household</div>
+                    </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      propertyDetails.roofType
+                        ? `
+                    <div class="metric-card">
+                        <div class="metric-value">${propertyDetails.roofType}</div>
+                        <div class="metric-label">Roof Type</div>
+                        <div class="metric-description">Roof material and structure</div>
+                    </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      propertyDetails.roofCondition
+                        ? `
+                    <div class="metric-card">
+                        <div class="metric-value">${propertyDetails.roofCondition}</div>
+                        <div class="metric-label">Roof Condition</div>
+                        <div class="metric-description">Current roof condition assessment</div>
+                    </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      propertyDetails.shadingLevel
+                        ? `
+                    <div class="metric-card">
+                        <div class="metric-value">${propertyDetails.shadingLevel}</div>
+                        <div class="metric-label">Shading Level</div>
+                        <div class="metric-description">Amount of shade on roof area</div>
+                    </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      propertyDetails.roofAge
+                        ? `
+                    <div class="metric-card">
+                        <div class="metric-value">${propertyDetails.roofAge}</div>
+                        <div class="metric-label">Roof Age</div>
+                        <div class="metric-description">Approximate age of current roof</div>
+                    </div>
+                    `
+                        : ""
+                    }
+                </div>
+                
+                ${
+                  hasPool || hasEV || planningAdditions
+                    ? `
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">Additional Considerations</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        ${
+                          hasPool
+                            ? `
+                        <div style="background: #e3f2fd; padding: 15px; border-radius: 10px; border-left: 4px solid #2196f3;">
+                            <strong>Pool Present</strong><br>
+                            <small>Additional energy usage considered in sizing</small>
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-value">${hasEV ? "YES" : "NO"}</div>
-                            <div class="metric-label">Electric Vehicle</div>
-                            <div class="metric-description">EV charging impacts system sizing</div>
+                        `
+                            : ""
+                        }
+                        ${
+                          hasEV
+                            ? `
+                        <div style="background: #e8f5e8; padding: 15px; border-radius: 10px; border-left: 4px solid #4caf50;">
+                            <strong>Electric Vehicle</strong><br>
+                            <small>EV charging needs included in analysis</small>
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-value">${planningAdditions ? "YES" : "NO"}</div>
-                            <div class="metric-label">Planned Additions</div>
-                            <div class="metric-description">Future home expansions considered</div>
+                        `
+                            : ""
+                        }
+                        ${
+                          planningAdditions
+                            ? `
+                        <div style="background: #fff3e0; padding: 15px; border-radius: 10px; border-left: 4px solid #ff9800;">
+                            <strong>Future Additions</strong><br>
+                            <small>System sized for planned expansions</small>
                         </div>
+                        `
+                            : ""
+                        }
                     </div>
                 </div>
+                `
+                    : ""
+                }
             </div>
             `
                 : ""
@@ -794,70 +819,60 @@ export function generateEnhancedSolarReport(data: EnhancedReportData): string {
             <div class="section">
                 <h2>Financial Analysis</h2>
                 <div class="financial-section">
-                    <div class="section-title">Investment Overview</div>
+                    <div class="section-title">Investment & Returns</div>
                     <div class="metrics-grid">
                         <div class="metric-card">
                             <div class="metric-value">$${systemCost.toLocaleString()}</div>
-                            <div class="metric-label">Total System Cost</div>
-                            <div class="metric-description">Before incentives and rebates</div>
+                            <div class="metric-label">System Cost</div>
+                            <div class="metric-description">Total installation cost before incentives</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">$${(systemCost - netCost).toLocaleString()}</div>
+                            <div class="metric-label">Tax Credits & Incentives</div>
+                            <div class="metric-description">Federal and state incentives available</div>
                         </div>
                         <div class="metric-card">
                             <div class="metric-value">$${netCost.toLocaleString()}</div>
                             <div class="metric-label">Net Investment</div>
-                            <div class="metric-description">After 30% federal tax credit</div>
+                            <div class="metric-description">Final cost after all incentives</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-value">${((annualSavings / netCost) * 100).toFixed(1)}%</div>
-                            <div class="metric-label">Annual ROI</div>
-                            <div class="metric-description">Return on investment percentage</div>
+                            <div class="metric-value">${roiYears}</div>
+                            <div class="metric-label">Payback Period</div>
+                            <div class="metric-description">Years to recover initial investment</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-value">$${(electricityRate * 100).toFixed(1)}¢</div>
-                            <div class="metric-label">Current Rate</div>
-                            <div class="metric-description">Per kWh electricity cost</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value">$${(annualSavings * 10).toLocaleString()}</div>
-                            <div class="metric-label">10-Year Savings</div>
-                            <div class="metric-description">Cumulative savings projection</div>
+                            <div class="metric-value">$${monthlySavings.toLocaleString()}</div>
+                            <div class="metric-label">Monthly Savings</div>
+                            <div class="metric-description">Average monthly electricity bill reduction</div>
                         </div>
                         <div class="metric-card">
                             <div class="metric-value">$${twentyFiveYearSavings}</div>
-                            <div class="metric-label">25-Year Savings</div>
-                            <div class="metric-description">Lifetime system savings</div>
+                            <div class="metric-label">25-Year Net Savings</div>
+                            <div class="metric-description">Total savings over system lifetime</div>
                         </div>
                     </div>
                     
-                    <div class="section-title" style="margin-top: 30px;">Financing Options</div>
                     <div class="financing-options">
                         <div class="financing-option">
                             <div class="financing-title">Cash Purchase</div>
                             <div class="financing-details">
-                                <p><strong>Total Investment:</strong> $${netCost.toLocaleString()}</p>
-                                <p><strong>Monthly Savings:</strong> $${monthlySavings}</p>
-                                <p><strong>Payback Period:</strong> ${roiYears} years</p>
-                                <p>Maximize your savings with full ownership and all available incentives.</p>
-                                <div class="financing-highlight">Best Long-term Value</div>
+                                Pay the full system cost upfront and maximize your savings with immediate ownership benefits.
+                                <div class="financing-highlight">Best ROI: ${roiYears} years</div>
                             </div>
                         </div>
                         <div class="financing-option">
-                            <div class="financing-title">Solar Loan (20 years)</div>
+                            <div class="financing-title">Solar Loan</div>
                             <div class="financing-details">
-                                <p><strong>Down Payment:</strong> $0 - $${(netCost * 0.2).toLocaleString()}</p>
-                                <p><strong>Est. Monthly Payment:</strong> $${Math.round(netCost * 0.006)}</p>
-                                <p><strong>Net Monthly Savings:</strong> $${Math.max(0, monthlySavings - Math.round(netCost * 0.006))}</p>
-                                <p>Start saving immediately with low-interest solar financing.</p>
-                                <div class="financing-highlight">Immediate Savings</div>
+                                Finance your system with $0 down and start saving immediately with monthly payments lower than your current bill.
+                                <div class="financing-highlight">$0 Down Available</div>
                             </div>
                         </div>
                         <div class="financing-option">
                             <div class="financing-title">Solar Lease/PPA</div>
                             <div class="financing-details">
-                                <p><strong>Down Payment:</strong> $0</p>
-                                <p><strong>Est. Monthly Payment:</strong> $${Math.round(monthlySavings * 0.8)}</p>
-                                <p><strong>Immediate Savings:</strong> $${Math.round(monthlySavings * 0.2)}</p>
-                                <p>Go solar with no upfront costs and predictable monthly payments.</p>
-                                <div class="financing-highlight">No Money Down</div>
+                                No upfront costs with predictable monthly payments. Perfect for those who want immediate savings without ownership.
+                                <div class="financing-highlight">Immediate Savings</div>
                             </div>
                         </div>
                     </div>
@@ -867,37 +882,37 @@ export function generateEnhancedSolarReport(data: EnhancedReportData): string {
             <div class="section">
                 <h2>Environmental Impact</h2>
                 <div class="environmental-section">
-                    <div class="section-title">Sustainability Benefits</div>
+                    <div class="section-title">Your Contribution to a Cleaner Future</div>
                     <div class="metrics-grid">
                         <div class="metric-card">
                             <div class="metric-value">${co2OffsetTons}</div>
-                            <div class="metric-label">Annual CO₂ Offset (tons)</div>
-                            <div class="metric-description">Equivalent to removing a car from the road</div>
+                            <div class="metric-label">CO₂ Reduction (tons/year)</div>
+                            <div class="metric-description">Annual carbon footprint reduction</div>
                         </div>
                         <div class="metric-card">
                             <div class="metric-value">${treesEquivalent}</div>
                             <div class="metric-label">Trees Planted Equivalent</div>
-                            <div class="metric-description">Annual environmental benefit</div>
+                            <div class="metric-description">Environmental benefit equivalent per year</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-value">${(co2OffsetTons * 25).toFixed(0)}</div>
-                            <div class="metric-label">25-Year CO₂ Offset (tons)</div>
-                            <div class="metric-description">Lifetime carbon footprint reduction</div>
+                            <div class="metric-value">${Math.round(co2OffsetTons / 4.6)}</div>
+                            <div class="metric-label">Cars Off Road Equivalent</div>
+                            <div class="metric-description">Annual emission reduction impact</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-value">${(treesEquivalent * 25).toFixed(0)}</div>
-                            <div class="metric-label">Lifetime Tree Equivalent</div>
-                            <div class="metric-description">25-year environmental impact</div>
+                            <div class="metric-value">${Math.round(co2OffsetTons * 25)}</div>
+                            <div class="metric-label">25-Year CO₂ Reduction</div>
+                            <div class="metric-description">Lifetime environmental impact (tons)</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-value">${(annualProductionKwh * 0.0007 * 25).toFixed(1)}</div>
+                            <div class="metric-value">${Math.round(annualProductionKwh * 0.0007 * 25)}</div>
                             <div class="metric-label">Coal Avoided (tons)</div>
-                            <div class="metric-description">25-year coal consumption offset</div>
+                            <div class="metric-description">Coal equivalent avoided over 25 years</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-value">${Math.round((annualProductionKwh * 25) / 1000)}</div>
-                            <div class="metric-label">Clean Energy (MWh)</div>
-                            <div class="metric-description">25-year clean energy production</div>
+                            <div class="metric-value">${Math.round(treesEquivalent * 25)}</div>
+                            <div class="metric-label">Lifetime Tree Equivalent</div>
+                            <div class="metric-description">Total trees planted equivalent over 25 years</div>
                         </div>
                     </div>
                 </div>
@@ -905,69 +920,29 @@ export function generateEnhancedSolarReport(data: EnhancedReportData): string {
             
             <div class="section">
                 <h2>Warranty & Performance Guarantees</h2>
-                <div class="performance-section">
-                    <div class="section-title">Comprehensive Coverage</div>
-                    <div class="warranty-grid">
-                        <div class="warranty-item">
-                            <div class="warranty-title">Solar Panel Warranty</div>
-                            <div class="warranty-details">
-                                <strong>25-Year Performance:</strong> 85% power output guarantee<br>
-                                <strong>12-Year Product:</strong> Manufacturing defects coverage<br>
-                                <strong>Linear Degradation:</strong> Maximum 0.55% annually
-                            </div>
-                        </div>
-                        <div class="warranty-item">
-                            <div class="warranty-title">Inverter Warranty</div>
-                            <div class="warranty-details">
-                                <strong>12-Year Standard:</strong> Full replacement coverage<br>
-                                <strong>25-Year Extended:</strong> Available upgrade option<br>
-                                <strong>Monitoring:</strong> Real-time performance tracking
-                            </div>
-                        </div>
-                        <div class="warranty-item">
-                            <div class="warranty-title">Installation Warranty</div>
-                            <div class="warranty-details">
-                                <strong>10-Year Workmanship:</strong> Installation quality guarantee<br>
-                                <strong>Roof Penetration:</strong> Leak-proof installation<br>
-                                <strong>System Performance:</strong> Production guarantee
-                            </div>
-                        </div>
-                        <div class="warranty-item">
-                            <div class="warranty-title">Monitoring & Maintenance</div>
-                            <div class="warranty-details">
-                                <strong>25-Year Monitoring:</strong> System performance tracking<br>
-                                <strong>Annual Inspection:</strong> Professional system check<br>
-                                <strong>Cleaning Service:</strong> Optional maintenance package
-                            </div>
+                <div class="warranty-grid">
+                    <div class="warranty-item">
+                        <div class="warranty-title">25-Year Panel Warranty</div>
+                        <div class="warranty-details">
+                            Premium solar panels with 25-year power output warranty guaranteeing 80% performance after 25 years.
                         </div>
                     </div>
-                </div>
-            </div>
-            
-            <div class="section">
-                <h2>Market Analysis</h2>
-                <div class="financial-section">
-                    <div class="section-title">Competitive Positioning</div>
-                    <div class="metrics-grid">
-                        <div class="metric-card">
-                            <div class="metric-value">$${costPerWatt}</div>
-                            <div class="metric-label">Cost per Watt</div>
-                            <div class="metric-description">Market average: $2.85/W (Excellent value)</div>
+                    <div class="warranty-item">
+                        <div class="warranty-title">12-Year Product Warranty</div>
+                        <div class="warranty-details">
+                            Comprehensive product warranty covering manufacturing defects and material failures.
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-value">${capacityFactor}%</div>
-                            <div class="metric-label">Capacity Factor</div>
-                            <div class="metric-description">National average: 24.5% (Above average)</div>
+                    </div>
+                    <div class="warranty-item">
+                        <div class="warranty-title">10-Year Inverter Warranty</div>
+                        <div class="warranty-details">
+                            High-quality inverters with extended warranty coverage and monitoring capabilities.
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-value">${roiYears} yrs</div>
-                            <div class="metric-label">Payback Period</div>
-                            <div class="metric-description">Market average: 8-12 years (Competitive)</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value">${performanceRatio}%</div>
-                            <div class="metric-label">Performance Ratio</div>
-                            <div class="metric-description">Industry standard: 75-85% (Excellent)</div>
+                    </div>
+                    <div class="warranty-item">
+                        <div class="warranty-title">5-Year Installation Warranty</div>
+                        <div class="warranty-details">
+                            Professional installation warranty covering workmanship and system integration.
                         </div>
                     </div>
                 </div>
@@ -976,13 +951,13 @@ export function generateEnhancedSolarReport(data: EnhancedReportData): string {
         
         <div class="footer">
             <div class="footer-content">
-                <h3>The Solar Grind</h3>
-                <p><strong>Professional Solar Analysis & Design</strong></p>
-                <p>Report generated on ${analysisDate} | Report ID: ${reportId}</p>
-                <p>This enhanced analysis provides comprehensive technical and financial insights for your solar investment decision.</p>
+                <h3>The Solar Grind V2</h3>
+                <p><strong>Professional Solar Analysis & Installation Services</strong></p>
+                <p>Enhanced Report generated on ${analysisDate} | Report ID: ${reportId}</p>
+                <p>This comprehensive analysis includes advanced performance metrics, detailed financial projections, and environmental impact calculations.</p>
                 
                 <div class="disclaimer">
-                    <p><strong>Important Disclaimer:</strong> This enhanced analysis is based on current utility rates, available incentives, estimated solar production, and market data. Actual results may vary based on weather conditions, system performance, changes in utility rates, equipment specifications, installation factors, and other variables. Performance projections include estimated system degradation over time. Financial projections assume current electricity rates and available incentives, which may change. This report is for informational purposes only and should not be considered as financial or investment advice. Please consult with qualified solar professionals for detailed system design, final pricing, and installation specifications. All warranty information is subject to manufacturer terms and conditions.</p>
+                    <p><strong>Important Disclaimer:</strong> This enhanced analysis is based on sophisticated modeling using current utility rates, available incentives, historical weather data, and estimated solar production. Actual results may vary based on weather conditions, system performance, changes in utility rates, equipment selection, and other factors. Performance ratios and capacity factors are estimates based on location and system specifications. Please consult with a qualified solar professional for detailed system design, final pricing, and site-specific analysis. All financial projections assume current incentive levels and utility rate structures.</p>
                 </div>
             </div>
         </div>
@@ -991,3 +966,5 @@ export function generateEnhancedSolarReport(data: EnhancedReportData): string {
 </html>
   `
 }
+
+export default generateEnhancedSolarReport

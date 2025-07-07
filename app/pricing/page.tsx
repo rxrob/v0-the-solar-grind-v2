@@ -1,378 +1,221 @@
-import type { Metadata } from "next"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
+"use client"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Star } from "lucide-react"
-
-// Static page optimization
-export const dynamic = "force-static"
-export const revalidate = 3600 // Revalidate every hour
-
-export const metadata: Metadata = {
-  title: "Pricing - Solar Calculator Pro",
-  description:
-    "Choose the perfect plan for your solar analysis needs. Free basic calculations or Pro features with advanced analytics.",
-}
+import { Separator } from "@/components/ui/separator"
+import StripeCheckoutButton from "@/components/stripe-checkout-button"
+import { useAuth } from "@/hooks/use-auth-real"
+import { Check, Zap, Brain, FileText, Star } from "lucide-react"
 
 export default function PricingPage() {
+  const { isAuthenticated, canAccessProFeatures } = useAuth()
+
+  const features = {
+    free: ["Basic solar calculator", "Rough savings estimates", "Environmental impact calculation", "Email support"],
+    pro: [
+      "Everything in Free",
+      "AI-powered smart analysis",
+      "Detailed financial projections",
+      "Seasonal production analysis",
+      "Risk assessment & opportunities",
+      "Professional PDF reports",
+      "Priority support",
+      "Advanced system optimization",
+    ],
+    singleReport: [
+      "One-time advanced analysis",
+      "AI-powered insights",
+      "Detailed financial projections",
+      "Professional PDF report",
+      "Valid for 30 days",
+    ],
+  }
+
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Hero Section */}
-      <section className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-b from-blue-50 to-white">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col items-center justify-center space-y-4 text-center">
-            <div className="space-y-2">
-              <Badge variant="outline">
-                <Star className="w-3 h-3 mr-1" />
-                Simple Pricing
-              </Badge>
-              <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                Choose Your Plan
-              </h1>
-              <p className="max-w-[900px] text-gray-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed dark:text-gray-400">
-                Start with our free calculator or upgrade to Pro for advanced features and unlimited reports.
-              </p>
+    <div className="max-w-6xl mx-auto p-6 space-y-8">
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl font-bold">Choose Your Solar Analysis Plan</h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          Get the insights you need to make informed solar decisions. From basic estimates to comprehensive AI-powered
+          analysis.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Free Plan */}
+        <Card className="relative">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Free
+            </CardTitle>
+            <CardDescription>Perfect for getting started with solar</CardDescription>
+            <div className="text-3xl font-bold">$0</div>
+            <div className="text-sm text-muted-foreground">Forever free</div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ul className="space-y-2">
+              {features.free.map((feature, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  <span className="text-sm">{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <Separator />
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">Always free - no credit card required</p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Pro Plan */}
+        <Card className="relative border-2 border-primary">
+          <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+            <Badge className="bg-primary text-primary-foreground">
+              <Star className="h-3 w-3 mr-1" />
+              Most Popular
+            </Badge>
           </div>
-        </div>
-      </section>
-
-      {/* Pricing Cards */}
-      <section className="w-full py-12 md:py-24 lg:py-32">
-        <div className="container px-4 md:px-6">
-          <div className="grid gap-6 lg:grid-cols-4 lg:gap-8">
-            {/* Free Plan */}
-            <Card className="relative">
-              <CardHeader>
-                <CardTitle className="text-xl">Free</CardTitle>
-                <CardDescription>Perfect for homeowners exploring solar</CardDescription>
-                <div className="text-3xl font-bold">$0</div>
-                <div className="text-sm text-gray-500">Forever free</div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button asChild className="w-full">
-                  <Link href="/calculator">Get Started Free</Link>
-                </Button>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Basic solar calculator</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Energy production estimates</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Basic financial projections</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Community support</span>
-                  </div>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5" />
+              Pro
+            </CardTitle>
+            <CardDescription>Advanced AI-powered solar analysis</CardDescription>
+            <div className="text-3xl font-bold">$29</div>
+            <div className="text-sm text-muted-foreground">per month</div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ul className="space-y-2">
+              {features.pro.map((feature, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  <span className="text-sm">{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <Separator />
+            {isAuthenticated ? (
+              canAccessProFeatures() ? (
+                <div className="text-center">
+                  <Badge variant="default" className="bg-green-600">
+                    Current Plan
+                  </Badge>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Single Report */}
-            <Card className="relative">
-              <CardHeader>
-                <CardTitle className="text-xl">Single Report</CardTitle>
-                <CardDescription>Try advanced features with one report</CardDescription>
-                <div className="text-3xl font-bold">$4.99</div>
-                <div className="text-sm text-gray-500">One-time purchase</div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button asChild className="w-full bg-transparent" variant="outline">
-                  <Link href="/test-single-report-purchase">Purchase Report</Link>
-                </Button>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Everything in Free</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Professional PDF report</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">NREL data integration</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Advanced calculations</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Detailed financial analysis</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Pro Plan */}
-            <Card className="relative border-blue-200 shadow-lg">
-              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                <Badge className="bg-blue-600 text-white">Most Popular</Badge>
+              ) : (
+                <StripeCheckoutButton
+                  priceId={process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID!}
+                  productType="subscription"
+                  className="w-full"
+                >
+                  Upgrade to Pro
+                </StripeCheckoutButton>
+              )
+            ) : (
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-2">Sign in to upgrade</p>
+                <a href="/login" className="text-primary hover:underline">
+                  Sign In
+                </a>
               </div>
-              <CardHeader>
-                <CardTitle className="text-xl">Pro</CardTitle>
-                <CardDescription>For solar professionals and businesses</CardDescription>
-                <div className="text-3xl font-bold">$29</div>
-                <div className="text-sm text-gray-500">per month</div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button asChild className="w-full solar-gradient text-white">
-                  <Link href="/test-stripe-checkout">Start Pro Trial</Link>
-                </Button>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Everything in Single Report</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Unlimited reports</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Client management</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Project tracking</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Advanced analytics</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Priority support</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            )}
+          </CardContent>
+        </Card>
 
-            {/* Enterprise Plan */}
-            <Card className="relative">
-              <CardHeader>
-                <CardTitle className="text-xl">Enterprise</CardTitle>
-                <CardDescription>Custom solutions for large organizations</CardDescription>
-                <div className="text-3xl font-bold">Custom</div>
-                <div className="text-sm text-gray-500">Contact for pricing</div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button asChild className="w-full bg-transparent" variant="outline">
-                  <Link href="mailto:sales@solargrind.com">Contact Sales</Link>
-                </Button>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Everything in Pro</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">White-label solutions</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">API access</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Custom integrations</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">Dedicated support</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    <span className="text-sm">SLA guarantee</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Feature Comparison */}
-      <section className="w-full py-12 md:py-24 lg:py-32 bg-gray-50">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Feature Comparison</h2>
-            <p className="max-w-[900px] text-gray-500 md:text-xl/relaxed">See what's included in each plan</p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse bg-white rounded-lg shadow-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-4 font-semibold">Features</th>
-                  <th className="text-center p-4 font-semibold">Free</th>
-                  <th className="text-center p-4 font-semibold">Single Report</th>
-                  <th className="text-center p-4 font-semibold">Pro</th>
-                  <th className="text-center p-4 font-semibold">Enterprise</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="p-4">Basic Solar Calculator</td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr className="border-b">
-                  <td className="p-4">Professional PDF Reports</td>
-                  <td className="text-center p-4">-</td>
-                  <td className="text-center p-4">1 Report</td>
-                  <td className="text-center p-4">Unlimited</td>
-                  <td className="text-center p-4">Unlimited</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="p-4">NREL Data Integration</td>
-                  <td className="text-center p-4">-</td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr className="border-b">
-                  <td className="p-4">Client Management</td>
-                  <td className="text-center p-4">-</td>
-                  <td className="text-center p-4">-</td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr className="border-b">
-                  <td className="p-4">API Access</td>
-                  <td className="text-center p-4">-</td>
-                  <td className="text-center p-4">-</td>
-                  <td className="text-center p-4">-</td>
-                  <td className="text-center p-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-4">Support Level</td>
-                  <td className="text-center p-4">Community</td>
-                  <td className="text-center p-4">Email</td>
-                  <td className="text-center p-4">Priority</td>
-                  <td className="text-center p-4">Dedicated</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="w-full py-12 md:py-24 lg:py-32">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Frequently Asked Questions</h2>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Can I upgrade or downgrade my plan?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll
-                  prorate any billing differences.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">What's included in the Single Report option?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  The Single Report gives you access to all Pro features for one comprehensive solar analysis report.
-                  Perfect for trying our advanced features before committing to a subscription.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">How accurate are the solar calculations?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Our calculations use NREL (National Renewable Energy Laboratory) data and industry-standard models,
-                  achieving 99%+ accuracy for solar potential and financial projections.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Do you offer refunds?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  We offer a 30-day money-back guarantee for Pro subscriptions. Single report purchases are final but
-                  come with full support to ensure you get the results you need.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-r from-blue-600 to-orange-600">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col items-center justify-center space-y-4 text-center text-white">
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Ready to Get Started?</h2>
-              <p className="max-w-[600px] text-blue-100 md:text-xl">
-                Join thousands of professionals using our platform for accurate solar analysis.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 min-[400px]:flex-row">
-              <Button asChild size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-gray-100">
-                <Link href="/calculator">Try Free Calculator</Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="border-white text-white hover:bg-white hover:text-blue-600 bg-transparent"
+        {/* Single Report */}
+        <Card className="relative">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Single Report
+            </CardTitle>
+            <CardDescription>One-time advanced analysis</CardDescription>
+            <div className="text-3xl font-bold">$19</div>
+            <div className="text-sm text-muted-foreground">one-time purchase</div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ul className="space-y-2">
+              {features.singleReport.map((feature, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  <span className="text-sm">{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <Separator />
+            {isAuthenticated ? (
+              <StripeCheckoutButton
+                priceId={process.env.NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID!}
+                productType="single_report"
+                className="w-full"
               >
-                <Link href="/test-single-report-purchase">Get Report for $4.99</Link>
-              </Button>
-            </div>
-          </div>
+                Buy Single Report
+              </StripeCheckoutButton>
+            ) : (
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-2">Sign in to purchase</p>
+                <a href="/login" className="text-primary hover:underline">
+                  Sign In
+                </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="text-center space-y-4">
+        <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Can I cancel anytime?</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Yes, you can cancel your Pro subscription at any time. You'll continue to have access until the end of
+                your billing period.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">What's included in the AI analysis?</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Our AI analyzes satellite imagery, local weather patterns, utility rates, and shading to provide
+                accurate solar potential calculations.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">How accurate are the calculations?</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Our Pro analysis typically achieves 90%+ accuracy by incorporating real-world factors like shading,
+                weather patterns, and local utility rates.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Do you offer refunds?</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                We offer a 30-day money-back guarantee for Pro subscriptions. Single reports are non-refundable but
+                valid for 30 days.
+              </p>
+            </CardContent>
+          </Card>
         </div>
-      </section>
+      </div>
     </div>
   )
 }

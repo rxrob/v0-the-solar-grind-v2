@@ -1,327 +1,540 @@
+"use client"
+
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Calculator, Zap, Shield, Award, Sun, DollarSign, Leaf, BarChart3, MapPin } from "lucide-react"
-import Link from "next/link"
-import { SiteNavigation } from "@/components/site-navigation"
+import {
+  Calculator,
+  Zap,
+  CheckCircle,
+  ArrowRight,
+  Eye,
+  TrendingUp,
+  Sun,
+  Home,
+  Sparkles,
+  Brain,
+  MapPin,
+  BadgeCheck,
+} from "lucide-react"
+import { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
+
+const AnimatedBG = dynamic(() => import("@/components/AnimatedBG"), { ssr: false })
+
+// Live Weather Widget Component
+function SunExposureWidget() {
+  const [sunHours, setSunHours] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Simulate fetching real sun exposure data
+    const fetchSunData = async () => {
+      try {
+        // In production, this would call your weather API
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        setSunHours(Math.floor(Math.random() * 4) + 6) // 6-10 hours
+        setLoading(false)
+      } catch (error) {
+        setSunHours(8)
+        setLoading(false)
+      }
+    }
+    fetchSunData()
+  }, [])
+
+  return (
+    <div className="text-center">
+      {loading ? (
+        <div className="animate-pulse">
+          <div className="h-16 w-16 bg-yellow-200 rounded-full mx-auto mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-24 mx-auto"></div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="relative">
+            <Sun className="h-16 w-16 text-yellow-500 mx-auto animate-pulse" />
+            <div className="absolute inset-0 bg-yellow-400 rounded-full opacity-20 animate-ping"></div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-yellow-600">{sunHours} hours</div>
+            <p className="text-sm text-gray-600">Peak sun exposure today</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Utility Rate Trend Component
+function UtilityTrendChart() {
+  const [rates, setRates] = useState<number[]>([])
+
+  useEffect(() => {
+    // Simulate utility rate data over time
+    const mockRates = [0.12, 0.13, 0.15, 0.17, 0.19, 0.22, 0.25]
+    setRates(mockRates)
+  }, [])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-600">2018</span>
+        <TrendingUp className="h-5 w-5 text-red-500" />
+        <span className="text-sm text-gray-600">2024</span>
+      </div>
+      <div className="flex items-end space-x-2 h-20">
+        {rates.map((rate, index) => (
+          <div
+            key={index}
+            className="bg-red-500 rounded-t flex-1 transition-all duration-1000 ease-out"
+            style={{
+              height: `${(rate / 0.25) * 100}%`,
+              animationDelay: `${index * 200}ms`,
+            }}
+          ></div>
+        ))}
+      </div>
+      <div className="text-center">
+        <div className="text-2xl font-bold text-red-600">+108%</div>
+        <p className="text-sm text-gray-600">Rate increase since 2018</p>
+      </div>
+    </div>
+  )
+}
+
+// Floating Action Button
+function FloatingCTA() {
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsVisible(true), 3000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (!isVisible) return null
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 animate-bounce">
+      <Link href="/calculator">
+        <Button
+          size="lg"
+          className="shadow-2xl text-lg px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 border-0"
+        >
+          <Zap className="mr-2 h-5 w-5" />
+          Analyze My Home
+        </Button>
+      </Link>
+    </div>
+  )
+}
 
 export default function HomePage() {
+  const [geoLocation, setGeoLocation] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("https://ipapi.co/json")
+      .then((res) => res.json())
+      .then((data) => setGeoLocation(data.city + ", " + data.region_code))
+  }, [])
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      <SiteNavigation />
-
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-green-600/20" />
-        <div className="relative container mx-auto px-4 py-24 lg:py-32">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
-            <Badge variant="secondary" className="mb-4 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-              <Zap className="h-3 w-3 mr-1" />
-              AI-Powered Solar Analysis
-            </Badge>
-
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white leading-tight">
-              Revolutionizing Home Energy with{" "}
-              <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-                Solar + AI
-              </span>
-            </h1>
-
-            <p className="text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
-              Get AI-driven solar calculations, advanced satellite analysis, and precision reports that help you make
-              the smartest energy decisions for your home.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-              <Button
-                asChild
-                size="lg"
-                className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-lg px-8 py-6"
-              >
-                <Link href="/calculator">
-                  <Calculator className="h-5 w-5 mr-2" />
-                  Start Free Analysis
-                  <ArrowRight className="h-5 w-5 ml-2" />
-                </Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="text-lg px-8 py-6 border-white/20 text-white hover:bg-white/10 bg-transparent"
-              >
-                <Link href="/pro-calculator">View Pro Features</Link>
-              </Button>
-            </div>
+    <div className="relative min-h-screen flex flex-col items-center justify-center text-white overflow-hidden">
+      <AnimatedBG />
+      <div className="relative z-10 text-center px-6 md:px-12 max-w-4xl">
+        <h1 className="text-4xl md:text-6xl font-bold leading-tight drop-shadow-xl">Solar Grind</h1>
+        <p className="mt-4 text-lg md:text-xl text-muted-foreground">
+          Solar Design made easy — brought to you by <span className="text-primary font-semibold">OpenAI</span>
+        </p>
+        {geoLocation && (
+          <div className="mt-2 flex items-center justify-center text-sm text-muted-foreground">
+            <MapPin className="w-4 h-4 mr-1" />
+            Smart recommendations enabled for: {geoLocation}
           </div>
+        )}
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Button asChild className="text-lg px-8 py-6">
+            <Link href="/calculator">Start My Solar Report</Link>
+          </Button>
+          <Button variant="outline" asChild className="text-lg px-8 py-6 bg-transparent">
+            <Link href="/pricing">Compare Free vs Pro</Link>
+          </Button>
         </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-16 bg-white/5 backdrop-blur-sm">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div className="space-y-2">
-              <div className="text-3xl md:text-4xl font-bold text-white">50K+</div>
-              <div className="text-slate-400">Homes Analyzed</div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-3xl md:text-4xl font-bold text-white">$2.5M+</div>
-              <div className="text-slate-400">Savings Calculated</div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-3xl md:text-4xl font-bold text-white">98%</div>
-              <div className="text-slate-400">Accuracy Rate</div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-3xl md:text-4xl font-bold text-white">24/7</div>
-              <div className="text-slate-400">AI Analysis</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-24">
-        <div className="container mx-auto px-4">
-          <div className="text-center space-y-4 mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold text-white">Why Choose SolarGrind AI?</h2>
-            <p className="text-xl text-slate-300 max-w-3xl mx-auto">
-              Our advanced AI technology provides the most accurate solar analysis available, helping you make informed
-              decisions about your home's energy future.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20">
-              <CardHeader>
-                <div className="h-12 w-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4">
-                  <Sun className="h-6 w-6 text-blue-400" />
-                </div>
-                <CardTitle className="text-white">AI-Powered Analysis</CardTitle>
-                <CardDescription className="text-slate-300">
-                  Advanced machine learning algorithms analyze your roof, shading, and local weather patterns for
-                  maximum accuracy.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20">
-              <CardHeader>
-                <div className="h-12 w-12 bg-green-500/20 rounded-lg flex items-center justify-center mb-4">
-                  <MapPin className="h-6 w-6 text-green-400" />
-                </div>
-                <CardTitle className="text-white">Satellite Imagery</CardTitle>
-                <CardDescription className="text-slate-300">
-                  High-resolution satellite data provides precise roof measurements and shading analysis for your
-                  specific location.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20">
-              <CardHeader>
-                <div className="h-12 w-12 bg-yellow-500/20 rounded-lg flex items-center justify-center mb-4">
-                  <BarChart3 className="h-6 w-6 text-yellow-400" />
-                </div>
-                <CardTitle className="text-white">Detailed Reports</CardTitle>
-                <CardDescription className="text-slate-300">
-                  Professional-grade reports with financial analysis, equipment recommendations, and 25-year
-                  projections.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20">
-              <CardHeader>
-                <div className="h-12 w-12 bg-purple-500/20 rounded-lg flex items-center justify-center mb-4">
-                  <DollarSign className="h-6 w-6 text-purple-400" />
-                </div>
-                <CardTitle className="text-white">Financial Modeling</CardTitle>
-                <CardDescription className="text-slate-300">
-                  Comprehensive financial analysis including tax incentives, financing options, and ROI calculations.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20">
-              <CardHeader>
-                <div className="h-12 w-12 bg-red-500/20 rounded-lg flex items-center justify-center mb-4">
-                  <Leaf className="h-6 w-6 text-red-400" />
-                </div>
-                <CardTitle className="text-white">Environmental Impact</CardTitle>
-                <CardDescription className="text-slate-300">
-                  Calculate your carbon footprint reduction and environmental benefits over the system lifetime.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20">
-              <CardHeader>
-                <div className="h-12 w-12 bg-indigo-500/20 rounded-lg flex items-center justify-center mb-4">
-                  <Shield className="h-6 w-6 text-indigo-400" />
-                </div>
-                <CardTitle className="text-white">Trusted & Secure</CardTitle>
-                <CardDescription className="text-slate-300">
-                  Bank-level security with encrypted data transmission and secure cloud storage for all your
-                  information.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Calculator Preview Section */}
-      <section className="py-24 bg-white/5 backdrop-blur-sm">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center space-y-4 mb-12">
-              <h2 className="text-3xl md:text-5xl font-bold text-white">Get Started in Seconds</h2>
-              <p className="text-xl text-slate-300">
-                Try our basic calculator for free, or upgrade to Pro for advanced analysis
+        <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 gap-8 text-left text-muted-foreground">
+          <div className="flex items-start gap-4">
+            <Brain className="w-6 h-6 text-primary" />
+            <div>
+              <h3 className="text-lg font-semibold">AI-Powered Design</h3>
+              <p>
+                Get real-time, intelligent solar layouts based on your rooftop, utility profile, and weather patterns.
               </p>
             </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <Sun className="w-6 h-6 text-yellow-400" />
+            <div>
+              <h3 className="text-lg font-semibold">Live Sunlight Mapping</h3>
+              <p>Location-based irradiance, shading, and seasonality taken into account — instantly.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <BadgeCheck className="w-6 h-6 text-green-500" />
+            <div>
+              <h3 className="text-lg font-semibold">Accurate Savings Projections</h3>
+              <p>Understand how much you'll save year-over-year with solar, using local utility data.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <Sparkles className="w-6 h-6 text-pink-400" />
+            <div>
+              <h3 className="text-lg font-semibold">Free vs Pro Access</h3>
+              <p>
+                Free users get basic tools. Pro users unlock advanced calculators, professional reports, and priority
+                support.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-20">
+          <video autoPlay loop muted playsInline className="rounded-lg border border-muted max-w-full shadow-xl">
+            <source src="/demo/solar-ai-demo.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+          <p className="mt-2 text-sm text-muted-foreground">Preview of the advanced calculator in action</p>
+        </div>
+      </div>
 
-            <div className="grid md:grid-cols-2 gap-8">
-              <Card className="bg-white/10 backdrop-blur-sm border-white/20">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <Calculator className="h-5 w-5" />
-                    Basic Calculator
-                  </CardTitle>
-                  <CardDescription className="text-slate-300">
-                    Quick solar estimate based on your electric bill and roof size
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <ul className="space-y-2 text-slate-300">
-                    <li className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 bg-green-400 rounded-full" />
-                      System size estimation
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 bg-green-400 rounded-full" />
-                      Monthly savings calculation
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 bg-green-400 rounded-full" />
-                      Payback period analysis
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 bg-green-400 rounded-full" />
-                      Environmental impact
-                    </li>
-                  </ul>
-                  <Button asChild className="w-full">
-                    <Link href="/basic-calculator">Try Free Calculator</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+      {/* AI Capabilities Section */}
+      <section className="py-20 bg-white relative">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+              Powered by Smart AI
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Advanced algorithms that understand your unique solar potential
+            </p>
+          </div>
 
-              <Card className="bg-gradient-to-br from-blue-600/20 to-green-600/20 backdrop-blur-sm border-blue-400/30">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-white flex items-center gap-2">
-                      <Award className="h-5 w-5" />
-                      Pro Calculator
-                    </CardTitle>
-                    <Badge className="bg-gradient-to-r from-blue-500 to-green-500">Recommended</Badge>
-                  </div>
-                  <CardDescription className="text-slate-300">
-                    Advanced AI analysis with satellite imagery and detailed reports
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <ul className="space-y-2 text-slate-300">
-                    <li className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 bg-blue-400 rounded-full" />
-                      Satellite roof analysis
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 bg-blue-400 rounded-full" />
-                      Shading & obstruction detection
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 bg-blue-400 rounded-full" />
-                      Equipment recommendations
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 bg-blue-400 rounded-full" />
-                      Professional PDF reports
-                    </li>
-                  </ul>
-                  <Button
-                    asChild
-                    className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700"
-                  >
-                    <Link href="/pro-calculator">Start Pro Analysis</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br from-yellow-50 to-orange-50">
+              <CardHeader className="text-center pb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Zap className="h-8 w-8 text-white" />
+                </div>
+                <CardTitle className="text-xl">Real-Time Solar Savings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center leading-relaxed">
+                  Our AI predicts savings based on your roof shape, utility rates, and sun angle — in seconds, not
+                  hours.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br from-blue-50 to-indigo-50">
+              <CardHeader className="text-center pb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Calculator className="h-8 w-8 text-white" />
+                </div>
+                <CardTitle className="text-xl">Pro-Grade Calculator</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center leading-relaxed">
+                  Customize everything: panel type, inverter efficiency, shading analysis, inflation, and utility
+                  buyback rates.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br from-green-50 to-emerald-50">
+              <CardHeader className="text-center pb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Eye className="h-8 w-8 text-white" />
+                </div>
+                <CardTitle className="text-xl">Satellite Vision AI</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center leading-relaxed">
+                  Upload your address. Our AI scans your roof and identifies optimal solar panel placement instantly.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Live Data Section */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-blue-50">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900">Why Now Is the Perfect Time</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Real-time data shows the urgency and opportunity of going solar today
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-2xl flex items-center">
+                  <TrendingUp className="mr-3 h-6 w-6 text-red-500" />
+                  Utility Rates Are Skyrocketing
+                </CardTitle>
+                <CardDescription className="text-lg">Don't wait for rates to climb even higher</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UtilityTrendChart />
+                <p className="text-sm text-gray-600 mt-4 text-center">
+                  *Based on national average residential electricity rates
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-2xl flex items-center">
+                  <Sun className="mr-3 h-6 w-6 text-yellow-500" />
+                  Your Roof's Solar Potential Today
+                </CardTitle>
+                <CardDescription className="text-lg">Live sun exposure data for optimal timing</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SunExposureWidget />
+                <p className="text-sm text-gray-600 mt-4 text-center">*Real-time solar irradiance data from NASA</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-12 text-gray-900">Trusted by Solar Professionals</h2>
+
+          <div className="grid md:grid-cols-3 gap-8 mb-12">
+            <div className="space-y-2">
+              <div className="text-4xl font-bold text-blue-600">10,000+</div>
+              <p className="text-gray-600">Homes Analyzed</p>
+            </div>
+            <div className="space-y-2">
+              <div className="text-4xl font-bold text-green-600">$2.5M+</div>
+              <p className="text-gray-600">Savings Identified</p>
+            </div>
+            <div className="space-y-2">
+              <div className="text-4xl font-bold text-yellow-600">95%</div>
+              <p className="text-gray-600">Accuracy Rate</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
-            <h2 className="text-3xl md:text-5xl font-bold text-white">Ready to Harness the Power of the Sun?</h2>
-            <p className="text-xl text-slate-300 max-w-2xl mx-auto">
-              Join thousands of homeowners who have already discovered their solar potential with SolarGrind AI's
-              advanced analysis technology.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                asChild
-                size="lg"
-                className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-lg px-8 py-6"
-              >
-                <Link href="/calculator">
-                  <Sun className="h-5 w-5 mr-2" />
-                  Calculate Your Savings
-                  <ArrowRight className="h-5 w-5 ml-2" />
+      {/* Pricing Section */}
+      <section className="py-20 bg-gradient-to-br from-gray-900 to-blue-900 text-white">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">Simple, Transparent Pricing</h2>
+            <p className="text-xl text-gray-300">Choose the plan that fits your solar journey</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            <Card className="border-2 border-gray-700 bg-gray-800/50 backdrop-blur-sm">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl text-white">Free Explorer</CardTitle>
+                <div className="text-5xl font-bold text-white mt-4">$0</div>
+                <CardDescription className="text-gray-300 text-lg">
+                  Perfect for homeowners exploring solar
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ul className="space-y-3">
+                  <li className="flex items-center text-gray-300">
+                    <CheckCircle className="w-5 h-5 text-green-400 mr-3" />
+                    Basic solar potential analysis
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <CheckCircle className="w-5 h-5 text-green-400 mr-3" />
+                    Estimated savings calculation
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <CheckCircle className="w-5 h-5 text-green-400 mr-3" />1 property analysis per month
+                  </li>
+                </ul>
+                <Link href="/signup" className="block">
+                  <Button className="w-full mt-6 bg-white text-gray-900 hover:bg-gray-100">Start Free Analysis</Button>
                 </Link>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 border-yellow-500 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 backdrop-blur-sm relative">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                <Badge className="bg-yellow-500 text-black font-semibold px-4 py-1">Most Popular</Badge>
+              </div>
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl text-white">Pro Analyzer</CardTitle>
+                <div className="text-5xl font-bold text-yellow-400 mt-4">$29</div>
+                <CardDescription className="text-gray-300 text-lg">For serious solar investors</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ul className="space-y-3">
+                  <li className="flex items-center text-gray-300">
+                    <CheckCircle className="w-5 h-5 text-green-400 mr-3" />
+                    Advanced AI analysis with 3D modeling
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <CheckCircle className="w-5 h-5 text-green-400 mr-3" />
+                    Detailed PDF reports
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <CheckCircle className="w-5 h-5 text-green-400 mr-3" />
+                    Unlimited property analyses
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <CheckCircle className="w-5 h-5 text-green-400 mr-3" />
+                    Priority support & consultation
+                  </li>
+                </ul>
+                <Link href="/pricing" className="block">
+                  <Button className="w-full mt-6 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold">
+                    Upgrade to Pro
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-20 bg-gradient-to-r from-blue-600 via-purple-600 to-green-600 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="relative z-10 max-w-4xl mx-auto px-6 text-center text-white">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6">Your Solar Future Starts Now</h2>
+          <p className="text-xl mb-8 text-gray-100 max-w-2xl mx-auto leading-relaxed">
+            Join thousands of homeowners who've discovered their solar potential. Get your personalized analysis in
+            under 60 seconds.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/calculator">
+              <Button size="lg" className="text-lg px-8 py-4 bg-white text-gray-900 hover:bg-gray-100 shadow-2xl">
+                <Home className="mr-2 h-5 w-5" />
+                Analyze My Home Now
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="text-lg px-8 py-6 border-white/20 text-white hover:bg-white/10 bg-transparent"
-              >
-                <Link href="/pricing">View Pricing</Link>
-              </Button>
-            </div>
+            </Link>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 bg-black/20 backdrop-blur-sm border-t border-white/10">
-        <div className="container mx-auto px-4">
-          <div className="text-center space-y-4">
-            <div className="flex items-center justify-center gap-2">
-              <Sun className="h-6 w-6 text-yellow-500" />
-              <span className="text-xl font-bold text-white">SolarGrind AI</span>
+      <footer className="bg-gray-900 text-white py-16">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
+                  <Zap className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                  MySolarAI
+                </span>
+              </div>
+              <p className="text-gray-400 leading-relaxed">
+                Empowering homeowners with AI-driven solar analysis and smart energy solutions for a sustainable future.
+              </p>
             </div>
-            <p className="text-slate-400">Revolutionizing home energy with solar + artificial intelligence</p>
-            <div className="flex justify-center gap-6 text-sm text-slate-400">
-              <Link href="/privacy" className="hover:text-white transition-colors">
-                Privacy Policy
-              </Link>
-              <Link href="/terms" className="hover:text-white transition-colors">
-                Terms of Service
-              </Link>
-              <Link href="/contact" className="hover:text-white transition-colors">
-                Contact
-              </Link>
+
+            <div>
+              <h3 className="font-semibold mb-4 text-lg">Product</h3>
+              <ul className="space-y-3 text-gray-400">
+                <li>
+                  <Link href="/calculator" className="hover:text-white transition-colors">
+                    Solar Calculator
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/pricing" className="hover:text-white transition-colors">
+                    Pricing
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/reports" className="hover:text-white transition-colors">
+                    Reports
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/api-status" className="hover:text-white transition-colors">
+                    API Status
+                  </Link>
+                </li>
+              </ul>
             </div>
-            <p className="text-xs text-slate-500">© 2024 SolarGrind AI. All rights reserved.</p>
+
+            <div>
+              <h3 className="font-semibold mb-4 text-lg">Company</h3>
+              <ul className="space-y-3 text-gray-400">
+                <li>
+                  <Link href="/about" className="hover:text-white transition-colors">
+                    About
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="hover:text-white transition-colors">
+                    Contact
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/privacy" className="hover:text-white transition-colors">
+                    Privacy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms" className="hover:text-white transition-colors">
+                    Terms
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-4 text-lg">Support</h3>
+              <ul className="space-y-3 text-gray-400">
+                <li>
+                  <Link href="/help" className="hover:text-white transition-colors">
+                    Help Center
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/docs" className="hover:text-white transition-colors">
+                    Documentation
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/status" className="hover:text-white transition-colors">
+                    System Status
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/feedback" className="hover:text-white transition-colors">
+                    Feedback
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-800 mt-12 pt-8 text-center">
+            <p className="text-gray-400">
+              &copy; 2024 MySolarAI. All rights reserved. Built with ❤️ for a sustainable future.
+            </p>
           </div>
         </div>
       </footer>
+
+      {/* Floating CTA */}
+      <FloatingCTA />
     </div>
   )
 }

@@ -6,8 +6,9 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Calculator, Crown, FileText, AlertCircle, Clock, Loader2 } from "lucide-react"
+import { CheckCircle, Calculator, Crown, FileText, AlertCircle, Clock, Loader2, ArrowRight, Brain } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { useAuth } from "@/hooks/use-auth-real"
 
 interface PaymentFlow {
   mode: string
@@ -64,6 +65,7 @@ export default function SuccessPage() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")
   const type = searchParams.get("type")
+  const { refreshProfile } = useAuth()
   const [sessionData, setSessionData] = useState<SessionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -235,6 +237,23 @@ export default function SuccessPage() {
     verifySession()
   }, [sessionId, type])
 
+  useEffect(() => {
+    // Refresh user profile to get updated subscription status
+    const refreshData = async () => {
+      if (sessionId) {
+        // Wait a moment for webhook to process
+        setTimeout(async () => {
+          await refreshProfile()
+          setLoading(false)
+        }, 2000)
+      } else {
+        setLoading(false)
+      }
+    }
+
+    refreshData()
+  }, [sessionId, refreshProfile])
+
   if (loading) {
     console.log("⏳ Showing loading state...")
     return (
@@ -266,7 +285,7 @@ export default function SuccessPage() {
                 <Link href="/test-payments">Return to Testing</Link>
               </Button>
               <Button variant="outline" asChild>
-                <a href="mailto:rob@mysolarai.com">Contact Support</a>
+                <a href="mailto:support@mysolarai.com">Contact Support</a>
               </Button>
             </div>
           </CardContent>
@@ -528,15 +547,51 @@ export default function SuccessPage() {
             </Card>
           )}
 
+          {/* What's next? */}
+          <div className="space-y-4">
+            <h3 className="font-semibold">What's next?</h3>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 border rounded-lg">
+                <Brain className="h-5 w-5 text-blue-500 mt-0.5" />
+                <div>
+                  <h4 className="font-medium">Try Smart Solar Analysis</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Get AI-powered insights about your property's solar potential.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 border rounded-lg">
+                <FileText className="h-5 w-5 text-green-500 mt-0.5" />
+                <div>
+                  <h4 className="font-medium">Generate Professional Reports</h4>
+                  <p className="text-sm text-muted-foreground">Create detailed PDF reports for your solar analysis.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button asChild className="flex-1">
+              <a href="/pro-calculator">
+                <Brain className="h-4 w-4 mr-2" />
+                Start Analysis
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </a>
+            </Button>
+            <Button variant="outline" asChild>
+              <a href="/dashboard">Go to Dashboard</a>
+            </Button>
+          </div>
+
           {/* Support */}
-          <div className="text-center">
-            <p className="text-sm text-gray-500">
-              Need help? Contact us at{" "}
-              <a href="mailto:rob@mysolarai.com" className="text-blue-600 hover:underline">
-                rob@mysolarai.com
+          <div className="text-center pt-4 border-t">
+            <p className="text-xs text-muted-foreground">
+              Questions? Contact us at{" "}
+              <a href="mailto:support@mysolarai.com" className="text-primary hover:underline">
+                support@mysolarai.com
               </a>
             </p>
-            <p className="text-xs text-gray-400 mt-2">Session ID: {sessionData.session_id}</p>
           </div>
         </div>
       </div>
