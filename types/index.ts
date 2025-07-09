@@ -265,3 +265,13 @@ export interface FinancialAnalysis {
     lcoe: number
   }
 }
+
+export interface Report {
+  id: string
+  title: string
+  client: string
+  location: string
+  systemSize: number
+  createdAt: string
+  status: "generated" | "pending" | "error"
+}
