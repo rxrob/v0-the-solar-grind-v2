@@ -1,254 +1,132 @@
 "use client"
 
-import type React from "react"
 import { useState, useCallback } from "react"
-import { OCRService, type ExtractedData, type OCRProgress } from "@/lib/ocr-service"
-import { useProCalculatorStore } from "@/lib/store"
+import { useDropzone } from "react-dropzone"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Loader2, FileUp, X, CheckCircle } from "lucide-react"
 
 interface EnhancedFileUploadProps {
-  onDataExtracted?: (data: ExtractedData) => void
+  onOcrResult: (text: string) => void
 }
 
-export function EnhancedFileUpload({ onDataExtracted }: EnhancedFileUploadProps) {
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [progress, setProgress] = useState<OCRProgress | null>(null)
-  const [error, setError] = useState<string>("")
-  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+export function EnhancedFileUpload({ onOcrResult }: EnhancedFileUploadProps) {
+  const [file, setFile] = useState<File | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
+  const [preview, setPreview] = useState<string | null>(null)
 
-  const { setEnergyData } = useProCalculatorStore()
+  const handleFileProcessing = useCallback(
+    async (selectedFile: File) => {
+      setFile(selectedFile)
+      setIsLoading(true)
+      setIsSuccess(false)
 
-  const handleProgressUpdate = useCallback((progressData: OCRProgress) => {
-    setProgress(progressData)
-  }, [])
+      const reader = new FileReader()
+      reader.readAsDataURL(selectedFile)
+      reader.onloadend = async () => {
+        const base64data = reader.result as string
+        setPreview(base64data)
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+        try {
+          const response = await fetch("/api/ocr", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: base64data }),
+          })
 
-    // Validate file type
-    const validTypes = ["image/jpeg", "image/jpg", "image/png", "application/pdf"]
-    if (!validTypes.includes(file.type)) {
-      setError("Please upload a JPG, PNG, or PDF file.")
-      return
-    }
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || "Failed to process file.")
+          }
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File size must be less than 10MB.")
-      return
-    }
+          const result = await response.json()
 
-    setUploadedFile(file)
-    setIsProcessing(true)
-    setError("")
-    setExtractedData(null)
-    setProgress(null)
+          if (result.IsErroredOnProcessing) {
+            throw new Error(result.ErrorMessage.join("\n"))
+          }
 
-    try {
-      const ocrService = new OCRService(handleProgressUpdate)
-      const data = await ocrService.processFile(file)
+          const parsedText = result.ParsedResults[0]?.ParsedText || ""
+          if (!parsedText) {
+            throw new Error("OCR could not extract any text from the document.")
+          }
 
-      setExtractedData(data)
+          onOcrResult(parsedText)
+          toast.success("Utility bill processed successfully!")
+          setIsSuccess(true)
+        } catch (error: any) {
+          toast.error(`OCR Error: ${error.message}`)
+          setFile(null)
+          setPreview(null)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+      reader.onerror = () => {
+        toast.error("Failed to read file.")
+        setIsLoading(false)
+      }
+    },
+    [onOcrResult],
+  )
 
-      // Auto-fill the form data
-      const rate = data.usage && data.bill ? data.bill / data.usage : null
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      if (acceptedFiles.length > 0) {
+        handleFileProcessing(acceptedFiles[0])
+      }
+    },
+    [handleFileProcessing],
+  )
 
-      setEnergyData({
-        usage: data.usage,
-        bill: data.bill,
-        provider: data.provider,
-        rate,
-        extractedText: data.rawText,
-        uploadedFileName: file.name,
-      })
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { "image/jpeg": [], "image/png": [], "application/pdf": [] },
+    maxFiles: 1,
+  })
 
-      onDataExtracted?.(data)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to process file"
-      setError(errorMessage)
-      console.error("File processing error:", err)
-    } finally {
-      setIsProcessing(false)
-      setProgress(null)
-    }
-  }
-
-  const getProgressColor = () => {
-    if (!progress) return "bg-orange-500"
-
-    switch (progress.stage) {
-      case "processing":
-        return "bg-blue-500"
-      case "converting":
-        return "bg-purple-500"
-      case "reading":
-        return "bg-yellow-500"
-      case "extracting":
-        return "bg-green-500"
-      case "complete":
-        return "bg-green-600"
-      default:
-        return "bg-orange-500"
-    }
-  }
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 80) return "text-green-400"
-    if (confidence >= 60) return "text-yellow-400"
-    return "text-red-400"
-  }
-
-  const getConfidenceLabel = (confidence: number) => {
-    if (confidence >= 80) return "High Confidence"
-    if (confidence >= 60) return "Medium Confidence"
-    return "Low Confidence"
+  const removeFile = () => {
+    setFile(null)
+    setPreview(null)
+    setIsSuccess(false)
   }
 
   return (
-    <div className="space-y-6">
-      {/* Upload Area */}
-      <div className="bg-gray-900 p-6 rounded-lg">
-        <h3 className="text-xl font-semibold text-white mb-4 flex items-center">📄 Upload Electric Bill</h3>
-        <p className="text-gray-400 text-sm mb-4">
-          Upload a photo or PDF of your electric bill for automatic data extraction
-        </p>
-
-        <div className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-orange-500 transition-colors">
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="bill-upload"
-            disabled={isProcessing}
-          />
-          <label htmlFor="bill-upload" className={`cursor-pointer ${isProcessing ? "opacity-50" : ""}`}>
-            <div className="text-4xl mb-2">📁</div>
-            <p className="text-white font-semibold mb-1">{isProcessing ? "Processing..." : "Click to upload bill"}</p>
-            <p className="text-gray-400 text-sm">Supports JPG, PNG, PDF (multi-page)</p>
-          </label>
+    <div className="w-full">
+      {preview ? (
+        <div className="relative w-full p-4 border-2 border-dashed border-gray-600 rounded-lg text-center">
+          {file?.type.startsWith("image/") ? (
+            <img src={preview || "/placeholder.svg"} alt="Preview" className="max-h-48 mx-auto rounded-md" />
+          ) : (
+            <p className="text-white p-4 bg-gray-800 rounded-md">{file?.name}</p>
+          )}
+          <p className="text-sm text-gray-400 mt-2">{file?.name}</p>
+          <Button onClick={removeFile} variant="ghost" size="sm" className="absolute top-2 right-2">
+            <X className="h-4 w-4" />
+          </Button>
+          {isLoading && (
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
+              <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+            </div>
+          )}
+          {isSuccess && (
+            <div className="absolute inset-0 bg-green-900 bg-opacity-75 flex items-center justify-center rounded-lg">
+              <CheckCircle className="h-12 w-12 text-green-400" />
+            </div>
+          )}
         </div>
-
-        {/* File Info */}
-        {uploadedFile && (
-          <div className="mt-4 p-3 bg-gray-800 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white text-sm font-medium">{uploadedFile.name}</p>
-                <p className="text-gray-400 text-xs">
-                  {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB • {uploadedFile.type}
-                </p>
-              </div>
-              {!isProcessing && !error && <div className="text-green-400 text-xl">✅</div>}
-            </div>
-          </div>
-        )}
-
-        {/* Progress Bar */}
-        {isProcessing && progress && (
-          <div className="mt-4 p-4 bg-gray-800 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-white text-sm font-medium">{progress.message}</p>
-              <span className="text-gray-400 text-sm">{Math.round(progress.progress)}%</span>
-            </div>
-            <div className="w-full bg-gray-700 rounded-full h-2">
-              <div
-                className={`h-2 rounded-full transition-all duration-300 ${getProgressColor()}`}
-                style={{ width: `${progress.progress}%` }}
-              />
-            </div>
-            <div className="mt-2 text-xs text-gray-400 capitalize">
-              Stage: {progress.stage.replace(/([A-Z])/g, " $1").trim()}
-            </div>
-          </div>
-        )}
-
-        {/* Error Display */}
-        {error && (
-          <div className="mt-4 p-4 bg-red-900/30 border border-red-500 rounded-lg">
-            <div className="flex items-start space-x-3">
-              <div className="text-red-400 text-xl">❌</div>
-              <div>
-                <p className="text-red-400 font-medium mb-2">Couldn't read your bill</p>
-                <p className="text-red-300 text-sm mb-3">{error}</p>
-                <p className="text-gray-300 text-sm">
-                  💡 <strong>Want to enter the values manually?</strong> Use the form on the right, or try:
-                </p>
-                <ul className="text-gray-400 text-xs mt-2 space-y-1 ml-4">
-                  <li>• Taking a clearer, well-lit photo</li>
-                  <li>• Ensuring all text is readable</li>
-                  <li>• Using a PDF version if available</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Success & Preview */}
-        {extractedData && !isProcessing && (
-          <div className="mt-4 p-4 bg-green-900/30 border border-green-500 rounded-lg">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-green-400 font-semibold flex items-center">✅ Data Extracted Successfully</h4>
-              <div className={`text-sm font-medium ${getConfidenceColor(extractedData.confidence)}`}>
-                {getConfidenceLabel(extractedData.confidence)} ({extractedData.confidence}%)
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              {extractedData.usage > 0 && (
-                <div className="bg-gray-800 p-3 rounded">
-                  <p className="text-gray-400 text-xs">Monthly Usage</p>
-                  <p className="text-white font-bold text-lg">{extractedData.usage.toLocaleString()} kWh</p>
-                </div>
-              )}
-
-              {extractedData.bill > 0 && (
-                <div className="bg-gray-800 p-3 rounded">
-                  <p className="text-gray-400 text-xs">Total Bill</p>
-                  <p className="text-white font-bold text-lg">${extractedData.bill.toFixed(2)}</p>
-                </div>
-              )}
-
-              {extractedData.usage > 0 && extractedData.bill > 0 && (
-                <div className="bg-gray-800 p-3 rounded">
-                  <p className="text-gray-400 text-xs">Rate per kWh</p>
-                  <p className="text-white font-bold text-lg">
-                    ${(extractedData.bill / extractedData.usage).toFixed(3)}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {extractedData.provider && (
-              <div className="bg-gray-800 p-3 rounded mb-4">
-                <p className="text-gray-400 text-xs">Utility Provider</p>
-                <p className="text-white font-medium">{extractedData.provider}</p>
-              </div>
-            )}
-
-            <details className="text-sm">
-              <summary className="text-gray-400 cursor-pointer hover:text-white">View extracted text preview</summary>
-              <div className="mt-2 p-3 bg-gray-800 rounded text-xs text-gray-300 max-h-32 overflow-y-auto">
-                {extractedData.rawText.slice(0, 500)}
-                {extractedData.rawText.length > 500 && "..."}
-              </div>
-            </details>
-          </div>
-        )}
-      </div>
-
-      {/* Tips */}
-      <div className="bg-gray-800 p-4 rounded-lg">
-        <h4 className="text-sm font-semibold text-gray-300 mb-2">📸 Tips for better results:</h4>
-        <ul className="text-xs text-gray-400 space-y-1">
-          <li>• Take a clear, well-lit photo of the entire bill</li>
-          <li>• Ensure all text is readable and not blurry</li>
-          <li>• Include the summary section with usage and total amount</li>
-          <li>• PDF files typically give the best results</li>
-          <li>• Multi-page PDFs are automatically processed</li>
-        </ul>
-      </div>
+      ) : (
+        <div
+          {...getRootProps()}
+          className={`p-10 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors
+          ${isDragActive ? "border-orange-400 bg-gray-800" : "border-gray-600 hover:border-orange-500"}`}
+        >
+          <input {...getInputProps()} />
+          <FileUp className="mx-auto h-12 w-12 text-gray-400" />
+          <p className="mt-2 text-white">Drag & drop your utility bill here, or click to select a file</p>
+          <p className="text-xs text-gray-500">PDF, PNG, or JPG supported</p>
+        </div>
+      )}
     </div>
   )
 }

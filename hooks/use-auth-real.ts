@@ -1,145 +1,88 @@
 "use client"
-import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase-client"
-import { useSupabase } from "@/components/supabase-provider"
-import { toast } from "sonner"
 
-interface SignUpData {
-  email: string
-  password: string
-  firstName?: string
-  lastName?: string
-}
+import { useState, useEffect } from "react"
+import type { User } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabase"
 
-interface SignInData {
-  email: string
-  password: string
+interface AuthState {
+  user: User | null
+  loading: boolean
+  error: string | null
 }
 
 export function useAuthReal() {
-  const { user, session, loading } = useSupabase()
-  const router = useRouter()
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    loading: true,
+    error: null,
+  })
 
-  const signUp = async ({ email, password, firstName, lastName }: SignUpData) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || null,
-            first_name: firstName || null,
-            last_name: lastName || null,
-          },
-        },
-      })
+  useEffect(() => {
+    // Get initial session
+    const getInitialSession = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+        if (error) throw error
 
-      if (error) {
-        toast.error(error.message)
-        return { success: false, error: error.message }
+        setState({
+          user: session?.user ?? null,
+          loading: false,
+          error: null,
+        })
+      } catch (error) {
+        setState({
+          user: null,
+          loading: false,
+          error: error instanceof Error ? error.message : "Authentication error",
+        })
       }
-
-      if (data.user && !data.session) {
-        toast.success("Check your email to confirm your account")
-        return { success: true, needsConfirmation: true }
-      }
-
-      toast.success("Account created!")
-      return { success: true, user: data.user }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "An unexpected error occurred"
-      toast.error(msg)
-      return { success: false, error: msg }
     }
-  }
 
-  const signIn = async ({ email, password }: SignInData) => {
+    getInitialSession()
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setState({
+        user: session?.user ?? null,
+        loading: false,
+        error: null,
+      })
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const signIn = async (email: string, password: string) => {
+    setState((prev) => ({ ...prev, loading: true, error: null }))
+
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-      if (error) {
-        toast.error(error.message)
-        return { success: false, error: error.message }
-      }
-
-      toast.success("Signed in!")
-      router.push("/dashboard")
-      return { success: true, user: data.user }
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "An unexpected error occurred"
-      toast.error(msg)
-      return { success: false, error: msg }
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : "Sign in failed",
+      }))
     }
   }
 
   const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-
-      if (error) {
-        toast.error(error.message)
-        return { success: false, error: error.message }
-      }
-
-      toast.success("Signed out!")
-      router.push("/")
-      return { success: true }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "An unexpected error occurred"
-      toast.error(msg)
-      return { success: false, error: msg }
-    }
-  }
-
-  const resetPassword = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
-
-      if (error) {
-        toast.error(error.message)
-        return { success: false, error: error.message }
-      }
-
-      toast.success("Password reset email sent!")
-      return { success: true }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "An unexpected error occurred"
-      toast.error(msg)
-      return { success: false, error: msg }
-    }
-  }
-
-  const updatePassword = async (newPassword: string) => {
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword })
-
-      if (error) {
-        toast.error(error.message)
-        return { success: false, error: error.message }
-      }
-
-      toast.success("Password updated!")
-      return { success: true }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "An unexpected error occurred"
-      toast.error(msg)
-      return { success: false, error: msg }
-    }
+    setState((prev) => ({ ...prev, loading: true }))
+    await supabase.auth.signOut()
   }
 
   return {
-    user,
-    session,
-    loading,
-    isAuthenticated: !!user,
-    signUp,
+    ...state,
     signIn,
     signOut,
-    resetPassword,
-    updatePassword,
   }
 }
 
-export default useAuthReal
+// Alias for compatibility
+export const useAuth = useAuthReal

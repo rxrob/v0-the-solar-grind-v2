@@ -1,103 +1,85 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
+import type { PropertyData, EnergyData, AnalysisData } from "@/types/solar"
 
-interface PropertyData {
-  address: string
-  coordinates: { lat: number; lng: number } | null
-  propertyImages: {
-    front: string
-    right: string
-    left: string
-    aerial: string
-  } | null
-}
-
-interface EnergyData {
-  usage: number
-  bill: number
-  provider: string
-  rate: number | null
-  extractedText: string
-  uploadedFileName: string
-}
-
-interface AnalysisData {
-  roofScore: number
-  sunlightHours: number
-  suitabilityScore: number
-  recommendations: string[]
-  advantages: string[]
-  considerations: string[]
-}
-
-interface ProCalculatorState {
+interface SolarCalculatorState {
   currentStep: number
+  isHydrated: boolean
   propertyData: PropertyData
   energyData: EnergyData
-  analysisData: AnalysisData | null
-
-  // Actions
+  analysisData: AnalysisData
   setCurrentStep: (step: number) => void
   setPropertyData: (data: Partial<PropertyData>) => void
   setEnergyData: (data: Partial<EnergyData>) => void
-  setAnalysisData: (data: AnalysisData) => void
-  resetStore: () => void
+  setAnalysisData: (data: Partial<AnalysisData>) => void
+  reset: () => void
+  setHydrated: () => void
 }
 
-const initialState = {
+const initialState: Omit<
+  SolarCalculatorState,
+  "setCurrentStep" | "setPropertyData" | "setEnergyData" | "setAnalysisData" | "reset" | "setHydrated"
+> = {
   currentStep: 1,
+  isHydrated: false,
   propertyData: {
-    address: "",
+    address: null,
     coordinates: null,
-    propertyImages: null,
+    zipCode: null,
+    sunHours: null,
   },
   energyData: {
-    usage: 0,
-    bill: 0,
-    provider: "",
-    rate: null,
-    extractedText: "",
-    uploadedFileName: "",
+    monthlyUsage: null,
+    monthlyBill: null,
+    electricityRate: null,
+    utilityProvider: null,
+    solarProgram: null,
   },
-  analysisData: null,
+  analysisData: {
+    systemSize: null,
+    annualProduction: null,
+    monthlySavings: null,
+    annualSavings: null,
+    paybackPeriod: null,
+    totalCost: null,
+    incentives: null,
+    netCost: null,
+    co2Reduction: null,
+    treesEquivalent: null,
+    solarOffsetPercent: null,
+    productionKwhPerMonth: null,
+    sunlightHours: null,
+  },
 }
 
-export const useProCalculatorStore = create<ProCalculatorState>()(
+export const useSolarCalculatorStore = create<SolarCalculatorState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       ...initialState,
-
-      setCurrentStep: (step: number) => set({ currentStep: step }),
-
-      setPropertyData: (data: Partial<PropertyData>) =>
+      setCurrentStep: (step) => set({ currentStep: step }),
+      setPropertyData: (data) =>
         set((state) => ({
           propertyData: { ...state.propertyData, ...data },
         })),
-
-      setEnergyData: (data: Partial<EnergyData>) =>
-        set((state) => {
-          const newEnergyData = { ...state.energyData, ...data }
-
-          // Auto-calculate rate if usage and bill are available
-          if (newEnergyData.usage > 0 && newEnergyData.bill > 0) {
-            newEnergyData.rate = newEnergyData.bill / newEnergyData.usage
-          }
-
-          return { energyData: newEnergyData }
-        }),
-
-      setAnalysisData: (data: AnalysisData) => set({ analysisData: data }),
-
-      resetStore: () => set(initialState),
+      setEnergyData: (data) =>
+        set((state) => ({
+          energyData: { ...state.energyData, ...data },
+        })),
+      setAnalysisData: (data) =>
+        set((state) => ({
+          analysisData: { ...state.analysisData, ...data },
+        })),
+      reset: () => set((state) => ({ ...initialState, isHydrated: state.isHydrated })),
+      setHydrated: () => set({ isHydrated: true }),
     }),
     {
-      name: "pro-calculator-storage",
-      partialize: (state) => ({
-        currentStep: state.currentStep,
-        propertyData: state.propertyData,
-        energyData: state.energyData,
-        analysisData: state.analysisData,
-      }),
+      name: "solar-ai-store",
+      version: 2,
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setHydrated()
+        }
+      },
     },
   ),
 )

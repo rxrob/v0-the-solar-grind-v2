@@ -2,19 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Search, CheckCircle, XCircle } from "lucide-react"
-import { google } from "google-maps"
-
-interface PlacePrediction {
-  place_id: string
-  description: string
-  structured_formatting: {
-    main_text: string
-    secondary_text: string
-  }
-}
+import { MapPin, CheckCircle, XCircle } from "lucide-react"
+import type { google } from "google-maps"
 
 interface PlaceDetails {
   formatted_address: string
@@ -28,16 +18,13 @@ interface PlaceDetails {
 }
 
 export default function TestAddressAutocompletePage() {
-  const [query, setQuery] = useState("")
-  const [predictions, setPredictions] = useState<PlacePrediction[]>([])
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null)
-  const [loading, setLoading] = useState(false)
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load Google Maps API
+  // Load Google Maps API and Places Widget
   useEffect(() => {
-    const loadGoogleMaps = async () => {
+    const loadScripts = async () => {
       try {
         const response = await fetch("/api/google-maps-config")
         const config = await response.json()
@@ -48,107 +35,43 @@ export default function TestAddressAutocompletePage() {
         }
 
         // Load Google Maps script
-        const script = document.createElement("script")
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${config.apiKey}&libraries=places`
-        script.async = true
-        script.defer = true
-        script.onload = () => setGoogleMapsLoaded(true)
-        script.onerror = () => setError("Failed to load Google Maps API")
-        document.head.appendChild(script)
+        const mapsScript = document.createElement("script")
+        mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${config.apiKey}&libraries=places,marker&v=beta`
+        mapsScript.async = true
+        mapsScript.defer = true
+        mapsScript.onload = () => setGoogleMapsLoaded(true)
+        mapsScript.onerror = () => setError("Failed to load Google Maps API")
+        document.head.appendChild(mapsScript)
+
+        // Load Places Widget module from unpkg
+        const widgetScript = document.createElement("script")
+        widgetScript.src = "https://unpkg.com/@googlemaps/places-widget"
+        widgetScript.type = "module"
+        widgetScript.async = true
+        document.head.appendChild(widgetScript)
       } catch (error) {
         setError("Failed to load Google Maps configuration")
       }
     }
 
-    loadGoogleMaps()
+    loadScripts()
   }, [])
 
-  // Search for place predictions
-  const searchPlaces = async (searchQuery: string) => {
-    if (!googleMapsLoaded || !searchQuery.trim()) {
-      setPredictions([])
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const service = new google.maps.places.AutocompleteService()
-
-      service.getPlacePredictions(
-        {
-          input: searchQuery,
-          types: ["address"],
-          componentRestrictions: { country: "us" },
+  const handlePlaceChange = (event: CustomEvent<{ value: google.maps.places.Place | null }>) => {
+    const place = event.detail.value
+    if (place && place.geometry && place.geometry.location) {
+      setSelectedPlace({
+        formatted_address: place.formatted_address || "",
+        geometry: {
+          location: {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          },
         },
-        (predictions, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-            setPredictions(predictions)
-          } else {
-            setPredictions([])
-            if (status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-              setError(`Places API error: ${status}`)
-            }
-          }
-          setLoading(false)
-        },
-      )
-    } catch (error) {
-      setError("Error searching places")
-      setLoading(false)
+        place_id: place.place_id || "",
+      })
     }
   }
-
-  // Get place details
-  const getPlaceDetails = async (placeId: string) => {
-    if (!googleMapsLoaded) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const service = new google.maps.places.PlacesService(document.createElement("div"))
-
-      service.getDetails(
-        {
-          placeId: placeId,
-          fields: ["formatted_address", "geometry", "place_id"],
-        },
-        (place, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-            setSelectedPlace({
-              formatted_address: place.formatted_address || "",
-              geometry: {
-                location: {
-                  lat: place.geometry?.location?.lat() || 0,
-                  lng: place.geometry?.location?.lng() || 0,
-                },
-              },
-              place_id: place.place_id || "",
-            })
-            setPredictions([])
-            setQuery(place.formatted_address || "")
-          } else {
-            setError(`Place details error: ${status}`)
-          }
-          setLoading(false)
-        },
-      )
-    } catch (error) {
-      setError("Error getting place details")
-      setLoading(false)
-    }
-  }
-
-  // Handle input change with debouncing
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      searchPlaces(query)
-    }, 300)
-
-    return () => clearTimeout(timeoutId)
-  }, [query, googleMapsLoaded])
 
   return (
     <div className="container mx-auto p-6 max-w-2xl">
@@ -156,7 +79,7 @@ export default function TestAddressAutocompletePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
-            Address Autocomplete Test
+            Address Autocomplete Test (Modern)
           </CardTitle>
           <div className="flex items-center gap-2">
             {googleMapsLoaded ? (
@@ -175,49 +98,18 @@ export default function TestAddressAutocompletePage() {
         <CardContent className="space-y-4">
           {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>}
 
-          {/* Search Input */}
           <div className="relative">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
+            {googleMapsLoaded ? (
+              <gmpx-place-autocomplete
+                onPlaceChange={handlePlaceChange}
                 placeholder="Start typing an address..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="pl-10"
-                disabled={!googleMapsLoaded}
-              />
-            </div>
-
-            {/* Predictions Dropdown */}
-            {predictions.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                {predictions.map((prediction) => (
-                  <button
-                    key={prediction.place_id}
-                    onClick={() => getPlaceDetails(prediction.place_id)}
-                    className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                  >
-                    <div className="font-medium">{prediction.structured_formatting.main_text}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {prediction.structured_formatting.secondary_text}
-                    </div>
-                  </button>
-                ))}
-              </div>
+                className="w-full"
+              ></gmpx-place-autocomplete>
+            ) : (
+              <div className="w-full p-3 border rounded-md bg-gray-100 text-gray-500">Loading Autocomplete...</div>
             )}
           </div>
 
-          {loading && (
-            <div className="text-center py-4">
-              <div className="inline-flex items-center gap-2 text-muted-foreground">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                Searching...
-              </div>
-            </div>
-          )}
-
-          {/* Selected Place Details */}
           {selectedPlace && (
             <Card>
               <CardHeader>
@@ -246,7 +138,6 @@ export default function TestAddressAutocompletePage() {
             </Card>
           )}
 
-          {/* Instructions */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Test Instructions</CardTitle>
@@ -255,7 +146,7 @@ export default function TestAddressAutocompletePage() {
               <p>1. Start typing an address in the search box above</p>
               <p>2. Select an address from the dropdown suggestions</p>
               <p>3. View the detailed address information and coordinates</p>
-              <p>4. This tests the Google Places API integration</p>
+              <p>4. This tests the modern Google Places Autocomplete Web Component</p>
             </CardContent>
           </Card>
         </CardContent>

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const fs = require("fs")
-const path = require("path")
+import fs from "fs"
+import path from "path"
 
 const requiredVars = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -34,11 +34,20 @@ function loadEnvFile() {
   }
 }
 
+function isValidUrl(string: string): boolean {
+  try {
+    new URL(string)
+    return true
+  } catch (_) {
+    return false
+  }
+}
+
 function validateEnvironment() {
   loadEnvFile()
 
-  const errors = []
-  const warnings = []
+  const errors: string[] = []
+  const warnings: string[] = []
 
   console.log("🔍 Validating environment variables...\n")
 
@@ -83,15 +92,6 @@ function validateEnvironment() {
   }
 
   console.log("\n🎉 All environment variables are properly configured!")
-}
-
-function isValidUrl(string) {
-  try {
-    new URL(string)
-    return true
-  } catch (_) {
-    return false
-  }
 }
 
 validateEnvironment()

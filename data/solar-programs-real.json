@@ -1,0 +1,140 @@
+{
+  "Grayson-Collin Electric Cooperative": {
+    "netMetering": true,
+    "buybackRate": 0.127,
+    "dgFee": 5,
+    "notes": "1:1 net metering with a $5 monthly DG charge."
+  },
+  "GRAYSON-COLLIN ELECTRIC COOPERATIVE INC": {
+    "netMetering": true,
+    "buybackRate": 0.127,
+    "dgFee": 5,
+    "notes": "1:1 net metering with a $5 monthly DG charge."
+  },
+  "Bluebonnet Electric Cooperative": {
+    "netMetering": false,
+    "buybackRate": 0.0616,
+    "dgFee": 0,
+    "notes": "Avoided-cost buyback. No net metering."
+  },
+  "BLUEBONNET ELECTRIC COOPERATIVE INC": {
+    "netMetering": false,
+    "buybackRate": 0.0616,
+    "dgFee": 0,
+    "notes": "Avoided-cost buyback. No net metering."
+  },
+  "CenterPoint Energy": {
+    "netMetering": false,
+    "buybackRate": "Varies by REP",
+    "dgFee": 0,
+    "notes": "No net metering. Choose REP with solar buyback."
+  },
+  "Oncor Electric Delivery": {
+    "netMetering": false,
+    "buybackRate": "Varies by REP",
+    "dgFee": 0,
+    "notes": "1:1 buyback only available through select REPs."
+  },
+  "Oncor Electric Delivery Company NTU LLC": {
+    "netMetering": false,
+    "buybackRate": "Varies by REP",
+    "dgFee": 0,
+    "notes": "1:1 buyback only available through select REPs."
+  },
+  "Guadalupe Valley Electric Cooperative": {
+    "netMetering": false,
+    "buybackRate": 0.045,
+    "dgFee": 0,
+    "notes": "Avoided-cost rate. Export-only compensation."
+  },
+  "GUADALUPE VALLEY ELECTRIC COOPERATIVE INC": {
+    "netMetering": false,
+    "buybackRate": 0.045,
+    "dgFee": 0,
+    "notes": "Avoided-cost rate. Export-only compensation."
+  },
+  "Hamilton County Electric Cooperative Association": {
+    "netMetering": false,
+    "buybackRate": 0,
+    "dgFee": 0,
+    "notes": "No buyback currently offered."
+  },
+  "HAMILTON COUNTY ELECTRIC COOPERATIVE ASSOCIATION": {
+    "netMetering": false,
+    "buybackRate": 0,
+    "dgFee": 0,
+    "notes": "No buyback currently offered."
+  },
+  "Wise Electric Cooperative Inc": {
+    "netMetering": false,
+    "buybackRate": 0.036,
+    "dgFee": 0,
+    "notes": "Avoided cost only, no 1:1 buyback."
+  },
+  "WISE ELECTRIC COOPERATIVE INC": {
+    "netMetering": false,
+    "buybackRate": 0.036,
+    "dgFee": 0,
+    "notes": "Avoided cost only, no 1:1 buyback."
+  },
+  "Houston County Electric Cooperative Inc": {
+    "netMetering": false,
+    "buybackRate": 0,
+    "dgFee": 0,
+    "notes": "No solar buyback offered."
+  },
+  "HOUSTON COUNTY ELECTRIC COOPERATIVE INC": {
+    "netMetering": false,
+    "buybackRate": 0,
+    "dgFee": 0,
+    "notes": "No solar buyback offered."
+  },
+  "Rio Grande Electric Cooperative Inc": {
+    "netMetering": false,
+    "buybackRate": 0.03,
+    "dgFee": 0,
+    "notes": "Export compensation only. Must install bi-directional meter."
+  },
+  "RIO GRANDE ELECTRIC COOPERATIVE INC": {
+    "netMetering": false,
+    "buybackRate": 0.03,
+    "dgFee": 0,
+    "notes": "Export compensation only. Must install bi-directional meter."
+  },
+  "PEDERNALES ELECTRIC COOPERATIVE INC": {
+    "netMetering": false,
+    "buybackRate": 0.055,
+    "dgFee": 0,
+    "notes": "Avoided cost buyback. No net metering available."
+  },
+  "DENTON COUNTY ELECTRIC COOPERATIVE INC": {
+    "netMetering": false,
+    "buybackRate": "Varies by REP",
+    "dgFee": 0,
+    "notes": "Also known as CoServ. Choose REP with solar buyback."
+  },
+  "CoServ Electric": {
+    "netMetering": false,
+    "buybackRate": "Varies by REP",
+    "dgFee": 0,
+    "notes": "Also known as CoServ. Choose REP with solar buyback."
+  },
+  "AEP Texas North": {
+    "netMetering": false,
+    "buybackRate": "Varies by REP",
+    "dgFee": 0,
+    "notes": "Deregulated area. Choose REP with solar buyback."
+  },
+  "AEP Texas Central": {
+    "netMetering": false,
+    "buybackRate": "Varies by REP",
+    "dgFee": 0,
+    "notes": "Deregulated area. Choose REP with solar buyback."
+  },
+  "Texas-New Mexico Power (TNMP)": {
+    "netMetering": false,
+    "buybackRate": "Varies by REP",
+    "dgFee": 0,
+    "notes": "Deregulated area. Choose REP with solar buyback."
+  }
+}

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-const fs = require("fs")
-const path = require("path")
+import fs from "fs"
+import path from "path"
 
+// The HTML content for the maintenance page
 const lockdownPage = `
 <!DOCTYPE html>
 <html>
@@ -84,27 +85,33 @@ function emergencyLockdown() {
     ),
   )
 
-  // Backup current pages
-  const pagesDir = path.join(process.cwd(), "app")
+  // Backup critical files
+  const appDir = path.join(process.cwd(), "app")
   const backupDir = path.join(process.cwd(), ".lockdown-backup")
 
-  if (fs.existsSync(pagesDir) && !fs.existsSync(backupDir)) {
+  if (fs.existsSync(appDir) && !fs.existsSync(backupDir)) {
     fs.mkdirSync(backupDir, { recursive: true })
-    // Simple backup of critical files
+    console.log(`📦 Created backup directory at ${backupDir}`)
     try {
-      if (fs.existsSync(path.join(pagesDir, "page.tsx"))) {
-        fs.copyFileSync(path.join(pagesDir, "page.tsx"), path.join(backupDir, "page.tsx"))
+      const mainPagePath = path.join(appDir, "page.tsx")
+      if (fs.existsSync(mainPagePath)) {
+        fs.copyFileSync(mainPagePath, path.join(backupDir, "page.tsx.bak"))
+        console.log(`📄 Backed up app/page.tsx`)
+      }
+      const layoutPath = path.join(appDir, "layout.tsx")
+      if (fs.existsSync(layoutPath)) {
+        fs.copyFileSync(layoutPath, path.join(backupDir, "layout.tsx.bak"))
+        console.log(`📄 Backed up app/layout.tsx`)
       }
     } catch (error) {
-      console.log("⚠️  Backup failed, continuing with lockdown...")
+      console.error("⚠️  Backup failed, continuing with lockdown...", error)
     }
   }
 
-  console.log("✅ Emergency lockdown activated")
+  console.log("\n✅ Emergency lockdown activated")
   console.log("📄 Maintenance page created at /public/maintenance.html")
   console.log("🔒 System is now in lockdown mode")
-  console.log("")
-  console.log("To restore service:")
+  console.log("\nTo restore service, run:")
   console.log("  npm run restore-from-lockdown")
 }
 

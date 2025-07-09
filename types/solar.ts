@@ -359,6 +359,91 @@ export interface DashboardProject {
   lastUpdated: string
 }
 
+// Property Data Types
+export interface PropertyData {
+  address: string | null
+  coordinates: {
+    lat: number
+    lng: number
+  } | null
+  zipCode: string | null
+  sunHours: number | null
+}
+
+// Energy Data Types
+export interface EnergyData {
+  monthlyUsage: number | null
+  monthlyBill: number | null
+  electricityRate: number | null
+  utilityProvider: string | null
+  solarProgram: {
+    rateType: string
+    buybackRatePerkWh?: number
+    exportCreditRatePerkWh?: number
+    monthlyCustomerFee?: number
+    solarFeeMonthly?: number
+    notes?: string
+  } | null
+}
+
+// Financial Data Types
+export interface FinancialData {
+  systemCost: number
+  upfrontCost: number
+  loanAmount: number
+  loanInterestRate: number
+  loanTerm: number
+  federalIncentive: number | null
+  stateIncentive: number | null
+  utilityIncentive: number | null
+  netCost: number | null
+  paybackPeriod: number | null
+  annualSavings: number | null
+}
+
+// Solar System Data Types
+export interface SolarSystemData {
+  systemSize: number | null
+  panelCount: number | null
+  estimatedCost: number | null
+  estimatedProduction: number | null
+}
+
+// Solar Analysis Data Types
+export interface SolarAnalysisData {
+  monthlyProduction: number[]
+  annualProduction: number
+  monthlySavings: number[]
+  annualSavings: number
+}
+
+// Analysis Data Types
+export interface AnalysisData {
+  systemSize: number | null
+  annualProduction: number | null
+  monthlySavings: number | null
+  annualSavings: number | null
+  paybackPeriod: number | null
+  totalCost: number | null
+  incentives: number | null
+  netCost: number | null
+  co2Reduction: number | null
+  treesEquivalent: number | null
+  solarOffsetPercent: number | null
+  productionKwhPerMonth: number | null
+  sunlightHours: number | null
+}
+
+// Solar Program Types
+export interface SolarProgram {
+  rateType: string
+  buybackRatePerkWh: number
+  exportCreditRatePerkWh: number
+  monthlyCustomerFee: number
+  solarFeeMonthly: number
+  notes: string
+}
+
 // Export all types for easy importing
 export type {
   SolarCalculationInput,
@@ -394,4 +479,11 @@ export type {
   ApiConfig,
   DashboardStats,
   DashboardProject,
+  PropertyData,
+  EnergyData,
+  FinancialData,
+  SolarSystemData,
+  SolarAnalysisData,
+  SolarProgram,
+  AnalysisData,
 }

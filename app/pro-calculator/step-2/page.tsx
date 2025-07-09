@@ -1,232 +1,204 @@
 "use client"
-import { useState, useEffect } from "react"
-import { useProCalculatorStore } from "@/lib/store"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { useSolarCalculatorStore } from "@/lib/store"
 import { EnhancedFileUpload } from "@/components/enhanced-file-upload"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toast } from "sonner"
+import utilityOptions from "@/data/texas-utility-options.json"
+import { Loader2 } from "lucide-react"
 
-export default function ProCalculatorStep2() {
-  const { energyData, setEnergyData } = useProCalculatorStore()
-  const [localUsage, setLocalUsage] = useState(energyData.usage || 0)
-  const [localBill, setLocalBill] = useState(energyData.bill || 0)
-  const [localProvider, setLocalProvider] = useState(energyData.provider || "")
+export default function Step2() {
+  const router = useRouter()
+  const { propertyData, energyData, setEnergyData, setCurrentStep, isHydrated } = useSolarCalculatorStore()
 
-  // Sync local state with store
+  // Initialize state safely from the store, providing fallbacks
+  const [monthlyUsage, setMonthlyUsage] = useState<string>(energyData?.monthlyUsage?.toString() || "")
+  const [monthlyBill, setMonthlyBill] = useState<string>(energyData?.monthlyBill?.toString() || "")
+  const [utilityProvider, setUtilityProvider] = useState<string>(energyData?.utilityProvider || "")
+  const [solarInfo, setSolarInfo] = useState<string | null>(null)
+
   useEffect(() => {
-    setLocalUsage(energyData.usage || 0)
-    setLocalBill(energyData.bill || 0)
-    setLocalProvider(energyData.provider || "")
-  }, [energyData])
+    if (isHydrated) {
+      if (!propertyData?.address) {
+        toast.error("Please start from Step 1.", {
+          description: "Redirecting you back...",
+        })
+        router.push("/pro-calculator/step-1")
+      } else {
+        setCurrentStep(2)
+      }
+    }
+  }, [isHydrated, propertyData, setCurrentStep, router])
 
-  // Update store when local values change
-  const handleUsageChange = (value: number) => {
-    setLocalUsage(value)
-    setEnergyData({ usage: value })
+  useEffect(() => {
+    const normalized = utilityProvider?.trim().toLowerCase()
+    if (!normalized) {
+      setSolarInfo(null)
+      return
+    }
+    if (normalized.includes("coserv")) {
+      setSolarInfo(
+        "🟠 CoServ Electric does not offer net metering. You must choose a REP with buyback (~$0.105/kWh). Monthly fee: $30. Solar fee: $12.",
+      )
+    } else if (normalized.includes("bluebonnet")) {
+      setSolarInfo(
+        "🟢 Bluebonnet Electric offers 1:1 net metering. Credits carry forward monthly. No solar fee. Base fee: $35.",
+      )
+    } else if (normalized.includes("centerpoint") || normalized.includes("oncor")) {
+      setSolarInfo(
+        "🟡 CenterPoint / Oncor territory varies by REP. Some offer 1:1 buyback. No base solar fee from utility.",
+      )
+    } else {
+      setSolarInfo("⚪ Utility not recognized. Please confirm solar policy manually.")
+    }
+  }, [utilityProvider])
+
+  const handleOCRSuccess = (data: any) => {
+    toast.success("Bill data extracted!")
+    // Safely access properties from OCR data
+    const usage = data?.monthlyUsage
+    const bill = data?.monthlyBill
+    const provider = data?.utilityProvider
+
+    if (usage) setMonthlyUsage(usage.toString())
+    if (bill) setMonthlyBill(bill.toString())
+    if (provider) setUtilityProvider(provider)
+
+    setEnergyData({
+      monthlyUsage: usage ? Number(usage) : energyData?.monthlyUsage,
+      monthlyBill: bill ? Number(bill) : energyData?.monthlyBill,
+      utilityProvider: provider || energyData?.utilityProvider,
+    })
   }
 
-  const handleBillChange = (value: number) => {
-    setLocalBill(value)
-    setEnergyData({ bill: value })
+  const handleOCRError = (error: string) => {
+    toast.error("OCR Failed", { description: error })
   }
 
-  const handleProviderChange = (value: string) => {
-    setLocalProvider(value)
-    setEnergyData({ provider: value })
+  const handleSubmit = () => {
+    const usageNum = Number(monthlyUsage)
+    const billNum = Number(monthlyBill)
+
+    if (isNaN(usageNum) || usageNum <= 0 || isNaN(billNum) || billNum <= 0 || !utilityProvider) {
+      toast.error("Please complete all required fields with valid numbers before continuing.")
+      return
+    }
+
+    const calculatedRate = usageNum > 0 ? billNum / usageNum : null
+
+    setEnergyData({
+      monthlyUsage: usageNum,
+      monthlyBill: billNum,
+      electricityRate: calculatedRate,
+      utilityProvider,
+    })
+    router.push("/pro-calculator/step-3")
   }
 
-  const effectiveRate = localUsage && localBill ? (localBill / localUsage).toFixed(3) : null
-  const canContinue = localUsage > 0 && localBill > 0
+  if (!isHydrated) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+      </div>
+    )
+  }
+
+  const electricityRate = Number(monthlyUsage) > 0 ? (Number(monthlyBill) / Number(monthlyUsage)).toFixed(3) : ""
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Nav */}
-      <header className="fixed top-0 left-0 w-full bg-black/80 backdrop-blur-md shadow-md z-50 px-6 py-4 flex justify-between items-center border-b border-orange-500">
-        <a href="/" className="text-xl font-bold text-orange-400">
-          SolarAI
-        </a>
-        <nav className="flex gap-6 items-center text-sm font-semibold">
-          <a href="/calculator" className="hover:text-orange-400">
-            Free Calculator
-          </a>
-          <a href="/dashboard" className="hover:text-orange-400">
-            Dashboard
-          </a>
-          <a href="/login" className="bg-orange-500 hover:bg-orange-600 px-4 py-2 rounded-lg text-white transition">
-            Sign In / Sign Up
-          </a>
-        </nav>
-      </header>
-
-      <main className="min-h-screen bg-black text-white px-8 py-32">
-        {/* Progress Indicator */}
-        <div className="mb-8 max-w-4xl">
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-sm font-bold">
-                ✓
-              </div>
-              <span className="ml-2 text-green-400 font-semibold">Step 1: Address</span>
+    <div className="max-w-4xl mx-auto">
+      <Card className="bg-[#0a0a0a] border border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-orange-400 text-2xl">Step 2: Energy Usage</CardTitle>
+          <CardDescription className="text-gray-400">
+            Upload your utility bill for automatic detection, or enter the info manually. We'll estimate your $/kWh and
+            summarize the solar program.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-8">
+            <EnhancedFileUpload onExtractedData={handleOCRSuccess} onError={handleOCRError} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="monthly-usage" className="text-gray-300">
+                Monthly Energy Usage (kWh)
+              </Label>
+              <Input
+                id="monthly-usage"
+                type="number"
+                value={monthlyUsage}
+                onChange={(e) => setMonthlyUsage(e.target.value)}
+                className="bg-gray-800 border-gray-600 text-white"
+                placeholder="e.g., 1200"
+              />
             </div>
-            <div className="flex-1 h-1 bg-gray-700 rounded">
-              <div className="h-1 bg-orange-500 rounded w-1/2"></div>
+            <div className="space-y-2">
+              <Label htmlFor="monthly-bill" className="text-gray-300">
+                Monthly Bill Amount ($)
+              </Label>
+              <Input
+                id="monthly-bill"
+                type="number"
+                value={monthlyBill}
+                onChange={(e) => setMonthlyBill(e.target.value)}
+                className="bg-gray-800 border-gray-600 text-white"
+                placeholder="e.g., 150"
+              />
             </div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-sm font-bold">
-                2
-              </div>
-              <span className="ml-2 text-orange-400 font-semibold">Step 2: Energy Usage</span>
+            <div className="space-y-2">
+              <Label htmlFor="utility-provider" className="text-gray-300">
+                Utility Provider
+              </Label>
+              <Select onValueChange={setUtilityProvider} value={utilityProvider}>
+                <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
+                  <SelectValue placeholder="Select your utility provider" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-900 text-white border-gray-700 max-h-60">
+                  {utilityOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex-1 h-1 bg-gray-700 rounded"></div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-sm font-bold">
-                3
-              </div>
-              <span className="ml-2 text-gray-400 font-semibold">Step 3: Analysis</span>
+            <div className="space-y-2">
+              <Label htmlFor="electricity-rate" className="text-gray-300">
+                Electricity Rate ($/kWh)
+              </Label>
+              <Input
+                id="electricity-rate"
+                type="text"
+                value={electricityRate ? `$${electricityRate}` : ""}
+                readOnly
+                className="bg-gray-900 border-gray-700 text-gray-400"
+                placeholder="Auto-calculated"
+              />
             </div>
           </div>
-        </div>
-
-        <h1 className="text-4xl font-bold text-orange-400 mb-6">Step 2: Energy Usage</h1>
-        <p className="text-gray-300 mb-8 max-w-xl">
-          Upload your electric bill for automatic data extraction, or enter your usage details manually to get accurate
-          solar savings calculations.
-        </p>
-
-        <div className="max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Enhanced File Upload */}
-          <EnhancedFileUpload />
-
-          {/* Right Column - Manual Input */}
-          <div className="space-y-6">
-            <div className="bg-gray-900 p-6 rounded-lg">
-              <h3 className="text-xl font-semibold text-white mb-4 flex items-center">⚡ Energy Details</h3>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-300">Monthly Usage (kWh) *</label>
-                  <input
-                    type="number"
-                    value={localUsage || ""}
-                    onChange={(e) => handleUsageChange(Number(e.target.value))}
-                    placeholder="e.g., 1200"
-                    className="w-full rounded-md px-4 py-3 text-black text-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  <p className="text-gray-400 text-xs mt-1">
-                    Find this on your electric bill (usually labeled as kWh used)
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-300">Total Monthly Bill ($) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={localBill || ""}
-                    onChange={(e) => handleBillChange(Number(e.target.value))}
-                    placeholder="e.g., 150.00"
-                    className="w-full rounded-md px-4 py-3 text-black text-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  <p className="text-gray-400 text-xs mt-1">Total amount due on your electric bill</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-300">Utility Provider</label>
-                  <input
-                    type="text"
-                    value={localProvider}
-                    onChange={(e) => handleProviderChange(e.target.value)}
-                    placeholder="e.g., Pacific Gas & Electric"
-                    className="w-full rounded-md px-4 py-3 text-black text-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  <p className="text-gray-400 text-xs mt-1">Your electric company name (optional)</p>
-                </div>
-
-                {effectiveRate && (
-                  <div className="mt-6 p-4 bg-green-900/30 border border-green-500 rounded-lg">
-                    <div className="text-green-300 text-center">
-                      <p className="text-sm text-green-400 mb-1">Calculated Rate</p>
-                      <p className="text-2xl font-bold">${effectiveRate}/kWh</p>
-                      <p className="text-xs text-green-400 mt-1">Based on your usage and bill amount</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+          {solarInfo && (
+            <div className="mt-6 bg-gray-900 border border-gray-700 p-4 rounded-lg">
+              <p className="text-sm text-green-400 font-semibold mb-1">Solar Program Details:</p>
+              <p className="text-white text-sm">{solarInfo}</p>
             </div>
-
-            {/* Sample Bill Info */}
-            <div className="bg-gray-800 p-4 rounded-lg">
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">💡 Where to find this info:</h4>
-              <ul className="text-xs text-gray-400 space-y-1">
-                <li>
-                  • <strong>kWh Usage:</strong> Usually in a box labeled "Energy Used" or "kWh"
-                </li>
-                <li>
-                  • <strong>Total Bill:</strong> "Amount Due" or "Total Charges"
-                </li>
-                <li>
-                  • <strong>Rate:</strong> May show "Rate per kWh" or we'll calculate it
-                </li>
-              </ul>
-            </div>
-
-            {/* Data Persistence Status */}
-            {(localUsage > 0 || localBill > 0 || localProvider) && (
-              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                <h4 className="text-blue-400 font-semibold mb-2 flex items-center">💾 Data Saved</h4>
-                <p className="text-blue-300 text-sm">
-                  Your energy data is automatically saved and will be available in the next steps.
-                </p>
-              </div>
-            )}
+          )}
+          <div className="flex justify-between mt-8">
+            <Button variant="outline" onClick={() => router.push("/pro-calculator/step-1")}>
+              Back to Step 1
+            </Button>
+            <Button onClick={handleSubmit} className="bg-orange-500 hover:bg-orange-600">
+              Continue to Step 3
+            </Button>
           </div>
-        </div>
-
-        {/* Navigation */}
-        <div className="mt-12 flex justify-between items-center max-w-6xl">
-          <a
-            href="/pro-calculator"
-            className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200"
-          >
-            ← Back to Step 1
-          </a>
-
-          <a
-            href="/pro-calculator/step-3"
-            className={`font-semibold py-4 px-8 rounded-lg transition-all duration-200 text-lg shadow-lg ${
-              canContinue
-                ? "bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white"
-                : "bg-gray-600 text-gray-400 cursor-not-allowed pointer-events-none"
-            }`}
-          >
-            Continue to Step 3: Analysis →
-          </a>
-        </div>
-
-        {/* Help Section */}
-        {!canContinue && (
-          <div className="mt-8 max-w-6xl">
-            <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-6">
-              <h4 className="text-blue-400 font-semibold mb-3">📋 Need Help?</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-300">
-                <div>
-                  <p className="font-semibold mb-2">Don't have your bill handy?</p>
-                  <ul className="space-y-1 text-xs">
-                    <li>• Check your utility company's website</li>
-                    <li>• Look for recent email bills</li>
-                    <li>• Use average: 900-1200 kWh/month</li>
-                  </ul>
-                </div>
-                <div>
-                  <p className="font-semibold mb-2">Typical rates by region:</p>
-                  <ul className="space-y-1 text-xs">
-                    <li>• California: $0.25-0.35/kWh</li>
-                    <li>• Texas: $0.12-0.18/kWh</li>
-                    <li>• National avg: $0.15-0.20/kWh</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
+        </CardContent>
+      </Card>
     </div>
   )
 }

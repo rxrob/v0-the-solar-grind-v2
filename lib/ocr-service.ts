@@ -1,301 +1,467 @@
-import Tesseract from "tesseract.js"
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf"
-import pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.entry"
-
-// Set up PDF.js worker locally
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
-
-export interface ExtractedData {
-  usage: number
-  bill: number
-  provider: string
-  confidence: number
-  rawText: string
+interface OCRResult {
+  success: boolean
+  data?: {
+    monthlyUsage?: number
+    monthlyBill?: number
+    electricityRate?: number
+    utilityProvider?: string
+    confidence: number
+    extractedText: string
+    extractionMethod: string
+  }
+  error?: string
+  progress?: number
 }
 
-export interface OCRProgress {
-  stage: "processing" | "converting" | "reading" | "extracting" | "complete"
+interface OCRProgress {
+  stage: string
   progress: number
   message: string
 }
 
-export class OCRService {
-  private onProgress?: (progress: OCRProgress) => void
+// Enhanced patterns for better extraction
+const USAGE_PATTERNS = [
+  // Standard kWh patterns
+  /(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)\s*kWh/gi,
+  /kWh\s*:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /usage:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)\s*kWh/gi,
+  /consumed:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)\s*kWh/gi,
 
-  constructor(onProgress?: (progress: OCRProgress) => void) {
-    this.onProgress = onProgress
+  // Alternative patterns without "kWh"
+  /electricity\s*usage:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /energy\s*used:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /total\s*usage:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /current\s*usage:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+
+  // Meter reading differences
+  /meter\s*reading.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /present\s*reading.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /current\s*reading.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+
+  // Table-like patterns
+  /(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:kwh|kw\s*h|kilowatt)/gi,
+  /(?:kwh|kw\s*h|kilowatt).*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+
+  // Fallback patterns for numbers near energy-related words
+  /energy.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /electric.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /power.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+
+  // Units variations
+  /(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:kwhr|kw-hr|kw\/hr)/gi,
+  /(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)\s*kilowatt\s*hours?/gi,
+
+  // Billing period patterns
+  /billing\s*period.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /service\s*period.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+
+  // Generic number patterns near usage indicators
+  /usage.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /consumed.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+  /used.*?(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)/gi,
+]
+
+const BILL_PATTERNS = [
+  // Standard currency patterns
+  /\$\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/g,
+  /(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)\s*\$/g,
+  /total.*?\$\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /amount.*?\$\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /due.*?\$\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /balance.*?\$\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /current.*?\$\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /charges.*?\$\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+
+  // Without currency symbol
+  /total\s*amount:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /amount\s*due:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /total\s*due:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /current\s*charges:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /bill\s*amount:?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+
+  // Specific billing terms
+  /electricity\s*charges:?\s*\$?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /energy\s*charges:?\s*\$?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+  /service\s*charges:?\s*\$?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/gi,
+]
+
+const RATE_PATTERNS = [
+  // Direct rate patterns
+  /(\d+\.?\d*)\s*¢?\s*\/?\s*kWh/gi,
+  /(\d+\.?\d*)\s*cents?\s*\/?\s*kWh/gi,
+  /rate:?\s*\$?\s*(\d+\.?\d*)\s*\/?\s*kWh/gi,
+  /price:?\s*\$?\s*(\d+\.?\d*)\s*\/?\s*kWh/gi,
+  /\$\s*(\d+\.?\d*)\s*per\s*kWh/gi,
+  /(\d+\.?\d*)\s*\$\s*\/\s*kWh/gi,
+
+  // Tier pricing
+  /first.*?(\d+\.?\d*)\s*¢?\s*\/?\s*kWh/gi,
+  /tier.*?(\d+\.?\d*)\s*¢?\s*\/?\s*kWh/gi,
+]
+
+const UTILITY_PATTERNS = [
+  // Common utility companies
+  /(?:pacific\s*gas\s*&?\s*electric|pg&e)/gi,
+  /(?:southern\s*california\s*edison|sce)/gi,
+  /(?:san\s*diego\s*gas\s*&?\s*electric|sdg&e)/gi,
+  /(?:consolidated\s*edison|con\s*ed)/gi,
+  /(?:florida\s*power\s*&?\s*light|fpl)/gi,
+  /(?:duke\s*energy)/gi,
+  /(?:american\s*electric\s*power|aep)/gi,
+  /(?:exelon)/gi,
+  /(?:national\s*grid)/gi,
+  /(?:dominion\s*energy)/gi,
+  /(?:xcel\s*energy)/gi,
+  /(?:entergy)/gi,
+  /(?:pse&g)/gi,
+  /(?:commonwealth\s*edison|comed)/gi,
+  /(?:detroit\s*edison|dte)/gi,
+  /(?:consumers\s*energy)/gi,
+  /(?:pepco)/gi,
+  /(?:baltimore\s*gas\s*&?\s*electric|bge)/gi,
+  /(?:potomac\s*electric)/gi,
+  /(?:georgia\s*power)/gi,
+]
+
+class OCRService {
+  private apiKey: string
+  private progressCallback?: (progress: OCRProgress) => void
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey
   }
 
-  private updateProgress(stage: OCRProgress["stage"], progress: number, message: string) {
-    this.onProgress?.({ stage, progress, message })
+  setProgressCallback(callback: (progress: OCRProgress) => void) {
+    this.progressCallback = callback
   }
 
-  async processFile(file: File): Promise<ExtractedData> {
-    this.updateProgress("processing", 0, "Starting file processing...")
-
-    try {
-      const fileType = file.type
-      let images: string[] = []
-
-      if (fileType === "application/pdf") {
-        images = await this.convertPDFToImages(file)
-      } else if (fileType.startsWith("image/")) {
-        const imageDataUrl = await this.fileToDataURL(file)
-        images = [imageDataUrl]
-      } else {
-        throw new Error("Unsupported file type. Please upload PDF, JPG, or PNG files.")
-      }
-
-      this.updateProgress("reading", 30, "Reading text from document...")
-
-      // Process all images and combine text
-      let combinedText = ""
-      for (let i = 0; i < images.length; i++) {
-        const pageText = await this.performOCR(images[i], i + 1, images.length)
-        combinedText += pageText + "\n"
-      }
-
-      this.updateProgress("extracting", 80, "Extracting energy data...")
-
-      const extractedData = this.extractEnergyData(combinedText)
-
-      this.updateProgress("complete", 100, "Processing complete!")
-
-      return {
-        ...extractedData,
-        rawText: combinedText,
-      }
-    } catch (error) {
-      console.error("OCR processing failed:", error)
-      throw new Error(error instanceof Error ? error.message : "Failed to process document")
+  private updateProgress(stage: string, progress: number, message: string) {
+    if (this.progressCallback) {
+      this.progressCallback({ stage, progress, message })
     }
   }
 
-  private async convertPDFToImages(file: File): Promise<string[]> {
-    this.updateProgress("converting", 10, "Converting PDF to images...")
+  private cleanNumber(value: string): number | null {
+    if (!value) return null
 
-    const arrayBuffer = await file.arrayBuffer()
-    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise
-    const images: string[] = []
+    // Remove commas and extra spaces
+    const cleaned = value.replace(/,/g, "").trim()
+    const num = Number.parseFloat(cleaned)
 
-    // Process up to 3 pages (most bills are 1-2 pages)
-    const numPages = Math.min(pdf.numPages, 3)
-
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum)
-      const viewport = page.getViewport({ scale: 2.0 }) // Higher scale for better OCR
-
-      const canvas = document.createElement("canvas")
-      const context = canvas.getContext("2d")
-
-      if (!context) {
-        throw new Error("Could not get canvas context")
-      }
-
-      canvas.height = viewport.height
-      canvas.width = viewport.width
-
-      await page.render({ canvasContext: context, viewport }).promise
-
-      const imageDataUrl = canvas.toDataURL("image/png", 0.95)
-      images.push(imageDataUrl)
-
-      this.updateProgress("converting", 10 + (pageNum / numPages) * 15, `Converted page ${pageNum}/${numPages}`)
-    }
-
-    return images
+    return isNaN(num) ? null : num
   }
 
-  private async fileToDataURL(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          resolve(e.target.result.toString())
-        } else {
-          reject(new Error("Failed to read file"))
+  private extractUsage(text: string): { value: number | null; confidence: number } {
+    console.log("🔍 Extracting usage from text...")
+
+    const matches: number[] = []
+
+    for (const pattern of USAGE_PATTERNS) {
+      const patternMatches = Array.from(text.matchAll(pattern))
+      for (const match of patternMatches) {
+        const value = this.cleanNumber(match[1])
+        if (value && value >= 50 && value <= 10000) {
+          // Reasonable range
+          matches.push(value)
+          console.log(`📊 Found usage match: ${value} kWh (pattern: ${pattern.source})`)
         }
       }
-      reader.onerror = () => reject(new Error("File reading failed"))
-      reader.readAsDataURL(file)
-    })
+    }
+
+    if (matches.length === 0) {
+      console.log("❌ No usage matches found")
+      return { value: null, confidence: 0 }
+    }
+
+    // Use most common value or median
+    const sortedMatches = matches.sort((a, b) => a - b)
+    const median = sortedMatches[Math.floor(sortedMatches.length / 2)]
+
+    // Higher confidence if multiple patterns agree
+    const confidence = Math.min(0.9, 0.5 + matches.length * 0.1)
+
+    console.log(`✅ Extracted usage: ${median} kWh (confidence: ${confidence})`)
+    return { value: median, confidence }
   }
 
-  private async performOCR(imageSource: string, pageNum: number, totalPages: number): Promise<string> {
-    try {
-      const { data } = await Tesseract.recognize(imageSource, "eng", {
-        logger: (m) => {
-          if (m.status === "recognizing text") {
-            const baseProgress = 30 + ((pageNum - 1) / totalPages) * 50
-            const pageProgress = (m.progress * 50) / totalPages
-            this.updateProgress(
-              "reading",
-              baseProgress + pageProgress,
-              `Reading page ${pageNum}/${totalPages}... ${Math.round(m.progress * 100)}%`,
-            )
-          }
-        },
-      })
+  private extractBill(text: string): { value: number | null; confidence: number } {
+    console.log("🔍 Extracting bill amount from text...")
 
-      return data.text
-    } catch (error) {
-      console.error(`OCR failed for page ${pageNum}:`, error)
+    const matches: number[] = []
 
-      // Try fallback OCR service
-      try {
-        return await this.fallbackOCR(imageSource)
-      } catch (fallbackError) {
-        console.error("Fallback OCR also failed:", fallbackError)
-        throw new Error(`Failed to read page ${pageNum}`)
+    for (const pattern of BILL_PATTERNS) {
+      const patternMatches = Array.from(text.matchAll(pattern))
+      for (const match of patternMatches) {
+        const value = this.cleanNumber(match[1])
+        if (value && value >= 10 && value <= 2000) {
+          // Reasonable range
+          matches.push(value)
+          console.log(`💰 Found bill match: $${value} (pattern: ${pattern.source})`)
+        }
       }
     }
+
+    if (matches.length === 0) {
+      console.log("❌ No bill matches found")
+      return { value: null, confidence: 0 }
+    }
+
+    // Use most common value or median
+    const sortedMatches = matches.sort((a, b) => a - b)
+    const median = sortedMatches[Math.floor(sortedMatches.length / 2)]
+
+    // Higher confidence if multiple patterns agree
+    const confidence = Math.min(0.9, 0.6 + matches.length * 0.1)
+
+    console.log(`✅ Extracted bill: $${median} (confidence: ${confidence})`)
+    return { value: median, confidence }
   }
 
-  private async fallbackOCR(imageSource: string): Promise<string> {
-    // Fallback to OCR.space API (free tier available)
-    const apiKey = process.env.NEXT_PUBLIC_OCR_SPACE_API_KEY
+  private extractRate(text: string): { value: number | null; confidence: number } {
+    console.log("🔍 Extracting rate from text...")
 
-    if (!apiKey) {
-      throw new Error("No fallback OCR service available")
+    const matches: number[] = []
+
+    for (const pattern of RATE_PATTERNS) {
+      const patternMatches = Array.from(text.matchAll(pattern))
+      for (const match of patternMatches) {
+        let value = this.cleanNumber(match[1])
+        if (value) {
+          // Convert cents to dollars if needed
+          if (value > 5) {
+            // Likely in cents
+            value = value / 100
+          }
+
+          if (value >= 0.05 && value <= 1.0) {
+            // Reasonable range
+            matches.push(value)
+            console.log(`⚡ Found rate match: $${value}/kWh (pattern: ${pattern.source})`)
+          }
+        }
+      }
     }
+
+    if (matches.length === 0) {
+      console.log("❌ No rate matches found")
+      return { value: null, confidence: 0 }
+    }
+
+    // Use most common value or median
+    const sortedMatches = matches.sort((a, b) => a - b)
+    const median = sortedMatches[Math.floor(sortedMatches.length / 2)]
+
+    // Higher confidence if multiple patterns agree
+    const confidence = Math.min(0.9, 0.7 + matches.length * 0.1)
+
+    console.log(`✅ Extracted rate: $${median}/kWh (confidence: ${confidence})`)
+    return { value: median, confidence }
+  }
+
+  private extractUtilityProvider(text: string): { value: string | null; confidence: number } {
+    console.log("🔍 Extracting utility provider from text...")
+
+    for (const pattern of UTILITY_PATTERNS) {
+      const match = text.match(pattern)
+      if (match) {
+        const provider = match[0].trim()
+        console.log(`🏢 Found utility provider: ${provider}`)
+        return { value: provider, confidence: 0.8 }
+      }
+    }
+
+    console.log("❌ No utility provider found")
+    return { value: null, confidence: 0 }
+  }
+
+  private estimateUsageFromBill(billAmount: number): { value: number; confidence: number } {
+    console.log(`🔮 Estimating usage from bill amount: $${billAmount}`)
+
+    // Common residential rates to try
+    const commonRates = [0.12, 0.15, 0.18, 0.22, 0.28] // $/kWh
+    const estimates: number[] = []
+
+    for (const rate of commonRates) {
+      const estimatedUsage = billAmount / rate
+      if (estimatedUsage >= 200 && estimatedUsage <= 3000) {
+        // Reasonable range
+        estimates.push(estimatedUsage)
+      }
+    }
+
+    if (estimates.length === 0) {
+      console.log("❌ Could not estimate reasonable usage")
+      return { value: 0, confidence: 0 }
+    }
+
+    // Use median estimate
+    const sortedEstimates = estimates.sort((a, b) => a - b)
+    const median = Math.round(sortedEstimates[Math.floor(sortedEstimates.length / 2)])
+
+    console.log(`🔮 Estimated usage: ${median} kWh (low confidence)`)
+    return { value: median, confidence: 0.3 } // Low confidence for estimates
+  }
+
+  private async extractFromPDF(file: File): Promise<string> {
+    this.updateProgress("pdf", 20, "Loading PDF...")
+
+    try {
+      // Dynamic import to avoid SSR issues
+      const pdfjsLib = await import("pdfjs-dist")
+
+      // Set worker source
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+
+      const arrayBuffer = await file.arrayBuffer()
+      this.updateProgress("pdf", 40, "Parsing PDF...")
+
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      let fullText = ""
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        this.updateProgress("pdf", 40 + (i / pdf.numPages) * 30, `Extracting page ${i}/${pdf.numPages}...`)
+
+        const page = await pdf.getPage(i)
+        const textContent = await page.getTextContent()
+        const pageText = textContent.items.map((item: any) => item.str).join(" ")
+
+        fullText += pageText + "\n"
+      }
+
+      this.updateProgress("pdf", 70, "PDF text extracted successfully")
+      console.log("📄 PDF text extracted:", fullText.substring(0, 500) + "...")
+
+      return fullText
+    } catch (error) {
+      console.error("❌ PDF extraction failed:", error)
+      throw new Error("Failed to extract text from PDF")
+    }
+  }
+
+  private async extractFromImage(file: File): Promise<string> {
+    this.updateProgress("ocr", 30, "Uploading image for OCR...")
 
     const formData = new FormData()
-
-    // Convert data URL to blob
-    const response = await fetch(imageSource)
-    const blob = await response.blob()
-
-    formData.append("file", blob, "image.png")
-    formData.append("apikey", apiKey)
+    formData.append("file", file)
+    formData.append("apikey", this.apiKey)
     formData.append("language", "eng")
+    formData.append("isOverlayRequired", "false")
+    formData.append("detectOrientation", "true")
+    formData.append("scale", "true")
+    formData.append("OCREngine", "2")
 
-    const ocrResponse = await fetch("https://api.ocr.space/parse/image", {
-      method: "POST",
-      body: formData,
-    })
+    try {
+      const response = await fetch("https://api.ocr.space/parse/image", {
+        method: "POST",
+        body: formData,
+      })
 
-    const result = await ocrResponse.json()
+      this.updateProgress("ocr", 60, "Processing OCR...")
 
-    if (result.IsErroredOnProcessing) {
-      throw new Error(result.ErrorMessage || "OCR service error")
+      if (!response.ok) {
+        throw new Error(`OCR API error: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.IsErroredOnProcessing) {
+        throw new Error(result.ErrorMessage || "OCR processing failed")
+      }
+
+      const extractedText = result.ParsedResults?.[0]?.ParsedText || ""
+      this.updateProgress("ocr", 80, "OCR completed successfully")
+
+      console.log("🖼️ OCR text extracted:", extractedText.substring(0, 500) + "...")
+      return extractedText
+    } catch (error) {
+      console.error("❌ OCR extraction failed:", error)
+      throw new Error("Failed to extract text from image")
     }
-
-    return result.ParsedResults?.[0]?.ParsedText || ""
   }
 
-  private extractEnergyData(text: string): Omit<ExtractedData, "rawText"> {
-    const cleanText = text.replace(/[,\s]/g, " ").toLowerCase()
+  async extractFromFile(file: File): Promise<OCRResult> {
+    try {
+      this.updateProgress("start", 0, "Starting file processing...")
 
-    let usage = 0
-    let bill = 0
-    let provider = ""
-    let confidence = 0
+      let extractedText = ""
+      let extractionMethod = ""
 
-    // Enhanced kWh usage patterns
-    const usagePatterns = [
-      /(\d{1,4}(?:,\d{3})*)\s*kwh/gi,
-      /kwh\s*used:?\s*(\d{1,4}(?:,\d{3})*)/gi,
-      /energy\s*used:?\s*(\d{1,4}(?:,\d{3})*)/gi,
-      /usage:?\s*(\d{1,4}(?:,\d{3})*)\s*kwh/gi,
-      /total\s*kwh:?\s*(\d{1,4}(?:,\d{3})*)/gi,
-      /electricity\s*used:?\s*(\d{1,4}(?:,\d{3})*)/gi,
-      /current\s*usage:?\s*(\d{1,4}(?:,\d{3})*)/gi,
-      /monthly\s*usage:?\s*(\d{1,4}(?:,\d{3})*)/gi,
-    ]
-
-    for (const pattern of usagePatterns) {
-      const matches = [...text.matchAll(pattern)]
-      for (const match of matches) {
-        const value = Number.parseInt(match[1].replace(/,/g, ""))
-        if (value >= 50 && value <= 50000) {
-          // Reasonable range
-          usage = Math.max(usage, value) // Take the largest reasonable value
-          confidence += 20
-        }
+      if (file.type === "application/pdf") {
+        extractedText = await this.extractFromPDF(file)
+        extractionMethod = "PDF.js"
+      } else if (file.type.startsWith("image/")) {
+        extractedText = await this.extractFromImage(file)
+        extractionMethod = "OCR.space"
+      } else {
+        throw new Error("Unsupported file type")
       }
-    }
 
-    // Enhanced bill amount patterns
-    const billPatterns = [
-      /total\s*(?:amount\s*)?(?:due|owed|charges?):?\s*\$?(\d{1,4}(?:\.\d{2})?)/gi,
-      /amount\s*due:?\s*\$?(\d{1,4}(?:\.\d{2})?)/gi,
-      /balance\s*due:?\s*\$?(\d{1,4}(?:\.\d{2})?)/gi,
-      /current\s*charges?:?\s*\$?(\d{1,4}(?:\.\d{2})?)/gi,
-      /total\s*bill:?\s*\$?(\d{1,4}(?:\.\d{2})?)/gi,
-      /pay\s*this\s*amount:?\s*\$?(\d{1,4}(?:\.\d{2})?)/gi,
-      /new\s*charges:?\s*\$?(\d{1,4}(?:\.\d{2})?)/gi,
-      /monthly\s*charges:?\s*\$?(\d{1,4}(?:\.\d{2})?)/gi,
-    ]
+      this.updateProgress("extract", 85, "Analyzing extracted text...")
 
-    const billAmounts: number[] = []
-    for (const pattern of billPatterns) {
-      const matches = [...text.matchAll(pattern)]
-      for (const match of matches) {
-        const value = Number.parseFloat(match[1])
-        if (value >= 10 && value <= 5000) {
-          // Reasonable range
-          billAmounts.push(value)
-        }
+      // Extract data using patterns
+      const usageResult = this.extractUsage(extractedText)
+      const billResult = this.extractBill(extractedText)
+      const rateResult = this.extractRate(extractedText)
+      const providerResult = this.extractUtilityProvider(extractedText)
+
+      // Fallback: estimate usage from bill if usage not found
+      let finalUsage = usageResult.value
+      let finalUsageConfidence = usageResult.confidence
+
+      if (!finalUsage && billResult.value) {
+        console.log("🔄 Usage not found, attempting to estimate from bill...")
+        const estimate = this.estimateUsageFromBill(billResult.value)
+        finalUsage = estimate.value
+        finalUsageConfidence = estimate.confidence
       }
-    }
 
-    // Also look for any dollar amounts in the text
-    const dollarMatches = [...text.matchAll(/\$(\d{2,4}(?:\.\d{2})?)/g)]
-    for (const match of dollarMatches) {
-      const amount = Number.parseFloat(match[1])
-      if (amount >= 20 && amount <= 2000) {
-        billAmounts.push(amount)
+      // Calculate rate if not found but usage and bill are available
+      let finalRate = rateResult.value
+      let finalRateConfidence = rateResult.confidence
+
+      if (!finalRate && finalUsage && billResult.value) {
+        finalRate = billResult.value / finalUsage
+        finalRateConfidence = Math.min(finalUsageConfidence, billResult.confidence) * 0.8
+        console.log(`🧮 Calculated rate from usage and bill: $${finalRate?.toFixed(4)}/kWh`)
       }
-    }
 
-    if (billAmounts.length > 0) {
-      // Use the largest reasonable amount (likely the total)
-      bill = Math.max(...billAmounts)
-      confidence += 20
-    }
+      // Calculate overall confidence
+      const confidenceScores = [finalUsageConfidence, billResult.confidence, finalRateConfidence].filter(
+        (score) => score > 0,
+      )
 
-    // Enhanced utility provider patterns
-    const providerPatterns = [
-      { pattern: /pacific\s*gas\s*&?\s*electric|pg&e/gi, name: "Pacific Gas & Electric (PG&E)" },
-      { pattern: /southern\s*california\s*edison|sce/gi, name: "Southern California Edison (SCE)" },
-      { pattern: /san\s*diego\s*gas\s*&?\s*electric|sdg&e/gi, name: "San Diego Gas & Electric (SDG&E)" },
-      { pattern: /con\s*edison|coned/gi, name: "Con Edison" },
-      { pattern: /florida\s*power\s*&?\s*light|fpl/gi, name: "Florida Power & Light (FPL)" },
-      { pattern: /duke\s*energy/gi, name: "Duke Energy" },
-      { pattern: /entergy/gi, name: "Entergy" },
-      { pattern: /xcel\s*energy/gi, name: "Xcel Energy" },
-      { pattern: /commonwealth\s*edison|comed/gi, name: "Commonwealth Edison (ComEd)" },
-      { pattern: /pepco/gi, name: "Pepco" },
-      { pattern: /dominion\s*energy/gi, name: "Dominion Energy" },
-      { pattern: /national\s*grid/gi, name: "National Grid" },
-      { pattern: /eversource/gi, name: "Eversource" },
-      { pattern: /pse&g/gi, name: "PSE&G" },
-      { pattern: /baltimore\s*gas\s*&?\s*electric|bge/gi, name: "Baltimore Gas & Electric (BGE)" },
-      { pattern: /american\s*electric\s*power|aep/gi, name: "American Electric Power (AEP)" },
-    ]
+      const overallConfidence =
+        confidenceScores.length > 0
+          ? confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length
+          : 0
 
-    for (const { pattern, name } of providerPatterns) {
-      if (pattern.test(text)) {
-        provider = name
-        confidence += 15
-        break
+      this.updateProgress("complete", 100, "Extraction completed!")
+
+      const result: OCRResult = {
+        success: true,
+        data: {
+          monthlyUsage: finalUsage,
+          monthlyBill: billResult.value,
+          electricityRate: finalRate,
+          utilityProvider: providerResult.value || undefined,
+          confidence: overallConfidence,
+          extractedText,
+          extractionMethod,
+        },
       }
-    }
 
-    // Additional confidence based on data quality
-    if (usage > 0 && bill > 0) {
-      const rate = bill / usage
-      if (rate >= 0.05 && rate <= 1.0) {
-        // Reasonable rate range
-        confidence += 25
+      console.log("✅ OCR extraction completed:", result.data)
+      return result
+    } catch (error) {
+      console.error("❌ OCR extraction failed:", error)
+      this.updateProgress("error", 0, `Error: ${error instanceof Error ? error.message : "Unknown error"}`)
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       }
-    }
-
-    return {
-      usage,
-      bill,
-      provider,
-      confidence: Math.min(confidence, 100),
     }
   }
 }
+
+export { OCRService, type OCRResult, type OCRProgress }

@@ -1,9 +1,21 @@
 #!/usr/bin/env node
 
-const fs = require("fs")
-const path = require("path")
+import fs from "fs"
+import path from "path"
 
-const secretPatterns = [
+interface SecretPattern {
+  name: string
+  pattern: RegExp
+}
+
+interface ScanResult {
+  file: string
+  line: number
+  type: string
+  content: string
+}
+
+const secretPatterns: SecretPattern[] = [
   { name: "AWS Access Key", pattern: /AKIA[0-9A-Z]{16}/ },
   { name: "AWS Secret Key", pattern: /[0-9a-zA-Z/+]{40}/ },
   { name: "Stripe Secret Key", pattern: /sk_live_[0-9a-zA-Z]{24}/ },
@@ -15,10 +27,10 @@ const secretPatterns = [
   { name: "Database URL", pattern: /postgres:\/\/[^:]+:[^@]+@[^:]+:\d+\/\w+/ },
 ]
 
-function scanDirectory(dir, excludeDirs = [".git", "node_modules", ".next", "dist"]) {
-  const results = []
+function scanDirectory(dir: string, excludeDirs: string[] = [".git", "node_modules", ".next", "dist"]): ScanResult[] {
+  const results: ScanResult[] = []
 
-  function scanFile(filePath) {
+  function scanFile(filePath: string): void {
     try {
       const content = fs.readFileSync(filePath, "utf8")
       const lines = content.split("\n")
@@ -40,12 +52,17 @@ function scanDirectory(dir, excludeDirs = [".git", "node_modules", ".next", "dis
     }
   }
 
-  function walkDir(currentDir) {
+  function walkDir(currentDir: string): void {
     const items = fs.readdirSync(currentDir)
 
     for (const item of items) {
       const fullPath = path.join(currentDir, item)
-      const stat = fs.statSync(fullPath)
+      let stat
+      try {
+        stat = fs.statSync(fullPath)
+      } catch (e) {
+        continue // Skip broken symlinks
+      }
 
       if (stat.isDirectory()) {
         if (!excludeDirs.includes(item)) {
@@ -64,7 +81,7 @@ function scanDirectory(dir, excludeDirs = [".git", "node_modules", ".next", "dis
   return results
 }
 
-function runSecurityScan() {
+function runSecurityScan(): void {
   console.log("🔒 Scanning for exposed secrets and sensitive data...\n")
 
   const results = scanDirectory(process.cwd())
