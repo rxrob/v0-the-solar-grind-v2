@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Google Geocoding API key not configured" }, { status: 500 })
     }
 
-    const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
+    const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+      address,
+    )}&key=${apiKey}`
 
     console.log(`🗺️ Geocoding address: ${address}`)
 

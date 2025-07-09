@@ -14,11 +14,13 @@ export function ProReportsClientPage({ reports }: ProReportsClientPageProps) {
   const handleDownload = (reportId: string) => {
     // Simulate download
     console.log("Downloading report:", reportId)
+    // In a real app, this would likely trigger an API call to generate and download a file
   }
 
   const handlePreview = (reportId: string) => {
     // Simulate preview
     console.log("Previewing report:", reportId)
+    // In a real app, this might open a modal or navigate to a preview page
   }
 
   const getStatusBadge = (status: Report["status"]) => {

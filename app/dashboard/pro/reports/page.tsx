@@ -4,9 +4,11 @@ import { redirect } from "next/navigation"
 import { ProReportsClientPage } from "@/components/pro-reports-client"
 import type { Report } from "@/types"
 
+// This is a Server Component by default (no "use client")
 export default async function ProReportsPage() {
   const cookieStore = cookies()
 
+  // ✅ Correctly configure createServerClient with cookie handlers
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -15,11 +17,11 @@ export default async function ProReportsPage() {
         get(name: string) {
           return cookieStore.get(name)?.value
         },
-        set() {
-          // This is a server component, so we don't need to set cookies here.
+        set(name: string, value: string, options) {
+          cookieStore.set({ name, value, ...options })
         },
-        remove() {
-          // This is a server component, so we don't need to remove cookies here.
+        remove(name: string, options) {
+          cookieStore.delete({ name, ...options })
         },
       },
     },
@@ -43,7 +45,7 @@ export default async function ProReportsPage() {
     redirect("/pricing")
   }
 
-  // Mock data - in production, fetch from database
+  // Mock data - in production, fetch from your database
   const reports: Report[] = [
     {
       id: "1",
@@ -74,5 +76,6 @@ export default async function ProReportsPage() {
     },
   ]
 
+  // Pass server-fetched data to the client component
   return <ProReportsClientPage reports={reports} />
 }
