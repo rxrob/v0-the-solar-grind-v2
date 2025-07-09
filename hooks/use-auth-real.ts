@@ -115,20 +115,16 @@ export function useAuthReal() {
     return { success: true }
   }, [supabase])
 
-  const canAccessProFeatures = useCallback(() => {
-    // This is a placeholder for real subscription logic
-    // @ts-ignore
-    return state.user?.profile?.subscription_type === "pro"
-  }, [state.user])
-
   return {
     ...state,
     signIn,
     signOut,
     signUp,
-    canAccessProFeatures,
   }
 }
 
 // Alias for compatibility
 export const useAuth = useAuthReal
+
+// Default export for components that might be using it
+export default useAuthReal

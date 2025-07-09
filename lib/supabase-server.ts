@@ -37,17 +37,41 @@ export const createClient = () => {
 }
 
 export const createSupabaseServiceClient = () => {
+  // Note: This client is for server-side operations with admin privileges.
+  // It does not rely on user cookies.
   return createServerClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     cookies: {
-      get() {
-        return undefined
-      },
-      set() {},
-      remove() {},
+      get: () => undefined,
+      set: () => {},
+      remove: () => {},
     },
   })
 }
 
-// Aliases for consistency
+export async function testServerConnection() {
+  const supabase = createClient()
+  try {
+    // We perform a simple query to a known table.
+    // This tests the connection, credentials, and basic RLS setup.
+    const { error } = await supabase.from("user_projects").select("id").limit(1)
+
+    if (error) {
+      // If we get an error, it could be due to RLS, which still means the connection is alive.
+      return {
+        success: true,
+        canQuery: false,
+        error: `Query failed (this may be due to RLS): ${error.message}`,
+      }
+    }
+
+    // If no error, the connection is good and we can query data.
+    return { success: true, canQuery: true, error: null }
+  } catch (e: any) {
+    // This will catch network errors or fundamental configuration problems.
+    return { success: false, canQuery: false, error: e.message }
+  }
+}
+
+// Aliases for consistency and backward compatibility
 export const createSupabaseServerClient = createClient
 export const createServerSupabaseClient = createClient

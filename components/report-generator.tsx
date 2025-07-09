@@ -15,7 +15,7 @@ interface ReportGeneratorProps {
   initialData?: any
 }
 
-export function ReportGenerator({ initialData }: ReportGeneratorProps) {
+export default function ReportGenerator({ initialData }: ReportGeneratorProps) {
   const [showPreview, setShowPreview] = useState(false)
   const [formData, setFormData] = useState({
     // Customer Information
