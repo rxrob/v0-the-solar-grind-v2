@@ -14,6 +14,14 @@ export default async function VisualAnalysisPage() {
         get(name: string) {
           return cookieStore.get(name)?.value
         },
+        set() {
+          // This is a server component, so we don't need to set cookies here.
+          // The client-side Supabase instance will handle that.
+        },
+        remove() {
+          // This is a server component, so we don't need to remove cookies here.
+          // The client-side Supabase instance will handle that.
+        },
       },
     },
   )

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,11 +10,15 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { MapPin, Settings, Eye, Camera, Zap, ArrowLeft } from "lucide-react"
 import { AddressAutocomplete } from "@/components/address-autocomplete"
-import Link from "next/link"
 import { VisualAnalysisClient } from "@/components/visual-analysis-client"
 
 const presetLocations = [
-  { name: "San Francisco, CA", lat: 37.7749, lng: -122.4194, address: "San Francisco, CA" },
+  {
+    name: "San Francisco, CA",
+    lat: 37.7749,
+    lng: -122.4194,
+    address: "San Francisco, CA",
+  },
   { name: "Austin, TX", lat: 30.2672, lng: -97.7431, address: "Austin, TX" },
   { name: "Denver, CO", lat: 39.7392, lng: -104.9903, address: "Denver, CO" },
   { name: "Phoenix, AZ", lat: 33.4484, lng: -112.074, address: "Phoenix, AZ" },
@@ -22,7 +27,10 @@ const presetLocations = [
 
 export function VisualAnalysisPageClient() {
   const [address, setAddress] = useState("")
-  const [coordinates, setCoordinates] = useState({ lat: 37.7749, lng: -122.4194 })
+  const [coordinates, setCoordinates] = useState({
+    lat: 37.7749,
+    lng: -122.4194,
+  })
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [analysisKey, setAnalysisKey] = useState(0)
 
@@ -140,7 +148,12 @@ export function VisualAnalysisPageClient() {
                       type="number"
                       step="0.0001"
                       value={coordinates.lat}
-                      onChange={(e) => setCoordinates((prev) => ({ ...prev, lat: Number.parseFloat(e.target.value) }))}
+                      onChange={(e) =>
+                        setCoordinates((prev) => ({
+                          ...prev,
+                          lat: Number.parseFloat(e.target.value),
+                        }))
+                      }
                     />
                   </div>
                   <div className="space-y-2">
@@ -150,7 +163,12 @@ export function VisualAnalysisPageClient() {
                       type="number"
                       step="0.0001"
                       value={coordinates.lng}
-                      onChange={(e) => setCoordinates((prev) => ({ ...prev, lng: Number.parseFloat(e.target.value) }))}
+                      onChange={(e) =>
+                        setCoordinates((prev) => ({
+                          ...prev,
+                          lng: Number.parseFloat(e.target.value),
+                        }))
+                      }
                     />
                   </div>
                 </div>

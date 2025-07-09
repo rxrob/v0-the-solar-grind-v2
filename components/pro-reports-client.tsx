@@ -21,7 +21,7 @@ export function ProReportsClientPage({ reports }: ProReportsClientPageProps) {
     console.log("Previewing report:", reportId)
   }
 
-  const getStatusBadge = (status: "generated" | "pending" | "error") => {
+  const getStatusBadge = (status: Report["status"]) => {
     const variants = {
       generated: "default",
       pending: "secondary",

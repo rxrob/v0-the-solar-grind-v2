@@ -15,6 +15,12 @@ export default async function ProReportsPage() {
         get(name: string) {
           return cookieStore.get(name)?.value
         },
+        set() {
+          // This is a server component, so we don't need to set cookies here.
+        },
+        remove() {
+          // This is a server component, so we don't need to remove cookies here.
+        },
       },
     },
   )
