@@ -1,8 +1,15 @@
-import pkg from '@next/bundle-analyzer'
-const { withBundleAnalyzer } = pkg
+// ✅ Use default import for CommonJS compatibility
+import bundleAnalyzer from '@next/bundle-analyzer'
+
+// ✅ Get the correct function from the default import
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+})
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: true,
+  swcMinify: true,
 eslint: {
   ignoreDuringBuilds: true,
 },
@@ -17,6 +24,7 @@ images: {
   deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
   imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   unoptimized: true,
+    domains: ['maps.googleapis.com', 'maps.gstatic.com'],
 },
 async headers() {
   return [
@@ -71,8 +79,5 @@ async rewrites() {
 },
 }
 
-const bundleAnalyzer = withBundleAnalyzer({
-enabled: process.env.ANALYZE === 'true',
-})
-
-export default bundleAnalyzer(nextConfig)
+// ✅ Export the final wrapped config
+export default withBundleAnalyzer(nextConfig)
