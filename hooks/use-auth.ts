@@ -25,6 +25,7 @@ interface AuthState {
   session: Session | null
   loading: boolean
   initialized: boolean
+  error: string | null
 }
 
 export function useAuth() {
@@ -34,6 +35,7 @@ export function useAuth() {
     session: null,
     loading: true,
     initialized: false,
+    error: null,
   })
 
   const fetchUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
@@ -111,7 +113,7 @@ export function useAuth() {
 
       if (error) {
         console.error("Error getting session:", error)
-        setState((prev) => ({ ...prev, loading: false, initialized: true }))
+        setState((prev) => ({ ...prev, loading: false, initialized: true, error: error.message }))
         return
       }
 
@@ -125,6 +127,7 @@ export function useAuth() {
           session,
           loading: false,
           initialized: true,
+          error: null,
         })
       } else {
         console.log("No active session found")
@@ -134,11 +137,12 @@ export function useAuth() {
           session: null,
           loading: false,
           initialized: true,
+          error: null,
         })
       }
     } catch (error) {
       console.error("Error in getInitialSession:", error)
-      setState((prev) => ({ ...prev, loading: false, initialized: true }))
+      setState((prev) => ({ ...prev, loading: false, initialized: true, error: error.message }))
     }
   }, [fetchUserProfile])
 
@@ -172,6 +176,8 @@ export function useAuth() {
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
+      setState((prev) => ({ ...prev, loading: true, error: null }))
+
       try {
         console.log("Starting email sign in for:", email)
 
@@ -182,6 +188,7 @@ export function useAuth() {
 
         if (error) {
           console.error("Email sign in error:", error)
+          setState((prev) => ({ ...prev, loading: false, error: error.message }))
           return { success: false, error: error.message }
         }
 
@@ -193,6 +200,7 @@ export function useAuth() {
             session: data.session,
             loading: false,
             initialized: true,
+            error: null,
           })
         }
 
@@ -200,6 +208,7 @@ export function useAuth() {
         return { success: true, data }
       } catch (error) {
         console.error("Unexpected error during email sign in:", error)
+        setState((prev) => ({ ...prev, loading: false, error: error.message }))
         return { success: false, error: "Unexpected error" }
       }
     },
@@ -234,15 +243,12 @@ export function useAuth() {
   }, [])
 
   const signOut = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true }))
+
     try {
       console.log("Signing out...")
-
       const { error } = await supabase.auth.signOut()
-
-      if (error) {
-        console.error("Sign out error:", error)
-        return { success: false, error: error.message }
-      }
+      if (error) throw error
 
       setState({
         user: null,
@@ -250,13 +256,15 @@ export function useAuth() {
         session: null,
         loading: false,
         initialized: true,
+        error: null,
       })
 
       console.log("Sign out successful")
       return { success: true }
     } catch (error) {
-      console.error("Unexpected error during sign out:", error)
-      return { success: false, error: "Unexpected error" }
+      console.error("Sign out error:", error)
+      setState((prev) => ({ ...prev, loading: false, error: error.message }))
+      return { success: false, error: error.message }
     }
   }, [])
 
@@ -292,6 +300,7 @@ export function useAuth() {
           session,
           loading: false,
           initialized: true,
+          error: null,
         })
       } else if (event === "SIGNED_OUT") {
         setState({
@@ -300,6 +309,7 @@ export function useAuth() {
           session: null,
           loading: false,
           initialized: true,
+          error: null,
         })
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
         setState((prev) => ({
@@ -329,3 +339,6 @@ export function useAuth() {
     canUseProFeatures: state.profile?.subscription_type === "pro" && state.profile?.subscription_status === "active",
   }
 }
+
+// Alias for compatibility
+export { useAuth as useAuthReal }

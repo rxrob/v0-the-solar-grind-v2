@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSolarCalculatorStore } from "@/lib/store"
-import { GoogleMap, Polygon } from "@react-google-maps/api"
+import { GoogleMap, Polygon, useJsApiLoader } from "@react-google-maps/api"
 import { Button } from "@/components/ui/button"
-import { useMapsApi } from "../layout"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 const SOLAR_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
+const MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 
 export default function Step3() {
   const router = useRouter()
@@ -19,7 +19,11 @@ export default function Step3() {
   const [polygonCoords, setPolygonCoords] = useState<any[]>([])
   const [isLoadingApi, setIsLoadingApi] = useState(true)
 
-  const { isLoaded } = useMapsApi()
+  const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: MAPS_API_KEY,
+    libraries: ["places", "maps"],
+  })
 
   const calculatePanels = (dailyKWh: number) => {
     if (!energyData.monthlyUsage || dailyKWh <= 0) return 0
@@ -112,7 +116,7 @@ export default function Step3() {
 
   const handleContinue = () => router.push("/pro-calculator/step-4")
 
-  if (isLoadingApi) {
+  if (!isLoaded || isLoadingApi) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
         <Loader2 className="w-8 h-8 animate-spin text-orange-400 mb-4" />

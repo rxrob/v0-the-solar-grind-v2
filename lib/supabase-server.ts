@@ -34,6 +34,7 @@ export const createClient = () => {
 export const createSupabaseServerClient = createClient
 export const createServerSupabaseClient = createClient
 export const createSupabaseServiceClient = () => {
+  // This client is for service-role operations and doesn't need cookies
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     cookies: {
       get() {

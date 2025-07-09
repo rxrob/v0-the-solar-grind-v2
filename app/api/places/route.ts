@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+export const dynamic = "force-dynamic"
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -18,7 +20,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Google Maps API key not configured" }, { status: 500 })
     }
 
-    const placesUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&types=address&key=${apiKey}`
+    const placesUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+      input,
+    )}&types=address&key=${apiKey}`
 
     console.log(`🔍 Places autocomplete: ${input}`)
 
