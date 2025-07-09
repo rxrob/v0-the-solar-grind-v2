@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -74,16 +73,14 @@ export default function SignUpPage() {
     }
 
     try {
-      // Split full name into first and last name
-      const nameParts = formData.fullName.trim().split(" ")
-      const firstName = nameParts[0]
-      const lastName = nameParts.slice(1).join(" ")
-
       const result = await signUp({
         email: formData.email,
         password: formData.password,
-        firstName,
-        lastName: lastName || undefined,
+        options: {
+          data: {
+            full_name: formData.fullName,
+          },
+        },
       })
 
       if (result.success) {
@@ -92,7 +89,6 @@ export default function SignUpPage() {
           setSuccess("Account created! Please check your email to confirm your account before signing in.")
         } else {
           setSuccess("Account created successfully! You are now signed in.")
-          // If user is automatically signed in, redirect to dashboard
           setTimeout(() => {
             router.push("/dashboard")
           }, 2000)
@@ -129,23 +125,10 @@ export default function SignUpPage() {
                   email to activate your account.
                 </AlertDescription>
               </Alert>
-
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600 text-center">
-                  Didn't receive the email? Check your spam folder or{" "}
-                  <button
-                    onClick={() => setNeedsConfirmation(false)}
-                    className="text-blue-600 hover:text-blue-500 font-medium underline"
-                  >
-                    try again
-                  </button>
-                </p>
-
-                <div className="text-center">
-                  <Link href="/login" className="text-blue-600 hover:text-blue-500 font-medium">
-                    Already confirmed? Sign in here
-                  </Link>
-                </div>
+              <div className="text-center">
+                <Link href="/login" className="text-blue-600 hover:text-blue-500 font-medium">
+                  Already confirmed? Sign in here
+                </Link>
               </div>
             </div>
           ) : (
@@ -237,20 +220,14 @@ export default function SignUpPage() {
                 </Alert>
               )}
 
-              {success && (
+              {success && !error && (
                 <Alert className="border-green-200 bg-green-50">
                   <CheckCircle className="h-4 w-4 text-green-500" />
                   <AlertDescription className="text-green-700">{success}</AlertDescription>
                 </Alert>
               )}
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={
-                  isLoading || !formData.fullName || !formData.email || !formData.password || !formData.confirmPassword
-                }
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -261,16 +238,11 @@ export default function SignUpPage() {
                 )}
               </Button>
 
-              <div className="text-center space-y-2">
+              <div className="text-center">
                 <p className="text-sm text-gray-600">
                   Already have an account?{" "}
                   <Link href="/login" className="text-blue-600 hover:text-blue-500 font-medium">
                     Sign in
-                  </Link>
-                </p>
-                <p className="text-xs text-gray-500">
-                  <Link href="/test-registration" className="hover:text-gray-700">
-                    Test Registration
                   </Link>
                 </p>
               </div>

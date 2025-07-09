@@ -1,14 +1,13 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, CheckCircle, XCircle, AlertTriangle, Info } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react"
 import { useAuthReal } from "@/hooks/use-auth-real"
 
 export default function TestRegistrationPage() {
@@ -26,10 +25,18 @@ export default function TestRegistrationPage() {
     setMessage("")
 
     try {
-      const result = await signUp(email, password, fullName)
+      const result = await signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName } },
+      })
 
       if (result.success) {
-        setMessage(result.message || "Registration successful! Please check your email to verify your account.")
+        setMessage(
+          result.needsConfirmation
+            ? "Registration successful! Please check your email to verify your account."
+            : "Registration successful!",
+        )
       } else {
         setMessage(`Registration failed: ${result.error}`)
       }
@@ -46,10 +53,10 @@ export default function TestRegistrationPage() {
     setMessage("")
 
     try {
-      const result = await signIn(email, password)
+      const result = await signIn({ email, password })
 
       if (result.success) {
-        setMessage(result.message || "Sign in successful!")
+        setMessage("Sign in successful!")
       } else {
         setMessage(`Sign in failed: ${result.error}`)
       }
@@ -68,21 +75,15 @@ export default function TestRegistrationPage() {
       const result = await signOut()
 
       if (result.success) {
-        setMessage(result.message || "Signed out successfully!")
+        setMessage("Signed out successfully!")
       } else {
-        setMessage(`Sign out failed: ${result.error}`)
+        setMessage(`Sign out failed`)
       }
     } catch (error) {
       setMessage("An unexpected error occurred during sign out")
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const fillDemoData = () => {
-    setEmail("demo@solarcalc.ai")
-    setPassword("demo123456")
-    setFullName("Demo User")
   }
 
   if (loading) {
@@ -105,24 +106,11 @@ export default function TestRegistrationPage() {
         </div>
 
         {authError && (
-          <Alert className="border-yellow-200 bg-yellow-50">
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
-            <AlertDescription className="text-yellow-700">
-              <strong>Demo Mode Active:</strong> {authError}
-              <br />
-              <small>All authentication is simulated for testing purposes.</small>
-            </AlertDescription>
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{authError}</AlertDescription>
           </Alert>
         )}
-
-        <Alert className="border-blue-200 bg-blue-50">
-          <Info className="h-4 w-4 text-blue-500" />
-          <AlertDescription className="text-blue-700">
-            <strong>Demo Instructions:</strong>
-            <br />• Use any email/password combination to test • Click "Fill Demo Data" for quick testing • All data is
-            simulated and not stored
-          </AlertDescription>
-        </Alert>
 
         {user ? (
           <Card className="shadow-lg">
@@ -131,32 +119,9 @@ export default function TestRegistrationPage() {
                 <CheckCircle className="h-5 w-5 text-green-500" />
                 <span>Successfully Authenticated</span>
               </CardTitle>
-              <CardDescription>Welcome, {user.name}!</CardDescription>
+              <CardDescription>Welcome, {user.user_metadata.full_name || user.email}!</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                <p className="flex justify-between">
-                  <strong>Email:</strong>
-                  <span className="text-sm">{user.email}</span>
-                </p>
-                <p className="flex justify-between">
-                  <strong>Account Type:</strong>
-                  <span className="text-sm capitalize">{user.accountType}</span>
-                </p>
-                <p className="flex justify-between">
-                  <strong>Usage:</strong>
-                  <span className="text-sm">
-                    {user.calculationsUsed}/{user.monthlyLimit} calculations
-                  </span>
-                </p>
-                <p className="flex justify-between">
-                  <strong>Email Verified:</strong>
-                  <span className={`text-sm ${user.emailVerified ? "text-green-600" : "text-orange-600"}`}>
-                    {user.emailVerified ? "✓ Verified" : "⚠ Pending"}
-                  </span>
-                </p>
-              </div>
-
               <Button
                 onClick={handleSignOut}
                 disabled={isSubmitting}
@@ -218,10 +183,6 @@ export default function TestRegistrationPage() {
                   />
                 </div>
 
-                <Button type="button" onClick={fillDemoData} variant="ghost" className="w-full text-sm">
-                  Fill Demo Data
-                </Button>
-
                 <div className="flex space-x-2">
                   <Button
                     type="button"
@@ -263,32 +224,20 @@ export default function TestRegistrationPage() {
 
         {message && (
           <Alert
-            className={
-              message.includes("successful") || message.includes("Demo mode")
-                ? "border-green-200 bg-green-50"
-                : "border-red-200 bg-red-50"
-            }
+            className={message.includes("successful") ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}
           >
             <div className="flex items-center space-x-2">
-              {message.includes("successful") || message.includes("Demo mode") ? (
+              {message.includes("successful") ? (
                 <CheckCircle className="h-4 w-4 text-green-500" />
               ) : (
                 <XCircle className="h-4 w-4 text-red-500" />
               )}
-              <AlertDescription
-                className={
-                  message.includes("successful") || message.includes("Demo mode") ? "text-green-700" : "text-red-700"
-                }
-              >
+              <AlertDescription className={message.includes("successful") ? "text-green-700" : "text-red-700"}>
                 {message}
               </AlertDescription>
             </div>
           </Alert>
         )}
-
-        <div className="text-center">
-          <p className="text-xs text-gray-500">This is a demo environment. No real data is stored or transmitted.</p>
-        </div>
       </div>
     </div>
   )

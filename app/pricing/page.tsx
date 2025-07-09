@@ -4,11 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import StripeCheckoutButton from "@/components/stripe-checkout-button"
-import { useAuth } from "@/hooks/use-auth-real"
+import { useAuthReal } from "@/hooks/use-auth-real"
 import { Check, Zap, Brain, FileText, Star } from "lucide-react"
 
 export default function PricingPage() {
-  const { isAuthenticated, canAccessProFeatures } = useAuth()
+  const { isAuthenticated, canAccessProFeatures } = useAuthReal()
 
   const features = {
     free: ["Basic solar calculator", "Rough savings estimates", "Environmental impact calculation", "Email support"],
@@ -162,59 +162,6 @@ export default function PricingPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      <div className="text-center space-y-4">
-        <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Can I cancel anytime?</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Yes, you can cancel your Pro subscription at any time. You'll continue to have access until the end of
-                your billing period.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">What's included in the AI analysis?</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Our AI analyzes satellite imagery, local weather patterns, utility rates, and shading to provide
-                accurate solar potential calculations.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">How accurate are the calculations?</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Our Pro analysis typically achieves 90%+ accuracy by incorporating real-world factors like shading,
-                weather patterns, and local utility rates.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Do you offer refunds?</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                We offer a 30-day money-back guarantee for Pro subscriptions. Single reports are non-refundable but
-                valid for 30 days.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   )

@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import type { Database } from "@/types/supabase"
 
-export function createSupabaseServerClient() {
+export const createClient = () => {
   const cookieStore = cookies()
 
   return createServerClient<Database>(
@@ -36,27 +36,18 @@ export function createSupabaseServerClient() {
   )
 }
 
-export async function testServerConnection() {
-  const supabase = createSupabaseServerClient()
-  try {
-    // We perform a simple query to a known table.
-    // This tests the connection, credentials, and basic RLS setup.
-    // An error here could mean a network issue, invalid keys, or RLS blocking the query.
-    const { error } = await supabase.from("user_projects").select("id").limit(1)
-
-    if (error) {
-      // Even if we get an error, if it's from Supabase (e.g., RLS), it means the connection is alive.
-      return {
-        success: true,
-        canQuery: false,
-        error: `Query failed (this may be due to RLS): ${error.message}`,
-      }
-    }
-
-    // If no error, the connection is good and we can query data.
-    return { success: true, canQuery: true, error: null }
-  } catch (e: any) {
-    // This will catch network errors or fundamental configuration problems.
-    return { success: false, canQuery: false, error: e.message }
-  }
+export const createSupabaseServiceClient = () => {
+  return createServerClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    cookies: {
+      get() {
+        return undefined
+      },
+      set() {},
+      remove() {},
+    },
+  })
 }
+
+// Aliases for consistency
+export const createSupabaseServerClient = createClient
+export const createServerSupabaseClient = createClient

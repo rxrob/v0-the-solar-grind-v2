@@ -46,16 +46,10 @@ export default function BillingPage() {
       setError(null)
 
       // Fetch subscription data from your API
-      const response = await fetch("/api/user-subscription", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
+      const response = await fetch("/api/user/subscription")
 
       if (!response.ok) {
         if (response.status === 404) {
-          // User has no subscription
           setSubscription(null)
           setBillingHistory([])
           return
@@ -74,18 +68,16 @@ export default function BillingPage() {
     } catch (error) {
       console.error("Error fetching subscription data:", error)
       setError(error instanceof Error ? error.message : "Failed to load billing information")
-
       // Fallback to mock data for demo purposes
       setSubscription({
         tier: "pro",
         status: "active",
-        currentPeriodEnd: "2024-02-15",
+        currentPeriodEnd: "2024-08-08",
         amount: 29.99,
       })
       setBillingHistory([
-        { date: "2024-01-15", amount: 29.99, status: "Paid" },
-        { date: "2023-12-15", amount: 29.99, status: "Paid" },
-        { date: "2023-11-15", amount: 29.99, status: "Paid" },
+        { date: "2024-07-08", amount: 29.99, status: "Paid" },
+        { date: "2024-06-08", amount: 29.99, status: "Paid" },
       ])
     } finally {
       setLoading(false)
@@ -105,13 +97,14 @@ export default function BillingPage() {
     try {
       setManagingBilling(true)
 
-      const response = await fetch("/api/create-portal-session", {
+      const response = await fetch("/api/stripe/portal", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          customerId: subscription.customerId || user.id,
+          // In a real app, you'd get the customerId from your DB
+          // customerId: profile.stripe_customer_id
         }),
       })
 
@@ -121,13 +114,11 @@ export default function BillingPage() {
       }
 
       const { url } = await response.json()
-
-      if (!url) {
+      if (url) {
+        window.location.href = url
+      } else {
         throw new Error("No portal URL received")
       }
-
-      // Redirect to Stripe billing portal
-      window.location.href = url
     } catch (error) {
       console.error("Error creating portal session:", error)
       toast({
@@ -163,19 +154,6 @@ export default function BillingPage() {
           <Button asChild>
             <a href="/login">Sign In</a>
           </Button>
-        </div>
-      </div>
-    )
-  }
-
-  if (error && !subscription) {
-    return (
-      <div className="container mx-auto py-8 max-w-4xl">
-        <div className="text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Error Loading Billing</h1>
-          <p className="text-muted-foreground mb-4">{error}</p>
-          <Button onClick={fetchSubscriptionData}>Try Again</Button>
         </div>
       </div>
     )

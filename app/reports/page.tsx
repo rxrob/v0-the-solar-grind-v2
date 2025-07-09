@@ -1,17 +1,12 @@
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase-server"
 import { redirect } from "next/navigation"
-import { ReportGenerator } from "@/components/report-generator"
+import ReportGenerator from "@/components/report-generator"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { FileText, Crown, CheckCircle, Star } from "lucide-react"
 
 export default async function ReportsPage() {
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies },
-  )
+  const supabase = createClient()
 
   const {
     data: { user },
@@ -21,13 +16,10 @@ export default async function ReportsPage() {
     redirect("/login")
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_pro, subscription_status")
-    .eq("user_id", user.id)
-    .maybeSingle()
+  const { data: profile } = await supabase.from("profiles").select("subscription_type").eq("id", user.id).single()
 
-  if (!profile?.is_pro || profile?.subscription_status !== "active") {
+  // Redirect if user is not a pro user
+  if (profile?.subscription_type !== "pro") {
     redirect("/pricing")
   }
 
