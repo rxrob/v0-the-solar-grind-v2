@@ -31,10 +31,14 @@ export const createClient = () => {
   })
 }
 
+// Main export for server-side client
 export const createSupabaseServerClient = createClient
+
+// Alias for consistency
 export const createServerSupabaseClient = createClient
+
+// Service Role Client for admin tasks
 export const createSupabaseServiceClient = () => {
-  // This client is for service-role operations and doesn't need cookies
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     cookies: {
       get() {
@@ -46,12 +50,14 @@ export const createSupabaseServiceClient = () => {
   })
 }
 
+// Test function to verify connection
 export const testServerConnection = async () => {
   try {
     const supabase = createClient()
-    const { data, error } = await supabase.from("users").select("count").limit(1)
-    return { success: !error, error: error?.message }
-  } catch (error) {
-    return { success: false, error: "Connection failed" }
+    const { error } = await supabase.from("users").select("id").limit(1)
+    if (error) throw error
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error.message }
   }
 }

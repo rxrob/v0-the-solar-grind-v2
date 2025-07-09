@@ -1,76 +1,40 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const lat = searchParams.get("lat")
+  const lng = searchParams.get("lng")
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
+  if (!lat || !lng) {
+    return NextResponse.json({ error: "Latitude and longitude are required" }, { status: 400 })
+  }
+
+  if (!apiKey) {
+    return NextResponse.json({ error: "Google Maps API key is not configured" }, { status: 500 })
+  }
+
+  const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=19&size=600x400&maptype=satellite&key=${apiKey}`
+
   try {
-    const { searchParams } = new URL(request.url)
-    const lat = searchParams.get("lat")
-    const lng = searchParams.get("lng")
-    const zoom = searchParams.get("zoom") || "21"
-    const size = searchParams.get("size") || "640x640"
-
-    if (!lat || !lng) {
-      return NextResponse.json({ error: "Missing lat or lng parameters" }, { status: 400 })
-    }
-
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: "Google Maps API key not configured" }, { status: 500 })
-    }
-
-    // Validate coordinates
-    const latitude = Number.parseFloat(lat)
-    const longitude = Number.parseFloat(lng)
-
-    if (isNaN(latitude) || isNaN(longitude)) {
-      return NextResponse.json({ error: "Invalid coordinates provided" }, { status: 400 })
-    }
-
-    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      return NextResponse.json({ error: "Coordinates out of valid range" }, { status: 400 })
-    }
-
-    // Google Static Maps API URL for aerial/satellite view
-    const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${size}&maptype=satellite&scale=2&key=${apiKey}`
-
-    console.log(`🛰️ Fetching aerial view: ${lat}, ${lng} (zoom: ${zoom})`)
-
-    const response = await fetch(staticMapUrl, {
-      headers: {
-        "User-Agent": "MySolarAI/1.0",
-      },
-    })
-
+    const response = await fetch(url)
     if (!response.ok) {
-      console.error("Google Static Maps API error:", response.status, response.statusText)
-      return NextResponse.json(
-        { error: `Google Static Maps API error: ${response.status}` },
-        { status: response.status },
-      )
+      throw new Error(`Google Maps API failed with status: ${response.status}`)
     }
-
     const imageBuffer = await response.arrayBuffer()
-
-    if (imageBuffer.byteLength === 0) {
-      return NextResponse.json({ error: "Empty response from Google Maps API" }, { status: 500 })
-    }
+    const contentType = response.headers.get("content-type") || "image/png"
 
     return new NextResponse(imageBuffer, {
+      status: 200,
       headers: {
-        "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=3600",
-        "Content-Length": imageBuffer.byteLength.toString(),
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400",
       },
     })
   } catch (error) {
-    console.error("Aerial view API error:", error)
-    return NextResponse.json(
-      {
-        error: "Failed to fetch aerial view",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+    return NextResponse.json({ error: "Failed to fetch aerial view", details: errorMessage }, { status: 500 })
   }
 }

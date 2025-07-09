@@ -1,57 +1,37 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const address = searchParams.get("address")
+  const apiKey = process.env.GOOGLE_GEOCODING_API_KEY
+
+  if (!address) {
+    return NextResponse.json({ error: "Address is required" }, { status: 400 })
+  }
+
+  if (!apiKey) {
+    return NextResponse.json({ error: "Google API key is not configured" }, { status: 500 })
+  }
+
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
+
   try {
-    const { searchParams } = new URL(request.url)
-    const address = searchParams.get("address")
-
-    if (!address) {
-      return NextResponse.json({ error: "Missing address parameter" }, { status: 400 })
-    }
-
-    const apiKey = process.env.GOOGLE_GEOCODING_API_KEY || process.env.GOOGLE_MAPS_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: "Google Geocoding API key not configured" }, { status: 500 })
-    }
-
-    const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-      address,
-    )}&key=${apiKey}`
-
-    console.log(`🗺️ Geocoding address: ${address}`)
-
-    const response = await fetch(geocodingUrl)
+    const response = await fetch(url)
     const data = await response.json()
 
-    if (!response.ok) {
-      console.error("Google Geocoding API error:", response.status, data)
-      return NextResponse.json({ error: `Geocoding API error: ${response.status}` }, { status: response.status })
-    }
-
     if (data.status !== "OK") {
-      console.error("Geocoding failed:", data.status, data.error_message)
-      return NextResponse.json({ error: `Geocoding failed: ${data.status}` }, { status: 400 })
+      return NextResponse.json({ error: data.error_message || "Geocoding failed" }, { status: 500 })
     }
 
-    const result = data.results[0]
-    if (!result) {
-      return NextResponse.json({ error: "No results found for address" }, { status: 404 })
-    }
+    const { lat, lng } = data.results[0].geometry.location
+    const formattedAddress = data.results[0].formatted_address
+    const placeId = data.results[0].place_id
 
-    return NextResponse.json({
-      success: true,
-      address: result.formatted_address,
-      coordinates: {
-        lat: result.geometry.location.lat,
-        lng: result.geometry.location.lng,
-      },
-      placeId: result.place_id,
-      components: result.address_components,
-    })
+    return NextResponse.json({ lat, lng, formattedAddress, placeId })
   } catch (error) {
-    console.error("Geocoding API error:", error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+    return NextResponse.json({ error: "Failed to fetch geocoding data", details: errorMessage }, { status: 500 })
   }
 }

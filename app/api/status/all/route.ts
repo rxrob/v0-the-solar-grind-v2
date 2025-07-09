@@ -7,7 +7,7 @@ interface ServiceStatus {
   category: string
   endpoint: string
   critical: boolean
-  status: "healthy" | "error" | "degraded"
+  status: "healthy" | "error" | "degraded" | "operational" | "outage"
   message: string
   response_time: number
   details: Record<string, any>
@@ -51,7 +51,11 @@ async function checkService(
       category,
       endpoint,
       critical,
-      status: response.ok ? "healthy" : "error",
+      status: response.ok
+        ? data.status === "ok" || data.status === "operational"
+          ? "operational"
+          : "degraded"
+        : "error",
       message: response.ok ? data.message || "Service operational" : data.message || `HTTP ${response.status}`,
       response_time: responseTime,
       details: data.details || {},
@@ -66,7 +70,7 @@ async function checkService(
       category,
       endpoint,
       critical,
-      status: "error",
+      status: "outage",
       message: error instanceof Error ? error.message : "Service unavailable",
       response_time: responseTime,
       details: { error: error instanceof Error ? error.message : "Unknown error" },
@@ -139,7 +143,7 @@ export async function GET(request: Request) {
       categories[service.category].services.push(service)
       categories[service.category].total++
 
-      if (service.status === "healthy") {
+      if (service.status === "healthy" || service.status === "operational") {
         categories[service.category].healthy++
       }
 
@@ -157,10 +161,12 @@ export async function GET(request: Request) {
 
     // Calculate summary statistics
     const totalServices = services.length
-    const healthyServices = services.filter((s) => s.status === "healthy").length
+    const healthyServices = services.filter((s) => s.status === "healthy" || s.status === "operational").length
     const errorServices = services.filter((s) => s.status === "error").length
     const criticalServices = services.filter((s) => s.critical).length
-    const criticalHealthy = services.filter((s) => s.critical && s.status === "healthy").length
+    const criticalHealthy = services.filter(
+      (s) => s.critical && (s.status === "healthy" || s.status === "operational"),
+    ).length
 
     const averageResponseTime = Math.round(
       services.reduce((sum, service) => sum + service.response_time, 0) / totalServices,

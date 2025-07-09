@@ -1,69 +1,35 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const input = searchParams.get("input")
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
+  if (!input) {
+    return NextResponse.json({ error: "Input is required" }, { status: 400 })
+  }
+
+  if (!apiKey) {
+    return NextResponse.json({ error: "Google API key is not configured" }, { status: 500 })
+  }
+
+  const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+    input,
+  )}&key=${apiKey}&types=address`
+
   try {
-    const { searchParams } = new URL(request.url)
-    const input = searchParams.get("input")
-
-    if (!input) {
-      return NextResponse.json({ error: "Missing input parameter" }, { status: 400 })
-    }
-
-    if (input.length < 2) {
-      return NextResponse.json({ error: "Input must be at least 2 characters" }, { status: 400 })
-    }
-
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: "Google Maps API key not configured" }, { status: 500 })
-    }
-
-    const placesUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-      input,
-    )}&types=address&key=${apiKey}`
-
-    console.log(`🔍 Places autocomplete: ${input}`)
-
-    const response = await fetch(placesUrl, {
-      headers: {
-        "User-Agent": "MySolarAI/1.0",
-      },
-    })
-
-    if (!response.ok) {
-      console.error("Google Places API error:", response.status, response.statusText)
-      return NextResponse.json({ error: `Places API error: ${response.status}` }, { status: response.status })
-    }
-
+    const response = await fetch(url)
     const data = await response.json()
 
     if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-      console.error("Places autocomplete failed:", data.status, data.error_message)
-      return NextResponse.json(
-        {
-          error: `Places autocomplete failed: ${data.status}`,
-          details: data.error_message || "Unknown API error",
-        },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: data.error_message || "Failed to fetch places" }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      predictions: data.predictions || [],
-      status: data.status,
-      count: data.predictions?.length || 0,
-    })
+    return NextResponse.json(data.predictions)
   } catch (error) {
-    console.error("Places API error:", error)
-    return NextResponse.json(
-      {
-        error: "Failed to fetch place suggestions",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+    return NextResponse.json({ error: "Failed to fetch places data", details: errorMessage }, { status: 500 })
   }
 }
