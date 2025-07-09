@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { testServerConnection } from "@/lib/supabase-server"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const connectionTest = await testServerConnection()
@@ -25,8 +27,9 @@ export async function GET() {
     )
   } catch (error) {
     console.error("Supabase status error:", error)
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
     return NextResponse.json(
-      { error: "Status check failed" },
+      { error: "Status check failed", details: errorMessage },
       {
         status: 500,
         headers: {
