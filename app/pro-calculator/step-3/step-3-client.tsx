@@ -7,25 +7,13 @@ import { GoogleMap, Polygon, useJsApiLoader } from "@react-google-maps/api"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import Step3Client from "./step-3-client"
 
-const Step3Page = () => {
-  const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY
-  const solarApiKey = process.env.NEXT_PUBLIC_SOLAR_API_KEY
-
-  if (!mapsApiKey || !solarApiKey) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
-        <h1 className="text-2xl font-bold text-red-500">Configuration Error</h1>
-        <p className="text-gray-300">A required API key is missing. Please check server configuration.</p>
-      </div>
-    )
-  }
-
-  return <Step3Client mapsApiKey={mapsApiKey} solarApiKey={solarApiKey} />
+interface Step3ClientProps {
+  mapsApiKey: string
+  solarApiKey: string
 }
 
-const Step3 = ({ mapsApiKey, solarApiKey }) => {
+export default function Step3Client({ mapsApiKey, solarApiKey }: Step3ClientProps) {
   const router = useRouter()
   const { propertyData, energyData, setCurrentStep, isHydrated, setAnalysisData } = useSolarCalculatorStore()
 
@@ -36,7 +24,7 @@ const Step3 = ({ mapsApiKey, solarApiKey }) => {
   const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script",
     googleMapsApiKey: mapsApiKey,
-    libraries: ["places", "maps", "solar"],
+    libraries: ["places", "maps", "marker"],
   })
 
   const calculatePanels = (dailyKWh: number) => {
@@ -136,7 +124,17 @@ const Step3 = ({ mapsApiKey, solarApiKey }) => {
     }, 15000)
 
     return () => clearTimeout(fallbackTimeout)
-  }, [isHydrated, isLoaded, loadError, propertyData.coordinates, setCurrentStep, router, energyData, setAnalysisData])
+  }, [
+    isHydrated,
+    isLoaded,
+    loadError,
+    propertyData.coordinates,
+    setCurrentStep,
+    router,
+    energyData,
+    setAnalysisData,
+    solarApiKey,
+  ])
 
   const handleContinue = () => router.push("/pro-calculator/step-4")
 
@@ -222,5 +220,3 @@ const Step3 = ({ mapsApiKey, solarApiKey }) => {
     </div>
   )
 }
-
-export default Step3Page

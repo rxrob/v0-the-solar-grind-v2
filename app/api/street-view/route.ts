@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const heading = searchParams.get("heading") || "0"
     const pitch = searchParams.get("pitch") || "0"
     const fov = searchParams.get("fov") || "90"
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY
 
     if (!lat || !lng) {
       return NextResponse.json({ error: "Latitude and longitude are required" }, { status: 400 })

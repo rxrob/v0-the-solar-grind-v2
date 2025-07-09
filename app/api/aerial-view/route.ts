@@ -6,7 +6,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const lat = searchParams.get("lat")
   const lng = searchParams.get("lng")
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY
 
   if (!lat || !lng) {
     return NextResponse.json({ error: "Latitude and longitude are required" }, { status: 400 })

@@ -1,22 +1,28 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { toast } from "sonner"
+import { Loader2, Download } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ReportPreview } from "./report-preview"
-import { FileText, User, Home, Zap, Calculator } from "lucide-react"
+import { User, Home, Zap, Calculator } from "lucide-react"
+import type { SolarAnalysisData } from "@/types/solar"
 
 interface ReportGeneratorProps {
   initialData?: any
+  analysisData: SolarAnalysisData | null
+  address: string
 }
 
-export default function ReportGenerator({ initialData }: ReportGeneratorProps) {
+export default function ReportGenerator({ initialData, analysisData, address }: ReportGeneratorProps) {
   const [showPreview, setShowPreview] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
   const [formData, setFormData] = useState({
     // Customer Information
     customerName: initialData?.customerName || "",
@@ -30,6 +36,7 @@ export default function ReportGenerator({ initialData }: ReportGeneratorProps) {
     roofType: initialData?.roofType || "",
     roofCondition: initialData?.roofCondition || "",
     roofAge: initialData?.roofAge || "",
+    shadingLevel: initialData?.shadingLevel || "",
 
     // Energy Information
     monthlyKwh: initialData?.monthlyKwh || "",
@@ -59,9 +66,6 @@ export default function ReportGenerator({ initialData }: ReportGeneratorProps) {
     hasPool: initialData?.hasPool || false,
     hasEv: initialData?.hasEv || false,
     planningAdditions: initialData?.planningAdditions || false,
-    shadingLevel: initialData?.shadingLevel || "",
-
-    // Notes
     additionalNotes: initialData?.additionalNotes || "",
   })
 
@@ -72,26 +76,55 @@ export default function ReportGenerator({ initialData }: ReportGeneratorProps) {
     }))
   }
 
-  const handleGenerateReport = () => {
-    // Validate required fields
-    const requiredFields = [
-      "customerName",
-      "propertyAddress",
-      "monthlyKwh",
-      "systemSizeKw",
-      "systemCost",
-      "annualSavings",
-    ]
-
-    const missingFields = requiredFields.filter((field) => !formData[field])
-
-    if (missingFields.length > 0) {
-      alert(`Please fill in the following required fields: ${missingFields.join(", ")}`)
+  const handleGenerateReport = useCallback(async () => {
+    if (!analysisData) {
+      toast.error("No analysis data available to generate a report.")
       return
     }
 
-    setShowPreview(true)
-  }
+    setIsGenerating(true)
+    const toastId = toast.loading("Generating PDF report...", {
+      description: "This may take a moment. Please wait.",
+    })
+
+    try {
+      const response = await fetch("/api/generate-pdf-report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ analysisData, address }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to generate PDF report.")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `Solar_Report_${address.replace(/ /g, "_")}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+
+      toast.success("Report downloaded successfully!", {
+        id: toastId,
+      })
+    } catch (error) {
+      console.error("Error generating report:", error)
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred."
+      toast.error("Failed to generate report.", {
+        id: toastId,
+        description: errorMessage,
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [analysisData, address])
 
   const customerData = {
     customerName: formData.customerName,
@@ -551,15 +584,27 @@ export default function ReportGenerator({ initialData }: ReportGeneratorProps) {
 
         {/* Generate Report Button */}
         <Card>
-          <CardContent className="pt-6">
-            <Button
-              onClick={handleGenerateReport}
-              className="w-full bg-gradient-to-r from-blue-600 to-yellow-600 hover:from-blue-700 hover:to-yellow-700"
-              size="lg"
-            >
-              <FileText className="h-5 w-5 mr-2" />
-              Generate Solar Report
+          <CardHeader>
+            <CardTitle>Download Report</CardTitle>
+            <CardDescription>Generate and download a comprehensive PDF report of your solar analysis.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleGenerateReport} disabled={isGenerating || !analysisData} className="w-full">
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF Report
+                </>
+              )}
             </Button>
+            {!analysisData && (
+              <p className="mt-2 text-sm text-muted-foreground">Complete the analysis to enable report generation.</p>
+            )}
           </CardContent>
         </Card>
       </div>
