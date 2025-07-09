@@ -1,16 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import type { User } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase"
+import { useState, useEffect, useCallback } from "react"
+import type { User, AuthError } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase-browser"
 
 interface AuthState {
   user: User | null
   loading: boolean
-  error: string | null
+  error: AuthError | null
 }
 
 export function useAuthReal() {
+  const supabase = createClient()
   const [state, setState] = useState<AuthState>({
     user: null,
     loading: true,
@@ -18,7 +19,6 @@ export function useAuthReal() {
   })
 
   useEffect(() => {
-    // Get initial session
     const getInitialSession = async () => {
       try {
         const {
@@ -36,17 +36,16 @@ export function useAuthReal() {
         setState({
           user: null,
           loading: false,
-          error: error instanceof Error ? error.message : "Authentication error",
+          error: error as AuthError,
         })
       }
     }
 
     getInitialSession()
 
-    // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setState({
         user: session?.user ?? null,
         loading: false,
@@ -55,27 +54,24 @@ export function useAuthReal() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [supabase])
 
-  const signIn = async (email: string, password: string) => {
-    setState((prev) => ({ ...prev, loading: true, error: null }))
-
-    try {
+  const signIn = useCallback(
+    async (email, password) => {
+      setState((prev) => ({ ...prev, loading: true, error: null }))
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : "Sign in failed",
-      }))
-    }
-  }
+      if (error) {
+        setState((prev) => ({ ...prev, loading: false, error }))
+      }
+    },
+    [supabase],
+  )
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }))
     await supabase.auth.signOut()
-  }
+    setState({ user: null, loading: false, error: null })
+  }, [supabase])
 
   return {
     ...state,
