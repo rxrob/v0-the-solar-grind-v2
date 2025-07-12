@@ -22,40 +22,35 @@ export default function TestAddressAutocompletePage() {
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load Google Maps API and Places Widget
   useEffect(() => {
-    const loadScripts = async () => {
-      try {
-        const response = await fetch("/api/google-maps-config")
-        const config = await response.json()
+    // Load Places Widget module from unpkg, which is separate from the main Google Maps API
+    const widgetScript = document.createElement("script")
+    widgetScript.src = "https://unpkg.com/@googlemaps/places-widget"
+    widgetScript.type = "module"
+    widgetScript.async = true
+    document.head.appendChild(widgetScript)
 
-        if (!config.configured) {
-          setError("Google Maps API not configured")
-          return
-        }
-
-        // Load Google Maps script
-        const mapsScript = document.createElement("script")
-        mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${config.apiKey}&libraries=places,marker&v=beta`
-        mapsScript.async = true
-        mapsScript.defer = true
-        mapsScript.onload = () => setGoogleMapsLoaded(true)
-        mapsScript.onerror = () => setError("Failed to load Google Maps API")
-        document.head.appendChild(mapsScript)
-
-        // Load Places Widget module from unpkg
-        const widgetScript = document.createElement("script")
-        widgetScript.src = "https://unpkg.com/@googlemaps/places-widget"
-        widgetScript.type = "module"
-        widgetScript.async = true
-        document.head.appendChild(widgetScript)
-      } catch (error) {
-        setError("Failed to load Google Maps configuration")
+    // Check for the Google Maps script that is now loaded globally from layout.tsx
+    const interval = setInterval(() => {
+      if (window.google && window.google.maps) {
+        setGoogleMapsLoaded(true)
+        clearInterval(interval)
       }
-    }
+    }, 100)
 
-    loadScripts()
-  }, [])
+    const timeout = setTimeout(() => {
+      if (!googleMapsLoaded) {
+        clearInterval(interval)
+        setError("Failed to load Google Maps API. Please check your API key and network connection.")
+      }
+    }, 5000)
+
+    // Cleanup interval and timeout on component unmount
+    return () => {
+      clearInterval(interval)
+      clearTimeout(timeout)
+    }
+  }, [googleMapsLoaded]) // Rerun effect if googleMapsLoaded changes to clear timeout
 
   const handlePlaceChange = (event: CustomEvent<{ value: google.maps.places.Place | null }>) => {
     const place = event.detail.value

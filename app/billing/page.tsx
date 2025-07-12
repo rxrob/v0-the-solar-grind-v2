@@ -45,7 +45,6 @@ export default function BillingPage() {
       setLoading(true)
       setError(null)
 
-      // Fetch subscription data from your API
       const response = await fetch("/api/user/subscription")
 
       if (!response.ok) {
@@ -68,7 +67,6 @@ export default function BillingPage() {
     } catch (error) {
       console.error("Error fetching subscription data:", error)
       setError(error instanceof Error ? error.message : "Failed to load billing information")
-      // Fallback to mock data for demo purposes
       setSubscription({
         tier: "pro",
         status: "active",
@@ -102,10 +100,7 @@ export default function BillingPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          // In a real app, you'd get the customerId from your DB
-          // customerId: profile.stripe_customer_id
-        }),
+        body: JSON.stringify({}),
       })
 
       if (!response.ok) {

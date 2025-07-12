@@ -1,7 +1,7 @@
-import { createSupabaseServerClient } from "@/lib/supabase-server"
-import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
+import { NextResponse } from "next/server"
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
   const next = searchParams.get("next") ?? "/dashboard"
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   console.log("🔄 Auth callback received:", { code: !!code, next })
 
   if (code) {
-    const supabase = createSupabaseServerClient()
+    const supabase = createClient()
 
     try {
       console.log("🔐 Exchanging code for session...")
@@ -102,5 +102,5 @@ export async function GET(request: NextRequest) {
   }
 
   console.log("❌ No code provided, redirecting to login")
-  return NextResponse.redirect(`${origin}/login?error=no_code`)
+  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
 }

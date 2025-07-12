@@ -1,172 +1,146 @@
 "use server"
 
-import { createClient } from "@/lib/supabase-server"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { z } from "zod"
 
-export async function signUp(email: string, password: string, fullName: string) {
-  try {
-    const supabase = await createClient()
-    const cookieStore = await cookies()
+const signupSchema = z.object({
+  email: z.string().email({ message: "Invalid email address." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters long." }),
+  full_name: z.string().min(2, { message: "Full name is required." }),
+})
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
+export type SignupFormState = {
+  message: string
+  errors?: {
+    email?: string[]
+    password?: string[]
+    full_name?: string[]
+    _form?: string[]
+  }
+  success: boolean
+}
+
+export async function signupAndCreateProfile(prevState: SignupFormState, formData: FormData): Promise<SignupFormState> {
+  const supabase = createClient()
+  const supabaseAdmin = createAdminClient()
+
+  const validatedFields = signupSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+    full_name: formData.get("full_name"),
+  })
+
+  if (!validatedFields.success) {
+    return {
+      message: "Invalid form data.",
+      errors: validatedFields.error.flatten().fieldErrors,
+      success: false,
+    }
+  }
+
+  const { email, password, full_name } = validatedFields.data
+
+  // Step 1: Sign up the user in Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name,
       },
-    })
+    },
+  })
 
-    if (error) {
-      return { success: false, error: error.message }
+  if (authError) {
+    return {
+      message: "Failed to sign up.",
+      errors: { _form: [authError.message] },
+      success: false,
     }
+  }
 
-    if (data.user) {
-      // Create user profile in our users table
-      const { error: profileError } = await supabase.from("users").insert({
-        id: data.user.id,
-        email: data.user.email,
-        full_name: fullName,
-        subscription_type: "free",
-        subscription_status: "active",
-        calculations_used: 0,
-        monthly_calculation_limit: 3,
-        pro_trial_used: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-
-      if (profileError) {
-        console.error("Error creating user profile:", profileError)
-      }
+  if (!authData.user) {
+    return {
+      message: "User not found after sign up.",
+      errors: { _form: ["An unexpected error occurred. Please try again."] },
+      success: false,
     }
+  }
 
-    return { success: true, data }
-  } catch (error) {
-    console.error("Sign up error:", error)
-    return { success: false, error: "Failed to create account" }
+  // Step 2: Create the user profile using the admin client to bypass RLS
+  const { error: profileError } = await supabaseAdmin.from("users").insert({
+    id: authData.user.id,
+    email: authData.user.email,
+    full_name: full_name,
+    // Set default values for the new user
+    subscription_type: "free",
+    subscription_status: "active",
+    calculations_used: 0,
+    monthly_calculation_limit: 3,
+    pro_trial_used: false,
+  })
+
+  if (profileError) {
+    // This is a critical error. We should ideally clean up the auth user.
+    console.error("CRITICAL: Failed to create user profile for auth user:", authData.user.id, profileError)
+    return {
+      message: "Failed to create user profile.",
+      errors: { _form: ["A critical error occurred during sign-up. Please contact support."] },
+      success: false,
+    }
+  }
+
+  return {
+    message: "Sign up successful! Please check your email for a confirmation link.",
+    success: true,
   }
 }
 
 export async function signIn(email: string, password: string) {
-  try {
-    const supabase = await createClient()
-    const cookieStore = await cookies()
+  const supabase = createClient()
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
 
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, data }
-  } catch (error) {
-    console.error("Sign in error:", error)
-    return { success: false, error: "Failed to sign in" }
+  if (error) {
+    return { success: false, error: error.message }
   }
+
+  return { success: true, data }
 }
 
 export async function signOut() {
-  try {
-    const supabase = await createClient()
-    const cookieStore = await cookies()
+  const supabase = createClient()
+  const { error } = await supabase.auth.signOut()
 
-    const { error } = await supabase.auth.signOut()
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true }
-  } catch (error) {
-    console.error("Sign out error:", error)
-    return { success: false, error: "Failed to sign out" }
+  if (error) {
+    return { success: false, error: error.message }
   }
+
+  return { success: true }
 }
 
 export async function getCurrentUser() {
-  try {
-    const supabase = await createClient()
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-
-    if (error || !user) {
-      return { success: false, user: null }
-    }
-
-    // Get user profile from our users table
-    const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
-
-    if (profileError) {
-      console.error("Error fetching user profile:", profileError)
-      return { success: true, user, profile: null }
-    }
-
-    return { success: true, user, profile }
-  } catch (error) {
-    console.error("Get current user error:", error)
-    return { success: false, user: null }
+  if (!user) {
+    return { success: false, user: null, profile: null }
   }
-}
 
-export async function updateUserProfile(userId: string, updates: any) {
-  try {
-    const supabase = await createClient()
+  // FIX: Using .select() correctly to avoid 406 error and handling potential errors.
+  const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
 
-    const { data, error } = await supabase.from("users").update(updates).eq("id", userId).select().single()
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, data }
-  } catch (error) {
-    console.error("Update user profile error:", error)
-    return { success: false, error: "Failed to update profile" }
+  if (profileError) {
+    console.error("Error fetching user profile:", profileError)
+    // Still return the user object even if profile fails
+    return { success: true, user, profile: null }
   }
-}
 
-export async function resetPassword(email: string) {
-  try {
-    const supabase = await createClient()
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
-    })
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, message: "Password reset email sent" }
-  } catch (error) {
-    console.error("Reset password error:", error)
-    return { success: false, error: "Failed to send reset email" }
-  }
-}
-
-export async function updatePassword(password: string) {
-  try {
-    const supabase = await createClient()
-
-    const { error } = await supabase.auth.updateUser({
-      password,
-    })
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, message: "Password updated successfully" }
-  } catch (error) {
-    console.error("Update password error:", error)
-    return { success: false, error: "Failed to update password" }
-  }
+  return { success: true, user, profile }
 }

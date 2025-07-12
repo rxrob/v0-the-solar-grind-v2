@@ -1,222 +1,133 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useSolarCalculatorStore } from "@/lib/store"
-import { GoogleMap, Polygon, useJsApiLoader } from "@react-google-maps/api"
-import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { useState, useCallback, useEffect } from "react"
+import { GoogleMap, useJsApiLoader, DrawingManager } from "@react-google-maps/api"
+import { useFormContext } from "react-hook-form"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Terminal } from "lucide-react"
+import { useProCalculator } from "@/lib/store"
+import * as google from "google.maps"
 
-interface Step3ClientProps {
-  mapsApiKey: string
-  solarApiKey: string
+const containerStyle = {
+  width: "100%",
+  height: "500px",
+  borderRadius: "0.5rem",
 }
 
-export default function Step3Client({ mapsApiKey, solarApiKey }: Step3ClientProps) {
-  const router = useRouter()
-  const { propertyData, energyData, setCurrentStep, isHydrated, setAnalysisData } = useSolarCalculatorStore()
+const libraries: ("places" | "geometry" | "marker" | "drawing")[] = ["places", "geometry", "marker", "drawing"]
 
-  const [sunlightHours, setSunlightHours] = useState<number | null>(null)
-  const [polygonCoords, setPolygonCoords] = useState<any[]>([])
-  const [isLoadingApi, setIsLoadingApi] = useState(true)
+export default function Step3Client() {
+  const { address, setRoofPolygons } = useProCalculator()
+  const { setValue } = useFormContext()
 
   const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script",
-    googleMapsApiKey: mapsApiKey,
-    libraries: ["places", "maps", "marker"],
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+    libraries: libraries,
   })
 
-  const calculatePanels = (dailyKWh: number) => {
-    if (!energyData.monthlyUsage || dailyKWh <= 0) return 0
-    const panelWatt = 440
-    const annualKWhNeeded = energyData.monthlyUsage * 12
-    const annualKWhPerPanel = (panelWatt / 1000) * dailyKWh * 365
-    if (annualKWhPerPanel === 0) return 0
-    return Math.ceil(annualKWhNeeded / annualKWhPerPanel)
-  }
+  const [map, setMap] = useState<google.maps.Map | null>(null)
+  const [center, setCenter] = useState({ lat: 30.2672, lng: -97.7431 }) // Default to Austin, TX
 
   useEffect(() => {
-    if (loadError) {
-      toast.error("Failed to load Google Maps API.")
-      console.error("Google Maps API load error:", loadError)
-    }
-    if (!isHydrated || !isLoaded) return
-
-    if (!propertyData.coordinates) {
-      toast.error("Address not found. Please start over.")
-      router.push("/pro-calculator/step-1")
-      return
-    }
-
-    setCurrentStep(3)
-    const { lat, lng } = propertyData.coordinates
-
-    const fetchSolarData = async () => {
-      setIsLoadingApi(true)
-      try {
-        const url = `https://solar.googleapis.com/v1/buildingInsights:findClosest?location.latitude=${lat}&location.longitude=${lng}&key=${solarApiKey}`
-        const res = await fetch(url)
-        const data = await res.json()
-
-        if (data.error) {
-          console.error("Google Solar API Error:", data.error.message)
-          toast.error(data.error.message || "No solar data available. Using fallback values.")
-          setSunlightHours(4.5)
-          setPolygonCoords([])
-          return
-        }
-
-        if (!res.ok || !data?.solarPotential) {
-          toast.error("No solar data available. Using fallback values.")
-          setSunlightHours(4.5)
-          setPolygonCoords([])
-          return
-        }
-
-        const hours = +(data.solarPotential.maxSunshineHoursPerYear / 365).toFixed(1)
-        setSunlightHours(hours)
-
-        const segments = data.solarPotential.roofSegmentStats || []
-        const polygons = segments.map((segment: any) => {
-          const { sw, ne } = segment.latLngBox
-          return [
-            { lat: sw.latitude, lng: sw.longitude },
-            { lat: ne.latitude, lng: sw.longitude },
-            { lat: ne.latitude, lng: ne.longitude },
-            { lat: sw.latitude, lng: ne.longitude },
-          ]
-        })
-        setPolygonCoords(polygons)
-
-        const panelCount = data.solarPotential.maxArrayPanelsCount || 0
-        const annualKWh = data.solarPotential.wholeRoofStats?.yearlyEnergyDcKwh || 0
-        const electricityRate =
-          energyData.electricityRate ||
-          (energyData.monthlyBill && energyData.monthlyUsage ? energyData.monthlyBill / energyData.monthlyUsage : 0.15)
-        const monthlySavings = (annualKWh / 12) * electricityRate
-
-        setAnalysisData({
-          systemSize: (panelCount * 440) / 1000,
-          annualProduction: annualKWh,
-          monthlySavings,
-          annualSavings: monthlySavings * 12,
-        })
-      } catch (err) {
-        console.error("❌ Google Solar API Fetch Error:", err)
-        toast.error("Solar API error — using fallback.")
-        setSunlightHours(4.5)
-        setPolygonCoords([])
-      } finally {
-        setIsLoadingApi(false)
+    if (address?.lat && address?.lng) {
+      const newCenter = { lat: address.lat, lng: address.lng }
+      setCenter(newCenter)
+      if (map) {
+        map.panTo(newCenter)
+        map.setZoom(20) // Zoom in close for roof drawing
+        map.setMapTypeId("satellite") // Switch to satellite view
       }
     }
+  }, [address, map])
 
-    fetchSolarData()
+  const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
+    setMap(mapInstance)
+  }, [])
 
-    const fallbackTimeout = setTimeout(() => {
-      if (isLoadingApi) {
-        toast.warning("API timeout. Using fallback.")
-        setSunlightHours(4.5)
-        setPolygonCoords([])
-        setIsLoadingApi(false)
-      }
-    }, 15000)
+  const onUnmount = useCallback(function callback(mapInstance: google.maps.Map) {
+    setMap(null)
+  }, [])
 
-    return () => clearTimeout(fallbackTimeout)
-  }, [
-    isHydrated,
-    isLoaded,
-    loadError,
-    propertyData.coordinates,
-    setCurrentStep,
-    router,
-    energyData,
-    setAnalysisData,
-    solarApiKey,
-  ])
+  const onPolygonComplete = (polygon: google.maps.Polygon) => {
+    const path = polygon
+      .getPath()
+      .getArray()
+      .map((latLng) => ({ lat: latLng.lat(), lng: latLng.lng() }))
+    const area = google.maps.geometry.spherical.computeArea(polygon.getPath())
 
-  const handleContinue = () => router.push("/pro-calculator/step-4")
+    const newPolygon = { path, area }
+    const updatedPolygons = [...useProCalculator.getState().roofPolygons, newPolygon]
+    setRoofPolygons(updatedPolygons)
 
-  if (!isLoaded || isLoadingApi) {
+    setValue("roofPolygons", updatedPolygons, { shouldValidate: true })
+
+    polygon.setMap(null) // Remove the drawn polygon to allow drawing more
+  }
+
+  if (loadError) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-400 mb-4" />
-        <p>Loading solar insights from Google...</p>
-      </div>
+      <Alert variant="destructive">
+        <Terminal className="h-4 w-4" />
+        <AlertTitle>Map Error</AlertTitle>
+        <AlertDescription>
+          There was an error loading the Google Maps script. Please check your API key and network connection.
+        </AlertDescription>
+      </Alert>
     )
   }
 
-  const panelCount = sunlightHours ? calculatePanels(sunlightHours) : 0
-  const annualKWh = Math.round(panelCount * 0.44 * (sunlightHours || 0) * 365)
-
   return (
-    <div className="min-h-screen bg-black text-white px-6 py-10">
-      <h1 className="text-4xl font-bold text-orange-500 mb-2">Step 3: Solar Analysis</h1>
-      <p className="mb-6 text-gray-300">Based on your data, here's your rooftop solar system summary:</p>
-
-      <div className="rounded-xl overflow-hidden mb-6 border border-gray-700">
-        <GoogleMap
-          mapContainerStyle={{ width: "100%", height: "400px" }}
-          center={propertyData.coordinates!}
-          zoom={20}
-          mapTypeId="satellite"
-          options={{ streetViewControl: false, fullscreenControl: false }}
-        >
-          {polygonCoords.map((path, index) => (
-            <Polygon
-              key={index}
-              path={path}
+    <Card>
+      <CardHeader>
+        <CardTitle>Draw Roof Sections</CardTitle>
+        <CardDescription>
+          Use the polygon tool to outline each flat section of the roof suitable for solar panels. The map will center
+          on your property address.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoaded ? (
+          <GoogleMap
+            mapContainerStyle={containerStyle}
+            center={center}
+            zoom={18}
+            onLoad={onLoad}
+            onUnmount={onUnmount}
+            options={{
+              streetViewControl: false,
+              mapTypeControl: true,
+              fullscreenControl: false,
+              mapTypeId: "satellite",
+              tilt: 0,
+            }}
+          >
+            <DrawingManager
+              onPolygonComplete={onPolygonComplete}
               options={{
-                fillColor: "#ffa500",
-                fillOpacity: 0.4,
-                strokeColor: "#ffffff",
-                strokeWeight: 2,
+                drawingControl: true,
+                drawingControlOptions: {
+                  position: google.maps.ControlPosition.TOP_CENTER,
+                  drawingModes: [google.maps.drawing.OverlayType.POLYGON],
+                },
+                polygonOptions: {
+                  fillColor: "#2196F3",
+                  fillOpacity: 0.5,
+                  strokeWeight: 2,
+                  strokeColor: "#2196F3",
+                  clickable: false,
+                  editable: false,
+                  zIndex: 1,
+                },
               }}
             />
-          ))}
-        </GoogleMap>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gray-900 rounded-lg p-6 border border-gray-700">
-          <h2 className="text-xl font-semibold mb-4">System Overview</h2>
-          <p>
-            <b>Estimated Sunlight:</b> {sunlightHours} hrs/day
-          </p>
-          <p>
-            <b>Panels Needed:</b> {panelCount} × 440W Silfab
-          </p>
-          <p>
-            <b>Microinverter:</b> Enphase IQ8+ MC
-          </p>
-          <p>
-            <b>Estimated Output:</b> {annualKWh.toLocaleString()} kWh/year
-          </p>
-        </div>
-        <div className="bg-gray-900 rounded-lg p-6 border border-gray-700">
-          <h2 className="text-xl font-semibold mb-4">Warranties & Support</h2>
-          <ul className="list-disc list-inside text-sm text-gray-300">
-            <li>⚙️ 25-year bumper-to-bumper coverage</li>
-            <li>🔋 Panel product & performance: 30 years</li>
-            <li>⚡ Enphase inverter: 25 years</li>
-            <li>🛠️ Installation workmanship: 10 years</li>
-          </ul>
-          <p className="mt-4 text-sm text-gray-400">
-            Your system is protected by ION Solar’s industry-leading service and support. No surprise fees or fine
-            print.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex justify-between items-center mt-8">
-        <Button variant="outline" onClick={() => router.push("/pro-calculator/step-2")}>
-          ← Back to Step 2
-        </Button>
-        <Button onClick={handleContinue} className="bg-orange-500 hover:bg-orange-600">
-          Continue to Step 4
-        </Button>
-      </div>
-    </div>
+          </GoogleMap>
+        ) : (
+          <Skeleton className="h-[500px] w-full rounded-lg" />
+        )}
+      </CardContent>
+    </Card>
   )
 }
