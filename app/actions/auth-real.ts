@@ -1,7 +1,8 @@
 "use server"
 
-import { createClient } from "@/lib/supabase-server"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
+import { headers, cookies } from "next/headers"
+import { redirect } from "next/navigation"
 
 export async function signInWithEmail(email: string, password: string) {
   try {
@@ -96,28 +97,29 @@ export async function signUpWithEmail(email: string, password: string, fullName?
   }
 }
 
-export async function signOut() {
-  try {
-    const supabase = await createClient()
-    const cookieStore = await cookies()
+export async function signInWithGoogle() {
+  const supabase = createClient()
+  const origin = headers().get("origin")
 
-    const { error } = await supabase.auth.signOut()
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${origin}/auth/callback`,
+    },
+  })
 
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    // Clear session cookie
-    cookieStore.delete("supabase-auth-token")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Sign out error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Sign out failed",
-    }
+  if (error) {
+    console.error("Error signing in with Google:", error)
+    return redirect("/login?error=Could not authenticate user")
   }
+
+  return redirect(data.url)
+}
+
+export async function signOut() {
+  const supabase = createClient()
+  await supabase.auth.signOut()
+  return redirect("/")
 }
 
 export async function getUser() {

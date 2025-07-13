@@ -1,130 +1,75 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import type { User, Session, SignUpWithPasswordCredentials } from "@supabase/supabase-js"
-import { createClient } from "@/lib/supabase-browser"
+import { useEffect, useState } from "react"
+import type { User } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabase-browser"
 
 interface AuthState {
   user: User | null
-  session: Session | null
   loading: boolean
-  error: string | null
-  isAuthenticated: boolean
+  signIn: (email: string, password: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string) => Promise<{ error: any }>
+  signOut: () => Promise<void>
 }
 
-interface SignUpResult {
-  success: boolean
-  error?: string | null
-  needsConfirmation?: boolean
-}
-
-// This is the primary authentication hook for the application.
-// It uses a named export to prevent import errors.
-export function useAuthReal() {
-  const supabase = createClient()
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    session: null,
-    loading: true,
-    error: null,
-    isAuthenticated: false,
-  })
+export function useAuthReal(): AuthState {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Get initial session
     const getInitialSession = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
-        if (error) throw error
-
-        setState({
-          user: session?.user ?? null,
-          session: session,
-          loading: false,
-          error: null,
-          isAuthenticated: !!session?.user,
-        })
-      } catch (error) {
-        setState({
-          user: null,
-          session: null,
-          loading: false,
-          error: error instanceof Error ? error.message : "Authentication error",
-          isAuthenticated: false,
-        })
-      }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setUser(session?.user ?? null)
+      setLoading(false)
     }
 
     getInitialSession()
 
+    // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setState({
-        user: session?.user ?? null,
-        session: session,
-        loading: false,
-        error: null,
-        isAuthenticated: !!session?.user,
-      })
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase])
+  }, [])
 
-  const signIn = useCallback(
-    async (credentials: { email: string; password: string }) => {
-      setState((prev) => ({ ...prev, loading: true, error: null }))
-      const { error } = await supabase.auth.signInWithPassword(credentials)
-      if (error) {
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          error: error.message,
-        }))
-        return { success: false, error: error.message }
-      }
-      return { success: true }
-    },
-    [supabase],
-  )
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { error }
+  }
 
-  const signUp = useCallback(
-    async (credentials: SignUpWithPasswordCredentials): Promise<SignUpResult> => {
-      setState((prev) => ({ ...prev, loading: true, error: null }))
-      const { data, error } = await supabase.auth.signUp(credentials)
+  const signUp = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    })
+    return { error }
+  }
 
-      if (error) {
-        setState((prev) => ({ ...prev, loading: false, error: error.message }))
-        return { success: false, error: error.message }
-      }
-
-      const needsConfirmation = data.user?.identities?.length === 0
-      setState((prev) => ({ ...prev, loading: false }))
-      return { success: true, needsConfirmation }
-    },
-    [supabase],
-  )
-
-  const signOut = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true }))
+  const signOut = async () => {
     await supabase.auth.signOut()
-    // The onAuthStateChange listener will handle setting the final state
-    return { success: true }
-  }, [supabase])
+  }
 
   return {
-    ...state,
+    user,
+    loading,
     signIn,
-    signOut,
     signUp,
+    signOut,
   }
 }
 
-// Alias for compatibility
+// Named export for compatibility
 export const useAuth = useAuthReal
 
-// Default export for components that might be using it
+// Default export
 export default useAuthReal

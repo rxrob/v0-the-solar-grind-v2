@@ -1,60 +1,32 @@
 "use client"
 
 import type React from "react"
+import { createContext, useContext, useState } from "react"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { createContext, useContext, useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase-browser"
-import type { SupabaseClient, User } from "@supabase/supabase-js"
-
-type SupabaseContextType = {
+type SupabaseContext = {
   supabase: SupabaseClient
-  user: User | null
-  isLoading: boolean
 }
 
-const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined)
+const Context = createContext<SupabaseContext | undefined>(undefined)
 
-export function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+export function SupabaseProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [supabase] = useState(() => createClientComponentClient())
 
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null)
-      setIsLoading(false)
-    })
-
-    // Fetch initial session
-    const getInitialSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      setIsLoading(false)
-    }
-
-    getInitialSession()
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  const value = {
-    supabase,
-    user,
-    isLoading,
-  }
-
-  return <SupabaseContext.Provider value={value}>{children}</SupabaseContext.Provider>
+  return <Context.Provider value={{ supabase }}>{children}</Context.Provider>
 }
 
 export const useSupabase = () => {
-  const context = useContext(SupabaseContext)
+  const context = useContext(Context)
+
   if (context === undefined) {
-    throw new Error("useSupabase must be used within a SupabaseProvider")
+    throw new Error("useSupabase must be used inside SupabaseProvider")
   }
+
   return context
 }

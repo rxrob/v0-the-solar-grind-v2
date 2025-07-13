@@ -1,29 +1,20 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Only return configuration status, not actual keys
-    const hasRecaptcha = !!process.env.RECAPTCHA_SECRET_KEY
+    // Return only the site key from server-side environment
+    const siteKey = process.env.RECAPTCHA_SITE_KEY
+
+    if (!siteKey) {
+      return NextResponse.json({ error: "reCAPTCHA site key not configured" }, { status: 500 })
+    }
 
     return NextResponse.json({
-      success: true,
-      recaptcha: {
-        enabled: hasRecaptcha,
-        configured: hasRecaptcha,
-      },
+      siteKey,
+      version: "v2",
     })
   } catch (error) {
     console.error("reCAPTCHA config error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to get reCAPTCHA configuration",
-        recaptcha: {
-          enabled: false,
-          configured: false,
-        },
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: "Failed to get reCAPTCHA configuration" }, { status: 500 })
   }
 }

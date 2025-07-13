@@ -1,17 +1,20 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
-// Note: this client is meant to be used on the server-side only.
-// It uses the service_role key and can bypass RLS.
-export const createAdminClient = () => {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("Missing Supabase URL or Service Role Key for admin client")
+// This client uses the SERVICE_ROLE_KEY for admin-level access.
+// It should ONLY be used on the server in secure environments.
+const createAdminSupabaseClient = () => {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set for admin client")
   }
-
-  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+  return createSupabaseClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
   })
 }
+
+// Exporting both names to satisfy all legacy imports from the error logs.
+export const createAdminClient = createAdminSupabaseClient
+export const createSupabaseServiceClient = createAdminSupabaseClient

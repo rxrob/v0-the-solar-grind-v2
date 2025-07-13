@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { createSupabaseServerClient } from "@/lib/supabase-server"
 
 export async function GET() {
   console.log("[SERVER] 🔍 === ENVIRONMENT CHECK START ===")
@@ -27,6 +28,11 @@ export async function GET() {
       issues: [] as string[],
     },
     nrel: {
+      configured: false,
+      api_key_present: false,
+      issues: [] as string[],
+    },
+    resend: {
       configured: false,
       api_key_present: false,
       issues: [] as string[],
@@ -73,10 +79,14 @@ export async function GET() {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY
   const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+  const stripeProMonthlyPriceId = process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID
+  const stripeSingleReportPriceId = process.env.NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID
 
   environment.stripe.secret_key_present = !!stripeSecretKey
   environment.stripe.publishable_key_present = !!stripePublishableKey
   environment.stripe.webhook_secret_present = !!stripeWebhookSecret
+  environment.stripe.pro_monthly_price_id_present = !!stripeProMonthlyPriceId
+  environment.stripe.single_report_price_id_present = !!stripeSingleReportPriceId
 
   if (stripeSecretKey) {
     if (stripeSecretKey.startsWith("sk_test_")) {
@@ -105,6 +115,14 @@ export async function GET() {
 
   if (!stripeWebhookSecret) {
     environment.stripe.issues.push("STRIPE_WEBHOOK_SECRET is missing")
+  }
+
+  if (!stripeProMonthlyPriceId) {
+    environment.stripe.issues.push("NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID is missing")
+  }
+
+  if (!stripeSingleReportPriceId) {
+    environment.stripe.issues.push("NEXT_PUBLIC_STRIPE_SINGLE_REPORT_PRICE_ID is missing")
   }
 
   environment.stripe.configured = environment.stripe.issues.length === 0
@@ -141,14 +159,31 @@ export async function GET() {
 
   environment.nrel.configured = environment.nrel.issues.length === 0
 
+  // Check Resend
+  const resendApiKey = process.env.RESEND_API_KEY
+
+  environment.resend.api_key_present = !!resendApiKey
+
+  if (!resendApiKey) {
+    environment.resend.issues.push("RESEND_API_KEY is missing")
+  }
+
+  environment.resend.configured = environment.resend.issues.length === 0
+
   // Calculate overall status
   const totalIssues =
     environment.supabase.issues.length +
     environment.stripe.issues.length +
     environment.google.issues.length +
-    environment.nrel.issues.length
+    environment.nrel.issues.length +
+    environment.resend.issues.length
 
-  const criticalServices = [environment.stripe.configured, environment.google.configured, environment.nrel.configured]
+  const criticalServices = [
+    environment.stripe.configured,
+    environment.google.configured,
+    environment.nrel.configured,
+    environment.resend.configured,
+  ]
   const criticalConfigured = criticalServices.filter(Boolean).length
 
   if (totalIssues === 0) {
@@ -168,7 +203,16 @@ export async function GET() {
   console.log(`[SERVER]    - Stripe: ${environment.stripe.configured ? "✅" : "❌"}`)
   console.log(`[SERVER]    - Google: ${environment.google.configured ? "✅" : "❌"}`)
   console.log(`[SERVER]    - NREL: ${environment.nrel.configured ? "✅" : "❌"}`)
+  console.log(`[SERVER]    - Resend: ${environment.resend.configured ? "✅" : "❌"}`)
   console.log("[SERVER] ✅ === ENVIRONMENT CHECK COMPLETE ===")
 
-  return NextResponse.json(environment)
+  const supabase = createSupabaseServerClient()
+  const { data, error } = await supabase.from("users").select("id").limit(1)
+
+  const status = {
+    supabaseConnection: error ? `Failed: ${error.message}` : "Success",
+    environmentVariables: environment.overall.status,
+  }
+
+  return NextResponse.json(status)
 }
