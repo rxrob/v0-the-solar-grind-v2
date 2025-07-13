@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe"
-import { createServiceSupabaseClient } from "@/lib/supabase"
+import { createAdminClient } from "@/lib/supabase/admin"
 import type Stripe from "stripe"
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
     }
 
-    const supabase = createServiceSupabaseClient()
+    const supabase = createAdminClient()
 
     switch (event.type) {
       case "customer.subscription.created":

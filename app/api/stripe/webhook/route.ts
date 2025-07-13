@@ -1,6 +1,6 @@
 import { headers } from "next/headers"
 import Stripe from "stripe"
-import { createServiceSupabaseClient } from "@/lib/supabase"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
     console.log("✅ Received webhook event:", event.type)
 
-    const supabase = createServiceSupabaseClient()
+    const supabase = createAdminClient()
 
     switch (event.type) {
       case "checkout.session.completed": {

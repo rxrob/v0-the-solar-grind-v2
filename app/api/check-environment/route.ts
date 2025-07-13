@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { isSupabaseAvailable } from "@/lib/supabase"
 
 export async function GET() {
   console.log("[SERVER] 🔍 === ENVIRONMENT CHECK START ===")
@@ -68,7 +67,7 @@ export async function GET() {
     environment.supabase.issues.push("SUPABASE_SERVICE_ROLE_KEY contains placeholder value")
   }
 
-  environment.supabase.configured = isSupabaseAvailable()
+  environment.supabase.configured = !!(supabaseUrl && supabaseAnonKey && supabaseServiceKey)
 
   // Check Stripe
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY
