@@ -44,7 +44,7 @@ function isValidUrl(string: string): boolean {
 }
 
 function validateEnvironment() {
-  loadEnvFile()
+  console.log("✅ validate-env.ts running... All required env vars are assumed to be loaded by the platform.")
 
   const errors: string[] = []
   const warnings: string[] = []

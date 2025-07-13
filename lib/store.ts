@@ -83,3 +83,6 @@ export const useSolarCalculatorStore = create<SolarCalculatorState>()(
     },
   ),
 )
+
+// Compatibility export to satisfy components that import the old name.
+export const useProCalculatorStore = useSolarCalculatorStore

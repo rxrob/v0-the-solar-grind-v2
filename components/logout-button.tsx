@@ -1,21 +1,21 @@
 "use client"
 
-import { useSupabaseClient } from "@supabase/auth-helpers-react"
+import { LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { Button } from "./ui/button"
+import supabase from "@/lib/supabaseClient" // CORRECT: Importing the singleton instance
+import { Button } from "@/components/ui/button"
 
-export default function LogoutButton() {
-  const supabase = useSupabaseClient()
+export function LogoutButton() {
   const router = useRouter()
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push("/login")
+    router.refresh()
   }
 
   return (
-    <Button onClick={handleLogout} variant="outline">
-      Logout
+    <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Log out">
+      <LogOut className="h-5 w-5" />
     </Button>
   )
 }

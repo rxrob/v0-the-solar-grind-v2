@@ -42,7 +42,6 @@
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
     "@react-google-maps/api": "latest",
-    "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/auth-helpers-react": "latest",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
@@ -55,7 +54,6 @@
     "framer-motion": "latest",
     "fs": "latest",
     "google-maps": "latest",
-    "google.maps": "latest",
     "immer": "latest",
     "input-otp": "latest",
     "jspdf": "latest",
@@ -87,6 +85,7 @@
     "@types/react-dom": "^18",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

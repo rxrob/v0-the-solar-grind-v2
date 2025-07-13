@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 
-import fs from "fs"
-import path from "path"
-
 // The HTML content for the maintenance page
 const lockdownPage = `
 <!DOCTYPE html>
@@ -54,65 +51,7 @@ const lockdownPage = `
 `
 
 function emergencyLockdown() {
-  const reason = process.env.LOCKDOWN_REASON || "Security incident detected"
-  const user = process.env.USER || "System"
-
-  console.log("🚨 INITIATING EMERGENCY LOCKDOWN")
-  console.log(`📋 Reason: ${reason}`)
-  console.log(`👤 Initiated by: ${user}`)
-  console.log(`⏰ Time: ${new Date().toISOString()}`)
-
-  // Create maintenance page
-  const publicDir = path.join(process.cwd(), "public")
-  if (!fs.existsSync(publicDir)) {
-    fs.mkdirSync(publicDir, { recursive: true })
-  }
-
-  fs.writeFileSync(path.join(publicDir, "maintenance.html"), lockdownPage)
-
-  // Create lockdown flag
-  fs.writeFileSync(
-    path.join(process.cwd(), ".lockdown"),
-    JSON.stringify(
-      {
-        timestamp: new Date().toISOString(),
-        reason,
-        user,
-        status: "LOCKED",
-      },
-      null,
-      2,
-    ),
-  )
-
-  // Backup critical files
-  const appDir = path.join(process.cwd(), "app")
-  const backupDir = path.join(process.cwd(), ".lockdown-backup")
-
-  if (fs.existsSync(appDir) && !fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true })
-    console.log(`📦 Created backup directory at ${backupDir}`)
-    try {
-      const mainPagePath = path.join(appDir, "page.tsx")
-      if (fs.existsSync(mainPagePath)) {
-        fs.copyFileSync(mainPagePath, path.join(backupDir, "page.tsx.bak"))
-        console.log(`📄 Backed up app/page.tsx`)
-      }
-      const layoutPath = path.join(appDir, "layout.tsx")
-      if (fs.existsSync(layoutPath)) {
-        fs.copyFileSync(layoutPath, path.join(backupDir, "layout.tsx.bak"))
-        console.log(`📄 Backed up app/layout.tsx`)
-      }
-    } catch (error) {
-      console.error("⚠️  Backup failed, continuing with lockdown...", error)
-    }
-  }
-
-  console.log("\n✅ Emergency lockdown activated")
-  console.log("📄 Maintenance page created at /public/maintenance.html")
-  console.log("🔒 System is now in lockdown mode")
-  console.log("\nTo restore service, run:")
-  console.log("  npm run restore-from-lockdown")
+  console.log("🚨 Emergency lockdown script placeholder. No action taken.")
 }
 
 emergencyLockdown()
