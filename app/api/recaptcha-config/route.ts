@@ -1,29 +1,15 @@
 import { NextResponse } from "next/server"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
-  try {
-    // Get the site key from server environment (not exposed to client)
-    const siteKey = process.env.RECAPTCHA_SITE_KEY
+  const siteKey = process.env.RECAPTCHA_SITE_KEY
 
-    if (!siteKey) {
-      return NextResponse.json({ error: "reCAPTCHA site key not configured" }, { status: 500 })
-    }
-
-    return NextResponse.json({
-      success: true,
-      siteKey,
-      status: "reCAPTCHA configured",
-    })
-  } catch (error) {
-    console.error("reCAPTCHA config error:", error)
-    return NextResponse.json(
-      {
-        error: "Failed to get reCAPTCHA configuration",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+  if (!siteKey) {
+    return NextResponse.json({ error: "reCAPTCHA site key not configured" }, { status: 500 })
   }
+
+  return NextResponse.json({ siteKey })
 }
 
 export async function POST(request: Request) {

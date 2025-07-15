@@ -4,110 +4,52 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 
-interface RecaptchaConfig {
-  siteKey: string
-}
-
 interface RecaptchaLoaderProps {
   onLoad?: (siteKey: string) => void
-  onError?: (error: string) => void
-  children?: React.ReactNode
+  children?: (siteKey: string | null, loading: boolean) => React.ReactNode
 }
 
-export function RecaptchaLoader({ onLoad, onError, children }: RecaptchaLoaderProps) {
-  const [isLoaded, setIsLoaded] = useState(false)
+export function RecaptchaLoader({ onLoad, children }: RecaptchaLoaderProps) {
   const [siteKey, setSiteKey] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    let isMounted = true
-
-    async function loadRecaptcha() {
+    async function fetchSiteKey() {
       try {
-        // Check if reCAPTCHA is already loaded
-        if (window.grecaptcha) {
-          setIsLoaded(true)
-          return
-        }
-
-        // Fetch the site key from server
         const response = await fetch("/api/recaptcha-config")
         if (!response.ok) {
-          throw new Error("Failed to get reCAPTCHA configuration")
+          throw new Error("Failed to fetch reCAPTCHA configuration")
         }
-
-        const { siteKey: fetchedSiteKey }: { siteKey: string } = await response.json()
-
-        if (isMounted) {
-          setSiteKey(fetchedSiteKey)
-
-          // Create script element
-          const script = document.createElement("script")
-          script.src = "https://www.google.com/recaptcha/api.js"
-          script.async = true
-          script.defer = true
-
-          script.onload = () => {
-            if (isMounted) {
-              setIsLoaded(true)
-              onLoad?.(fetchedSiteKey)
-            }
-          }
-
-          script.onerror = () => {
-            if (isMounted) {
-              const errorMsg = "Failed to load reCAPTCHA"
-              setError(errorMsg)
-              onError?.(errorMsg)
-            }
-          }
-
-          document.head.appendChild(script)
+        const data = await response.json()
+        setSiteKey(data.siteKey)
+        if (onLoad) {
+          onLoad(data.siteKey)
         }
       } catch (err) {
-        if (isMounted) {
-          const errorMsg = err instanceof Error ? err.message : "Unknown error loading reCAPTCHA"
-          setError(errorMsg)
-          onError?.(errorMsg)
-        }
+        setError(err instanceof Error ? err.message : "Unknown error")
+        console.error("Error loading reCAPTCHA config:", err)
+      } finally {
+        setLoading(false)
       }
     }
 
-    loadRecaptcha()
+    fetchSiteKey()
+  }, [onLoad])
 
-    return () => {
-      isMounted = false
-    }
-  }, [onLoad, onError])
+  if (children) {
+    return <>{children(siteKey, loading)}</>
+  }
+
+  if (loading) {
+    return <div>Loading reCAPTCHA...</div>
+  }
 
   if (error) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-        <p className="text-red-800">Error loading reCAPTCHA: {error}</p>
-      </div>
-    )
+    return <div>Error loading reCAPTCHA: {error}</div>
   }
 
-  if (!isLoaded || !siteKey) {
-    return (
-      <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-        <p className="text-gray-600">Loading reCAPTCHA...</p>
-      </div>
-    )
-  }
-
-  return <>{children}</>
+  return null
 }
 
-// Type declarations for reCAPTCHA
-declare global {
-  interface Window {
-    grecaptcha: {
-      render: (container: string | HTMLElement, parameters: any) => number
-      getResponse: (widgetId?: number) => string
-      reset: (widgetId?: number) => void
-      execute: (widgetId?: number) => void
-      ready: (callback: () => void) => void
-    }
-  }
-}
+export default RecaptchaLoader

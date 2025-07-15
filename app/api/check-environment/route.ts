@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
-import { createSupabaseServerClient } from "@/lib/supabase-server"
+
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
 
 export async function GET() {
   console.log("[SERVER] 🔍 === ENVIRONMENT CHECK START ===")
@@ -17,6 +19,8 @@ export async function GET() {
       secret_key_present: false,
       publishable_key_present: false,
       webhook_secret_present: false,
+      pro_monthly_price_id_present: false,
+      single_report_price_id_present: false,
       environment_type: "unknown" as "test" | "live" | "unknown",
       issues: [] as string[],
     },
@@ -179,6 +183,7 @@ export async function GET() {
     environment.resend.issues.length
 
   const criticalServices = [
+    environment.supabase.configured,
     environment.stripe.configured,
     environment.google.configured,
     environment.nrel.configured,
@@ -206,12 +211,23 @@ export async function GET() {
   console.log(`[SERVER]    - Resend: ${environment.resend.configured ? "✅" : "❌"}`)
   console.log("[SERVER] ✅ === ENVIRONMENT CHECK COMPLETE ===")
 
-  const supabase = createSupabaseServerClient()
-  const { data, error } = await supabase.from("users").select("id").limit(1)
+  // Test Supabase connection only if configured
+  let supabaseConnection = "Not configured"
+  if (environment.supabase.configured) {
+    try {
+      const { createSupabaseServerClient } = await import("@/lib/supabase-server")
+      const supabase = createSupabaseServerClient()
+      const { data, error } = await supabase.from("users").select("id").limit(1)
+      supabaseConnection = error ? `Failed: ${error.message}` : "Success"
+    } catch (error) {
+      supabaseConnection = `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+    }
+  }
 
   const status = {
-    supabaseConnection: error ? `Failed: ${error.message}` : "Success",
+    supabaseConnection,
     environmentVariables: environment.overall.status,
+    environment,
   }
 
   return NextResponse.json(status)
