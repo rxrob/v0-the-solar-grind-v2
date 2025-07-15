@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation"
-import { VisualAnalysisPageClient } from "@/components/visual-analysis-page-client"
 import { createClient } from "@/lib/supabase/server"
 
 // Force dynamic rendering to prevent build-time auth issues
@@ -11,45 +10,32 @@ export default async function VisualAnalysisPage() {
 
     const {
       data: { user },
-      error: userError,
+      error,
     } = await supabase.auth.getUser()
 
-    if (userError || !user) {
+    if (error || !user) {
       redirect("/login")
     }
 
-    // Get user profile with error handling
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("is_pro, subscription_status")
-      .eq("user_id", user.id)
-      .single()
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-white mb-4">Visual Analysis</h1>
+            <p className="text-xl text-gray-300">AI-powered visual analysis of your property</p>
+          </div>
 
-    // If profile doesn't exist, try users table
-    let isPro = false
-    let subscriptionStatus = "inactive"
-
-    if (profileError) {
-      const { data: userData } = await supabase
-        .from("users")
-        .select("subscription_type, subscription_status")
-        .eq("id", user.id)
-        .single()
-
-      isPro = userData?.subscription_type === "pro"
-      subscriptionStatus = userData?.subscription_status || "inactive"
-    } else {
-      isPro = profile?.is_pro || false
-      subscriptionStatus = profile?.subscription_status || "inactive"
-    }
-
-    if (!isPro || subscriptionStatus !== "active") {
-      redirect("/pricing")
-    }
-
-    return <VisualAnalysisPageClient />
+          <div className="bg-white/10 backdrop-blur-lg rounded-lg p-8 border border-white/20">
+            <h2 className="text-2xl font-semibold text-white mb-6">Upload Property Images</h2>
+            <div className="border-2 border-dashed border-white/30 rounded-lg p-12 text-center">
+              <p className="text-gray-300 text-lg">Drag and drop images here or click to browse</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   } catch (error) {
-    console.error("Error in visual analysis page:", error)
+    console.error("Visual analysis page error:", error)
     redirect("/login")
   }
 }

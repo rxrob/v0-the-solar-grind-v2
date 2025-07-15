@@ -101,9 +101,6 @@ importers:
       '@react-google-maps/api':
         specifier: latest
         version: 2.20.7(react-dom@18.0.0(react@18.0.0))(react@18.0.0)
-      '@supabase/auth-helpers-react':
-        specifier: latest
-        version: 0.5.0(@supabase/supabase-js@2.51.0)
       '@supabase/ssr':
         specifier: latest
         version: 0.6.1(@supabase/supabase-js@2.51.0)
@@ -1105,12 +1102,6 @@ packages:
 
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
-
-  '@supabase/auth-helpers-react@0.5.0':
-    resolution: {integrity: sha512-5QSaV2CGuhDhd7RlQCoviVEAYsP7XnrFMReOcBazDvVmqSIyjKcDwhLhWvnrxMOq5qjOaA44MHo7wXqDiF0puQ==}
-    deprecated: This package is now deprecated - please use the @supabase/ssr package instead.
-    peerDependencies:
-      '@supabase/supabase-js': ^2.39.8
 
   '@supabase/auth-js@2.71.0':
     resolution: {integrity: sha512-OMYNbhGa1Cj4stalJq0VoHm5l7Sj/xY0j9CiYEQCikbQmtiDG3c27EIFA4OD+NxuoHTZmjaW8VJlS3SP+yasEA==}
@@ -3220,10 +3211,6 @@ snapshots:
   '@standard-schema/spec@1.0.0': {}
 
   '@standard-schema/utils@0.3.0': {}
-
-  '@supabase/auth-helpers-react@0.5.0(@supabase/supabase-js@2.51.0)':
-    dependencies:
-      '@supabase/supabase-js': 2.51.0
 
   '@supabase/auth-js@2.71.0':
     dependencies:
