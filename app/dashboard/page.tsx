@@ -1,51 +1,85 @@
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase-browser"
+import type { User } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sun, Zap, ArrowRight, Crown } from "lucide-react"
 import Link from "next/link"
-import type { CookieOptions } from "@supabase/ssr"
 
-export default async function DashboardPage() {
-  const cookieStore = cookies()
+export default function DashboardPage() {
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<any>(null)
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          cookieStore.delete({ name, ...options })
-        },
-      },
-    },
-  )
+  useEffect(() => {
+    const getUser = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+      if (!session) {
+        router.push("/login")
+        return
+      }
+
+      setUser(session.user)
+
+      // Check the user's profile for pro status
+      const { data: profileData } = await supabase
+        .from("users")
+        .select("subscription_status")
+        .eq("id", session.user.id)
+        .single()
+
+      setProfile(profileData)
+      setLoading(false)
+
+      // If the user is a pro member, redirect them to the pro dashboard
+      if (profileData?.subscription_status === "active" || profileData?.subscription_status === "trialing") {
+        router.push("/dashboard/pro")
+      }
+    }
+
+    getUser()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        router.push("/login")
+      } else {
+        setUser(session.user)
+        setLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [router])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/login")
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          <p className="mt-4">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!user) {
-    // This is handled by middleware, but serves as a robust fallback.
-    redirect("/login")
+    return null
   }
 
-  // Check the user's profile for pro status from the 'users' table
-  const { data: profile } = await supabase.from("users").select("subscription_status").eq("id", user.id).single()
-
-  // If the user is a pro member, redirect them to the pro dashboard.
-  if (profile?.subscription_status === "active" || profile?.subscription_status === "trialing") {
-    redirect("/dashboard/pro")
-  }
-
-  // Otherwise, render the standard user dashboard.
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b">
@@ -64,6 +98,9 @@ export default async function DashboardPage() {
                   <Crown className="mr-2 h-4 w-4" /> Upgrade to Pro
                 </Button>
               </Link>
+              <Button onClick={handleSignOut} variant="outline">
+                Sign Out
+              </Button>
             </div>
           </div>
         </div>

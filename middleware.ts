@@ -31,7 +31,24 @@ export async function middleware(request: NextRequest) {
   )
 
   // Refresh session if expired - required for Server Components
-  await supabase.auth.getSession()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Protect dashboard routes
+  if (request.nextUrl.pathname.startsWith("/dashboard")) {
+    if (!user) {
+      console.log("No user found, redirecting to login")
+      return NextResponse.redirect(new URL("/login", request.url))
+    }
+    console.log("User found:", user.email)
+  }
+
+  // Redirect authenticated users away from auth pages
+  if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup")) {
+    console.log("Authenticated user accessing auth page, redirecting to dashboard")
+    return NextResponse.redirect(new URL("/dashboard", request.url))
+  }
 
   return response
 }
@@ -43,7 +60,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - api routes
      */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api).*)",
   ],
 }

@@ -2,19 +2,40 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    // Return only the API key from server-side environment
-    const apiKey = process.env.SOLAR_API_KEY
+    const config = {
+      nrelApiKey: process.env.NREL_API_KEY ? "configured" : "missing",
+      googleElevationKey: process.env.GOOGLE_ELEVATION_API_KEY ? "configured" : "missing",
+      googleGeocodingKey: process.env.GOOGLE_GEOCODING_API_KEY ? "configured" : "missing",
+    }
 
-    if (!apiKey) {
-      return NextResponse.json({ error: "Solar API key not configured" }, { status: 500 })
+    const missingKeys = Object.entries(config)
+      .filter(([, value]) => value === "missing")
+      .map(([key]) => key)
+
+    if (missingKeys.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Some Solar API keys are missing",
+          missing: missingKeys,
+          config,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
-      apiKey,
-      baseUrl: "https://solar.googleapis.com/v1",
+      success: true,
+      config,
+      status: "All Solar API keys configured",
     })
   } catch (error) {
-    console.error("Solar config error:", error)
-    return NextResponse.json({ error: "Failed to get solar configuration" }, { status: 500 })
+    console.error("Solar API config error:", error)
+    return NextResponse.json(
+      {
+        error: "Failed to get Solar API configuration",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

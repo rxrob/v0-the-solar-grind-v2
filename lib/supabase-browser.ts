@@ -1,17 +1,19 @@
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createBrowserClient } from "@supabase/ssr"
 
-// Create a singleton instance to prevent re-initialization
-let supabaseInstance: ReturnType<typeof createClientComponentClient> | null = null
+let supabaseInstance: ReturnType<typeof createBrowserClient> | null = null
 
-function createSupabaseBrowserClient() {
+export function getSupabaseBrowserClient() {
   if (!supabaseInstance) {
-    supabaseInstance = createClientComponentClient()
+    supabaseInstance = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
   }
   return supabaseInstance
 }
 
-// Export the singleton instance
-export const supabase = createSupabaseBrowserClient()
+// Named export for compatibility
+export const supabase = getSupabaseBrowserClient()
 
-// Export for compatibility
-export default supabase
+// Default export
+export default getSupabaseBrowserClient()

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase-browser"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 interface AuthState {
   user: User | null
@@ -17,13 +17,20 @@ export function useAuthReal(): AuthState {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const supabase = getSupabaseBrowserClient()
+
     // Get initial session
     const getInitialSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      setLoading(false)
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        setUser(session?.user ?? null)
+        setLoading(false)
+      } catch (error) {
+        console.error("Error getting session:", error)
+        setLoading(false)
+      }
     }
 
     getInitialSession()
@@ -32,6 +39,7 @@ export function useAuthReal(): AuthState {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.email)
       setUser(session?.user ?? null)
       setLoading(false)
     })
@@ -40,6 +48,7 @@ export function useAuthReal(): AuthState {
   }, [])
 
   const signIn = async (email: string, password: string) => {
+    const supabase = getSupabaseBrowserClient()
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -48,6 +57,7 @@ export function useAuthReal(): AuthState {
   }
 
   const signUp = async (email: string, password: string) => {
+    const supabase = getSupabaseBrowserClient()
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -56,6 +66,7 @@ export function useAuthReal(): AuthState {
   }
 
   const signOut = async () => {
+    const supabase = getSupabaseBrowserClient()
     await supabase.auth.signOut()
   }
 
