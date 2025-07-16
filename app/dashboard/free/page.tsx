@@ -1,665 +1,259 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuthReal } from "@/hooks/use-auth-real"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Slider } from "@/components/ui/slider"
-import {
-  Calculator,
-  Zap,
-  Lock,
-  TrendingUp,
-  Sun,
-  DollarSign,
-  Calendar,
-  Home,
-  Download,
-  FileText,
-  History,
-  Loader2,
-} from "lucide-react"
-import Link from "next/link"
-import { toast } from "sonner"
-import { AnimatedBG } from "@/components/AnimatedBG"
-
-interface CalculationResult {
-  systemSize: number
-  estimatedCost: number
-  annualSavings: number
-  paybackPeriod: number
-  co2Reduction: number
-  panelsNeeded: number
-  monthlyProduction: number
-  success: boolean
-  message?: string
-}
-
-interface SavedCalculation {
-  id: string
-  address: string
-  monthlyBill: number
-  systemSize: number
-  annualSavings: number
-  createdAt: string
-}
+import { Skeleton } from "@/components/ui/skeleton"
+import { Calculator, FileText, Crown, Zap, Lock } from "lucide-react"
 
 export default function FreeDashboardPage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "calculator" | "history">("overview")
-  const [isCalculating, setIsCalculating] = useState(false)
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
-  const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null)
-  const [savedCalculations, setSavedCalculations] = useState<SavedCalculation[]>([])
-
-  // Calculator form state
-  const [formData, setFormData] = useState({
-    address: "",
-    monthlyBill: 150,
-    roofArea: 1500,
-    sunHours: 5.5,
-    electricityRate: 0.12,
-  })
-
-  const usageData = {
-    calculationsUsed: 3,
-    calculationsLimit: 5,
-    reportsGenerated: 1,
-    reportsLimit: 2,
-  }
+  const { user, profile, loading, isPro, isIONEmployee, signOut } = useAuthReal()
+  const router = useRouter()
 
   useEffect(() => {
-    // Load saved calculations on component mount
-    loadSavedCalculations()
-  }, [])
-
-  const loadSavedCalculations = async () => {
-    try {
-      const response = await fetch("/api/user-calculations")
-      if (response.ok) {
-        const data = await response.json()
-        setSavedCalculations(data.calculations || [])
-      }
-    } catch (error) {
-      console.error("Error loading calculations:", error)
-    }
-  }
-
-  const handleCalculate = async () => {
-    if (!formData.address.trim()) {
-      toast.error("Please enter a property address")
-      return
-    }
-
-    setIsCalculating(true)
-
-    try {
-      // Simulate calculation delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Basic solar calculations
-      const monthlyUsage = formData.monthlyBill / formData.electricityRate
-      const annualUsage = monthlyUsage * 12
-
-      // System sizing
-      const systemEfficiency = 0.85
-      const systemSize = annualUsage / (formData.sunHours * 365 * systemEfficiency) / 1000
-
-      // Panel calculations
-      const panelWattage = 400
-      const panelsNeeded = Math.ceil((systemSize * 1000) / panelWattage)
-
-      // Cost calculations
-      const costPerWatt = 3.5
-      const estimatedCost = systemSize * 1000 * costPerWatt
-      const federalTaxCredit = estimatedCost * 0.3
-      const netCost = estimatedCost - federalTaxCredit
-
-      // Savings calculations
-      const annualProduction = systemSize * formData.sunHours * 365 * systemEfficiency
-      const annualSavings = annualProduction * formData.electricityRate
-      const monthlyProduction = annualProduction / 12
-      const paybackPeriod = netCost / annualSavings
-      const co2Reduction = annualProduction * 0.92
-
-      const result: CalculationResult = {
-        systemSize: Math.round(systemSize * 100) / 100,
-        estimatedCost: Math.round(estimatedCost),
-        annualSavings: Math.round(annualSavings),
-        paybackPeriod: Math.round(paybackPeriod * 10) / 10,
-        co2Reduction: Math.round(co2Reduction),
-        panelsNeeded,
-        monthlyProduction: Math.round(monthlyProduction),
-        success: true,
+    if (!loading) {
+      if (!user) {
+        router.push("/login")
+        return
       }
 
-      setCalculationResult(result)
-
-      // Save calculation to database
-      await saveCalculation(result)
-
-      toast.success("Solar calculation completed!")
-    } catch (error) {
-      console.error("Calculation error:", error)
-      toast.error("Calculation failed. Please try again.")
-    } finally {
-      setIsCalculating(false)
-    }
-  }
-
-  const saveCalculation = async (result: CalculationResult) => {
-    try {
-      const response = await fetch("/api/user-calculations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          address: formData.address,
-          monthly_bill: formData.monthlyBill,
-          system_size: result.systemSize,
-          annual_production: result.monthlyProduction * 12,
-          annual_savings: result.annualSavings,
-          payback_period: result.paybackPeriod,
-          calculation_type: "basic",
-        }),
-      })
-
-      if (response.ok) {
-        loadSavedCalculations() // Refresh the list
+      if (isPro || isIONEmployee) {
+        router.push("/dashboard/pro")
+        return
       }
-    } catch (error) {
-      console.error("Error saving calculation:", error)
     }
-  }
+  }, [user, loading, isPro, isIONEmployee, router])
 
-  const generatePDF = async () => {
-    if (!calculationResult) {
-      toast.error("No calculation results to export")
-      return
-    }
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <Skeleton className="h-8 w-64 mb-2" />
+              <Skeleton className="h-4 w-96" />
+            </div>
+            <Skeleton className="h-10 w-24" />
+          </div>
 
-    setIsGeneratingPDF(true)
-
-    try {
-      const response = await fetch("/api/generate-pdf-report", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          customerName: "Solar Customer",
-          customerEmail: "customer@example.com",
-          propertyAddress: formData.address,
-          systemSize: calculationResult.systemSize.toString(),
-          annualProduction: (calculationResult.monthlyProduction * 12).toString(),
-          annualSavings: calculationResult.annualSavings.toString(),
-          paybackPeriod: calculationResult.paybackPeriod.toString(),
-          co2Reduction: (calculationResult.co2Reduction / 2000).toString(), // Convert to tons
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-
-        // Create download link
-        const link = document.createElement("a")
-        link.href = data.pdf
-        link.download = `Solar_Report_${formData.address.replace(/\s+/g, "_")}.pdf`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-
-        toast.success("PDF report downloaded successfully!")
-      } else {
-        throw new Error("Failed to generate PDF")
-      }
-    } catch (error) {
-      console.error("PDF generation error:", error)
-      toast.error("Failed to generate PDF report")
-    } finally {
-      setIsGeneratingPDF(false)
-    }
-  }
-
-  return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      <AnimatedBG />
-
-      <div className="relative z-10 container mx-auto py-8">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 bg-clip-text text-transparent mb-4">
-            Solar AI Dashboard
-          </h1>
-          <p className="text-gray-300 text-xl">Your intelligent solar analysis toolkit</p>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-black/40 backdrop-blur-md border border-gray-700 rounded-full p-1 flex gap-1">
-            {[
-              { id: "overview", label: "Overview", icon: TrendingUp },
-              { id: "calculator", label: "Calculator", icon: Calculator },
-              { id: "history", label: "History", icon: History },
-            ].map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id as any)}
-                className={`px-6 py-3 rounded-full flex items-center gap-2 transition-all duration-300 ${
-                  activeTab === id
-                    ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-semibold"
-                    : "text-gray-300 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i}>
+                <CardContent className="p-6">
+                  <Skeleton className="h-6 w-32 mb-4" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-3/4" />
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
+      </div>
+    )
+  }
 
-        {/* Overview Tab */}
-        {activeTab === "overview" && (
-          <div className="space-y-8">
-            {/* Usage Stats */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <Card className="bg-black/40 backdrop-blur-md border border-gray-700 hover:border-yellow-400/50 transition-all duration-300">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-white">Calculations Used</CardTitle>
-                  <Calculator className="h-4 w-4 text-yellow-400" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-white mb-2">
-                    {usageData.calculationsUsed}/{usageData.calculationsLimit}
-                  </div>
-                  <Progress value={(usageData.calculationsUsed / usageData.calculationsLimit) * 100} className="mb-2" />
-                  <p className="text-xs text-gray-400">
-                    {usageData.calculationsLimit - usageData.calculationsUsed} calculations remaining
+  if (!user || isPro || isIONEmployee) {
+    return null // Will redirect via useEffect
+  }
+
+  const reportsUsed = profile?.reports_used || 0
+  const maxReports = profile?.max_reports || 3
+  const reportsRemaining = Math.max(0, maxReports - reportsUsed)
+  const usagePercentage = (reportsUsed / maxReports) * 100
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Free Dashboard
+              <Badge className="ml-2 bg-blue-500">Free Plan</Badge>
+            </h1>
+            <p className="text-gray-600">
+              Welcome back, {profile?.full_name || user.email}! You have {reportsRemaining} reports remaining.
+            </p>
+          </div>
+          <Button onClick={signOut} variant="outline">
+            Sign Out
+          </Button>
+        </div>
+
+        {/* Usage Stats */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              Report Usage
+            </CardTitle>
+            <CardDescription>Track your monthly report usage and upgrade when needed.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Reports Used</span>
+                <span className="text-sm text-gray-600">
+                  {reportsUsed} / {maxReports}
+                </span>
+              </div>
+              <Progress value={usagePercentage} className="w-full" />
+              {reportsRemaining <= 1 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <p className="text-orange-800 text-sm">
+                    ⚠️ You're running low on reports! Upgrade to Pro for unlimited access.
                   </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-black/40 backdrop-blur-md border border-gray-700 hover:border-green-400/50 transition-all duration-300">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-white">Reports Generated</CardTitle>
-                  <FileText className="h-4 w-4 text-green-400" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-white mb-2">
-                    {usageData.reportsGenerated}/{usageData.reportsLimit}
-                  </div>
-                  <Progress value={(usageData.reportsGenerated / usageData.reportsLimit) * 100} className="mb-2" />
-                  <p className="text-xs text-gray-400">
-                    {usageData.reportsLimit - usageData.reportsGenerated} reports remaining
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-black/40 backdrop-blur-md border border-gray-700 hover:border-purple-400/50 transition-all duration-300">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-white">Account Type</CardTitle>
-                  <Zap className="h-4 w-4 text-purple-400" />
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="secondary" className="bg-gray-700 text-white">
-                      Free
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-gray-400">Limited features available</p>
-                </CardContent>
-              </Card>
+                </div>
+              )}
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Available Tools & Upgrade */}
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card className="bg-black/40 backdrop-blur-md border border-gray-700 hover:border-yellow-400/50 transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-white">Available Tools</CardTitle>
-                  <CardDescription className="text-gray-400">Tools available with your free account</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-white">Basic Calculator</h4>
-                      <p className="text-sm text-gray-400">Simple solar estimates</p>
-                    </div>
-                    <Button
-                      onClick={() => setActiveTab("calculator")}
-                      className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black hover:from-yellow-500 hover:to-orange-600"
-                    >
-                      Use Tool
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between opacity-50">
-                    <div>
-                      <h4 className="font-medium flex items-center gap-2 text-white">
-                        Advanced Calculator
-                        <Lock className="h-4 w-4" />
-                      </h4>
-                      <p className="text-sm text-gray-400">Detailed analysis with custom parameters</p>
-                    </div>
-                    <Button size="sm" disabled className="bg-gray-600">
-                      Pro Only
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between opacity-50">
-                    <div>
-                      <h4 className="font-medium flex items-center gap-2 text-white">
-                        Pro Calculator
-                        <Lock className="h-4 w-4" />
-                      </h4>
-                      <p className="text-sm text-gray-400">Professional-grade calculations</p>
-                    </div>
-                    <Button size="sm" disabled className="bg-gray-600">
-                      Pro Only
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-black/40 backdrop-blur-md border border-gray-700 hover:border-pink-400/50 transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-white">Upgrade to Pro</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Unlock all features and unlimited calculations
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    {[
-                      "Unlimited calculations",
-                      "Advanced solar analysis",
-                      "Professional reports",
-                      "Priority support",
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-sm text-white">{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    asChild
-                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
-                  >
-                    <Link href="/pricing">Upgrade Now</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+        {/* Upgrade Prompt */}
+        <Card className="mb-8 border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-800">
+              <Crown className="h-5 w-5 text-yellow-600" />
+              Upgrade to Pro
+            </CardTitle>
+            <CardDescription className="text-orange-700">
+              Unlock unlimited reports, advanced features, and priority support.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="space-y-2">
+                <h4 className="font-semibold text-orange-800">Pro Features:</h4>
+                <ul className="text-sm text-orange-700 space-y-1">
+                  <li>• Unlimited solar reports</li>
+                  <li>• Advanced utility detection</li>
+                  <li>• Client management system</li>
+                  <li>• Priority customer support</li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-semibold text-orange-800">Advanced Tools:</h4>
+                <ul className="text-sm text-orange-700 space-y-1">
+                  <li>• Detailed financial analysis</li>
+                  <li>• Custom branding options</li>
+                  <li>• Bulk report generation</li>
+                  <li>• API access</li>
+                </ul>
+              </div>
             </div>
-          </div>
-        )}
+            <Button onClick={() => router.push("/pricing")} className="w-full bg-orange-600 hover:bg-orange-700">
+              Upgrade to Pro - $29/month
+            </Button>
+          </CardContent>
+        </Card>
 
-        {/* Calculator Tab */}
-        {activeTab === "calculator" && (
-          <div className="max-w-6xl mx-auto space-y-8">
-            <div className="grid lg:grid-cols-2 gap-8">
-              {/* Input Form */}
-              <Card className="bg-black/40 backdrop-blur-md border border-gray-700">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-white">
-                    <Calculator className="h-5 w-5 text-yellow-400" />
-                    Solar Calculator
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Enter your details to calculate your solar potential
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="address" className="text-white">
-                      Property Address *
-                    </Label>
-                    <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
-                      placeholder="123 Solar Street, Austin, TX 78701"
-                      className="bg-black/20 border-gray-600 text-white placeholder:text-gray-400"
-                    />
-                  </div>
+        {/* Available Features */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/calculator")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5 text-blue-600" />
+                Basic Solar Calculator
+              </CardTitle>
+              <CardDescription>
+                Generate basic solar calculations and estimates for residential properties.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full" disabled={reportsRemaining === 0}>
+                {reportsRemaining === 0 ? "No Reports Left" : "Start Calculation"}
+              </Button>
+            </CardContent>
+          </Card>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="monthly-bill" className="text-white">
-                      Monthly Electric Bill ($)
-                    </Label>
-                    <Input
-                      id="monthly-bill"
-                      type="number"
-                      value={formData.monthlyBill}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, monthlyBill: Number(e.target.value) }))}
-                      className="bg-black/20 border-gray-600 text-white"
-                    />
-                  </div>
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/reports")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-green-600" />
+                My Reports
+              </CardTitle>
+              <CardDescription>View and download your previously generated solar reports.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full bg-transparent" variant="outline">
+                View Reports
+              </Button>
+            </CardContent>
+          </Card>
 
-                  <div className="space-y-2">
-                    <Label className="text-white">Roof Size: {formData.roofArea.toLocaleString()} sq ft</Label>
-                    <Slider
-                      value={[formData.roofArea]}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, roofArea: value[0] }))}
-                      max={3000}
-                      min={500}
-                      step={100}
-                      className="w-full"
-                    />
-                  </div>
+          <Card className="opacity-60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-gray-400" />
+                Pro Calculator
+                <Badge variant="secondary">Pro Only</Badge>
+              </CardTitle>
+              <CardDescription>
+                Advanced calculations with utility detection and detailed analysis. Upgrade to unlock.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full bg-transparent" variant="outline" disabled>
+                Upgrade Required
+              </Button>
+            </CardContent>
+          </Card>
 
-                  <div className="space-y-2">
-                    <Label className="text-white">Daily Sun Hours: {formData.sunHours}</Label>
-                    <Slider
-                      value={[formData.sunHours]}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, sunHours: value[0] }))}
-                      max={8}
-                      min={3}
-                      step={0.1}
-                      className="w-full"
-                    />
-                  </div>
+          <Card className="opacity-60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-gray-400" />
+                Client Management
+                <Badge variant="secondary">Pro Only</Badge>
+              </CardTitle>
+              <CardDescription>
+                Organize clients and track their solar projects. Available with Pro subscription.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full bg-transparent" variant="outline" disabled>
+                Upgrade Required
+              </Button>
+            </CardContent>
+          </Card>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="electricity-rate" className="text-white">
-                      Electricity Rate ($/kWh)
-                    </Label>
-                    <Input
-                      id="electricity-rate"
-                      type="number"
-                      step="0.01"
-                      value={formData.electricityRate}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, electricityRate: Number(e.target.value) }))}
-                      className="bg-black/20 border-gray-600 text-white"
-                    />
-                  </div>
+          <Card className="opacity-60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-gray-400" />
+                Visual Analysis
+                <Badge variant="secondary">Pro Only</Badge>
+              </CardTitle>
+              <CardDescription>
+                Advanced roof analysis with satellite imagery. Upgrade to access this feature.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full bg-transparent" variant="outline" disabled>
+                Upgrade Required
+              </Button>
+            </CardContent>
+          </Card>
 
-                  <Button
-                    onClick={handleCalculate}
-                    disabled={isCalculating}
-                    className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-black hover:from-yellow-500 hover:to-orange-600 font-semibold"
-                  >
-                    {isCalculating ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Calculating...
-                      </>
-                    ) : (
-                      "Calculate Solar Potential"
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Results */}
-              <Card className="bg-black/40 backdrop-blur-md border border-gray-700">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-white">
-                    <Zap className="h-5 w-5 text-green-400" />
-                    Your Solar Estimate
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    {calculationResult ? "Here's what solar could do for you" : "Enter your information to see results"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {calculationResult ? (
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="text-center p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                          <Home className="h-6 w-6 mx-auto mb-2 text-blue-400" />
-                          <div className="text-2xl font-bold text-blue-400">{calculationResult.systemSize} kW</div>
-                          <div className="text-sm text-gray-400">System Size</div>
-                        </div>
-
-                        <div className="text-center p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                          <Sun className="h-6 w-6 mx-auto mb-2 text-green-400" />
-                          <div className="text-2xl font-bold text-green-400">
-                            {(calculationResult.monthlyProduction * 12).toLocaleString(undefined, {
-                              maximumFractionDigits: 0,
-                            })}{" "}
-                            kWh
-                          </div>
-                          <div className="text-sm text-gray-400">Annual Production</div>
-                        </div>
-
-                        <div className="text-center p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                          <DollarSign className="h-6 w-6 mx-auto mb-2 text-yellow-400" />
-                          <div className="text-2xl font-bold text-yellow-400">
-                            ${Math.round(calculationResult.annualSavings / 12)}
-                          </div>
-                          <div className="text-sm text-gray-400">Monthly Savings</div>
-                        </div>
-
-                        <div className="text-center p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                          <Calendar className="h-6 w-6 mx-auto mb-2 text-purple-400" />
-                          <div className="text-2xl font-bold text-purple-400">
-                            {calculationResult.paybackPeriod} years
-                          </div>
-                          <div className="text-sm text-gray-400">Payback Period</div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 pt-4 border-t border-gray-700">
-                        <div className="flex justify-between text-white">
-                          <span>System Cost:</span>
-                          <span className="font-semibold">${calculationResult.estimatedCost.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-green-400">
-                          <span>Federal Tax Credit (30%):</span>
-                          <span className="font-semibold">
-                            -${Math.round(calculationResult.estimatedCost * 0.3).toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-lg font-bold border-t border-gray-700 pt-2 text-white">
-                          <span>Net Cost:</span>
-                          <span>${Math.round(calculationResult.estimatedCost * 0.7).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-lg font-bold text-green-400">
-                          <span>Annual Savings:</span>
-                          <span>${calculationResult.annualSavings.toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-3 pt-4">
-                        <Button
-                          onClick={generatePDF}
-                          disabled={isGeneratingPDF}
-                          className="flex-1 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
-                        >
-                          {isGeneratingPDF ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Download className="mr-2 h-4 w-4" />
-                              Download PDF
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          onClick={() => window.print()}
-                          variant="outline"
-                          className="border-gray-600 text-white hover:bg-white/10"
-                        >
-                          Print
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 text-gray-400">
-                      <Calculator className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <p>Enter your information above to see your solar estimate</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {/* History Tab */}
-        {activeTab === "history" && (
-          <div className="max-w-4xl mx-auto">
-            <Card className="bg-black/40 backdrop-blur-md border border-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <History className="h-5 w-5 text-blue-400" />
-                  Calculation History
-                </CardTitle>
-                <CardDescription className="text-gray-400">Your saved solar calculations and reports</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {savedCalculations.length > 0 ? (
-                  <div className="space-y-4">
-                    {savedCalculations.map((calc) => (
-                      <div
-                        key={calc.id}
-                        className="p-4 bg-black/20 border border-gray-600 rounded-lg hover:border-yellow-400/50 transition-all duration-300"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-semibold text-white">{calc.address}</h4>
-                            <p className="text-sm text-gray-400">
-                              System Size: {calc.systemSize} kW • Annual Savings: ${calc.annualSavings}
-                            </p>
-                            <p className="text-xs text-gray-500">{new Date(calc.createdAt).toLocaleDateString()}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-gray-600 text-white hover:bg-white/10 bg-transparent"
-                            >
-                              <FileText className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-gray-600 text-white hover:bg-white/10 bg-transparent"
-                            >
-                              <Download className="h-4 w-4 mr-1" />
-                              PDF
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-gray-400">
-                    <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p>No calculations saved yet</p>
-                    <p className="text-sm">Use the calculator to create your first solar estimate</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/pricing")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-yellow-600" />
+                Upgrade Account
+              </CardTitle>
+              <CardDescription>View pricing plans and upgrade your account for unlimited access.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full bg-transparent" variant="outline">
+                View Pricing
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )
