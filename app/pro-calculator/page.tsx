@@ -6,14 +6,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Calculator, Home, Zap, Settings, DollarSign, BarChart3, Sun, Battery, Crown, FileText } from "lucide-react"
+import { Calculator, Home, Zap, Settings, DollarSign, BarChart3, Crown } from "lucide-react"
 
-export default function ProCalculator() {
+interface CalculationResults {
+  annualProduction: number
+  annualSavings: number
+  paybackPeriod: number
+  roi25Year: number
+  monthlyPayment: number
+  systemCost: number
+  netCost: number
+}
+
+export default function ProCalculatorPage() {
   const [activeTab, setActiveTab] = useState("property")
+  const [isCalculating, setIsCalculating] = useState(false)
+  const [results, setResults] = useState<CalculationResults | null>(null)
+
+  // Form state
   const [formData, setFormData] = useState({
     // Property
     address: "",
@@ -25,7 +38,7 @@ export default function ProCalculator() {
     // Energy
     monthlyBill: 150,
     annualUsage: 12000,
-    utilityCompany: "",
+    utilityCompany: "oncor",
     electricityRate: 0.12,
 
     // System
@@ -35,53 +48,54 @@ export default function ProCalculator() {
     batteryStorage: false,
 
     // Financial
-    installationCost: 25000,
-    federalTaxCredit: 30,
+    installationCost: 25500,
+    federalTaxCredit: 7650,
     stateIncentives: 2000,
     financingType: "cash",
     loanTerm: 20,
     interestRate: 4.5,
-  })
-
-  const [results, setResults] = useState({
-    annualProduction: 12750,
-    annualSavings: 1530,
-    paybackPeriod: 8.2,
-    roi25Year: 45600,
-    monthlyPayment: 0,
+    downPayment: 0,
   })
 
   const updateFormData = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-    calculateResults()
   }
 
-  const calculateResults = () => {
-    // Simplified calculation logic
-    const production = formData.systemSize * 1500 * (1 - formData.shadingLevel / 100)
-    const savings = production * formData.electricityRate
-    const netCost =
-      formData.installationCost -
-      (formData.installationCost * formData.federalTaxCredit) / 100 -
-      formData.stateIncentives
-    const payback = netCost / savings
-    const roi = savings * 25 - netCost
+  const calculateResults = async () => {
+    setIsCalculating(true)
+
+    // Simulate calculation delay
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    // Calculate results based on form data
+    const annualProduction = formData.systemSize * 1200 // kWh per kW
+    const annualSavings = annualProduction * formData.electricityRate
+    const netCost = formData.installationCost - formData.federalTaxCredit - formData.stateIncentives
+    const paybackPeriod = netCost / annualSavings
+    const roi25Year = ((annualSavings * 25 - netCost) / netCost) * 100
 
     let monthlyPayment = 0
     if (formData.financingType === "loan") {
+      const principal = netCost - formData.downPayment
       const monthlyRate = formData.interestRate / 100 / 12
       const numPayments = formData.loanTerm * 12
       monthlyPayment =
-        (netCost * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1)
+        (principal * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) /
+        (Math.pow(1 + monthlyRate, numPayments) - 1)
     }
 
     setResults({
-      annualProduction: Math.round(production),
-      annualSavings: Math.round(savings),
-      paybackPeriod: Math.round(payback * 10) / 10,
-      roi25Year: Math.round(roi),
-      monthlyPayment: Math.round(monthlyPayment),
+      annualProduction,
+      annualSavings,
+      paybackPeriod,
+      roi25Year,
+      monthlyPayment,
+      systemCost: formData.installationCost,
+      netCost,
     })
+
+    setIsCalculating(false)
+    setActiveTab("results")
   }
 
   return (
@@ -95,296 +109,306 @@ export default function ProCalculator() {
               Pro Solar Calculator
             </h1>
           </div>
-          <p className="text-slate-300 text-lg">Advanced solar analysis with professional-grade calculations</p>
-          <Badge className="mt-2 bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
-            Unlimited Calculations
-          </Badge>
+          <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+            Advanced solar analysis with professional-grade calculations and detailed financial modeling
+          </p>
+          <Badge className="mt-4 bg-gradient-to-r from-orange-500 to-yellow-500 text-white">Professional Edition</Badge>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Calculator */}
-          <div className="lg:col-span-2">
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Calculator className="mr-2 h-5 w-5" />
-                  Solar System Configuration
-                </CardTitle>
-                <CardDescription className="text-slate-300">
-                  Configure your solar system parameters for accurate calculations
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-5 bg-slate-700">
-                    <TabsTrigger value="property" className="data-[state=active]:bg-orange-500">
-                      <Home className="h-4 w-4 mr-1" />
-                      Property
-                    </TabsTrigger>
-                    <TabsTrigger value="energy" className="data-[state=active]:bg-orange-500">
-                      <Zap className="h-4 w-4 mr-1" />
-                      Energy
-                    </TabsTrigger>
-                    <TabsTrigger value="system" className="data-[state=active]:bg-orange-500">
-                      <Settings className="h-4 w-4 mr-1" />
-                      System
-                    </TabsTrigger>
-                    <TabsTrigger value="financial" className="data-[state=active]:bg-orange-500">
-                      <DollarSign className="h-4 w-4 mr-1" />
-                      Financial
-                    </TabsTrigger>
-                    <TabsTrigger value="results" className="data-[state=active]:bg-orange-500">
-                      <BarChart3 className="h-4 w-4 mr-1" />
-                      Results
-                    </TabsTrigger>
-                  </TabsList>
+        {/* Calculator Interface */}
+        <div className="max-w-6xl mx-auto">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-5 bg-slate-800 mb-8">
+              <TabsTrigger value="property" className="flex items-center gap-2">
+                <Home className="h-4 w-4" />
+                Property
+              </TabsTrigger>
+              <TabsTrigger value="energy" className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Energy
+              </TabsTrigger>
+              <TabsTrigger value="system" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                System
+              </TabsTrigger>
+              <TabsTrigger value="financial" className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Financial
+              </TabsTrigger>
+              <TabsTrigger value="results" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Results
+              </TabsTrigger>
+            </TabsList>
 
-                  <TabsContent value="property" className="space-y-6 mt-6">
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="address" className="text-white">
-                          Property Address
-                        </Label>
-                        <Input
-                          id="address"
-                          placeholder="Enter property address"
-                          value={formData.address}
-                          onChange={(e) => updateFormData("address", e.target.value)}
-                          className="bg-slate-700 border-slate-600 text-white"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-white">Property Type</Label>
-                          <Select
-                            value={formData.propertyType}
-                            onValueChange={(value) => updateFormData("propertyType", value)}
-                          >
-                            <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="residential">Residential</SelectItem>
-                              <SelectItem value="commercial">Commercial</SelectItem>
-                              <SelectItem value="industrial">Industrial</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <Label className="text-white">Roof Type</Label>
-                          <Select
-                            value={formData.roofType}
-                            onValueChange={(value) => updateFormData("roofType", value)}
-                          >
-                            <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="asphalt">Asphalt Shingles</SelectItem>
-                              <SelectItem value="metal">Metal</SelectItem>
-                              <SelectItem value="tile">Tile</SelectItem>
-                              <SelectItem value="flat">Flat</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label className="text-white">Roof Age: {formData.roofAge} years</Label>
-                        <Slider
-                          value={[formData.roofAge]}
-                          onValueChange={(value) => updateFormData("roofAge", value[0])}
-                          max={50}
-                          step={1}
-                          className="mt-2"
-                        />
-                      </div>
-
-                      <div>
-                        <Label className="text-white">Shading Level: {formData.shadingLevel}%</Label>
-                        <Slider
-                          value={[formData.shadingLevel]}
-                          onValueChange={(value) => updateFormData("shadingLevel", value[0])}
-                          max={100}
-                          step={5}
-                          className="mt-2"
-                        />
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="energy" className="space-y-6 mt-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="monthlyBill" className="text-white">
-                          Monthly Electric Bill ($)
-                        </Label>
-                        <Input
-                          id="monthlyBill"
-                          type="number"
-                          value={formData.monthlyBill}
-                          onChange={(e) => updateFormData("monthlyBill", Number(e.target.value))}
-                          className="bg-slate-700 border-slate-600 text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="annualUsage" className="text-white">
-                          Annual Usage (kWh)
-                        </Label>
-                        <Input
-                          id="annualUsage"
-                          type="number"
-                          value={formData.annualUsage}
-                          onChange={(e) => updateFormData("annualUsage", Number(e.target.value))}
-                          className="bg-slate-700 border-slate-600 text-white"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="utilityCompany" className="text-white">
-                        Utility Company
-                      </Label>
+            {/* Property Tab */}
+            <TabsContent value="property" className="space-y-6">
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Home className="h-5 w-5" />
+                    Property Information
+                  </CardTitle>
+                  <CardDescription>Enter details about the property for solar installation</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Property Address</Label>
                       <Input
-                        id="utilityCompany"
-                        placeholder="Enter utility company name"
-                        value={formData.utilityCompany}
-                        onChange={(e) => updateFormData("utilityCompany", e.target.value)}
-                        className="bg-slate-700 border-slate-600 text-white"
+                        id="address"
+                        placeholder="123 Main St, City, State"
+                        value={formData.address}
+                        onChange={(e) => updateFormData("address", e.target.value)}
+                        className="bg-slate-700 border-slate-600"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="propertyType">Property Type</Label>
+                      <Select
+                        value={formData.propertyType}
+                        onValueChange={(value) => updateFormData("propertyType", value)}
+                      >
+                        <SelectTrigger className="bg-slate-700 border-slate-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="residential">Residential</SelectItem>
+                          <SelectItem value="commercial">Commercial</SelectItem>
+                          <SelectItem value="industrial">Industrial</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="roofType">Roof Type</Label>
+                      <Select value={formData.roofType} onValueChange={(value) => updateFormData("roofType", value)}>
+                        <SelectTrigger className="bg-slate-700 border-slate-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="asphalt">Asphalt Shingles</SelectItem>
+                          <SelectItem value="metal">Metal</SelectItem>
+                          <SelectItem value="tile">Tile</SelectItem>
+                          <SelectItem value="flat">Flat Roof</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="roofAge">Roof Age (years)</Label>
+                      <Input
+                        id="roofAge"
+                        type="number"
+                        value={formData.roofAge}
+                        onChange={(e) => updateFormData("roofAge", Number.parseInt(e.target.value))}
+                        className="bg-slate-700 border-slate-600"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Shading Level: {formData.shadingLevel}%</Label>
+                    <Slider
+                      value={[formData.shadingLevel]}
+                      onValueChange={(value) => updateFormData("shadingLevel", value[0])}
+                      max={100}
+                      step={5}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-sm text-slate-400">
+                      <span>No Shade</span>
+                      <span>Heavy Shade</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                    <div>
-                      <Label htmlFor="electricityRate" className="text-white">
-                        Electricity Rate ($/kWh)
-                      </Label>
+            {/* Energy Tab */}
+            <TabsContent value="energy" className="space-y-6">
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Zap className="h-5 w-5" />
+                    Energy Usage Analysis
+                  </CardTitle>
+                  <CardDescription>Current energy consumption and utility information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="monthlyBill">Average Monthly Bill ($)</Label>
+                      <Input
+                        id="monthlyBill"
+                        type="number"
+                        value={formData.monthlyBill}
+                        onChange={(e) => updateFormData("monthlyBill", Number.parseFloat(e.target.value))}
+                        className="bg-slate-700 border-slate-600"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="annualUsage">Annual Usage (kWh)</Label>
+                      <Input
+                        id="annualUsage"
+                        type="number"
+                        value={formData.annualUsage}
+                        onChange={(e) => updateFormData("annualUsage", Number.parseInt(e.target.value))}
+                        className="bg-slate-700 border-slate-600"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="utilityCompany">Utility Company</Label>
+                      <Select
+                        value={formData.utilityCompany}
+                        onValueChange={(value) => updateFormData("utilityCompany", value)}
+                      >
+                        <SelectTrigger className="bg-slate-700 border-slate-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="oncor">Oncor (Texas)</SelectItem>
+                          <SelectItem value="pge">PG&E (California)</SelectItem>
+                          <SelectItem value="sce">SCE (California)</SelectItem>
+                          <SelectItem value="fpl">FPL (Florida)</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="electricityRate">Electricity Rate ($/kWh)</Label>
                       <Input
                         id="electricityRate"
                         type="number"
                         step="0.01"
                         value={formData.electricityRate}
-                        onChange={(e) => updateFormData("electricityRate", Number(e.target.value))}
-                        className="bg-slate-700 border-slate-600 text-white"
+                        onChange={(e) => updateFormData("electricityRate", Number.parseFloat(e.target.value))}
+                        className="bg-slate-700 border-slate-600"
                       />
                     </div>
-                  </TabsContent>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                  <TabsContent value="system" className="space-y-6 mt-6">
-                    <div>
-                      <Label className="text-white">System Size: {formData.systemSize} kW</Label>
-                      <Slider
-                        value={[formData.systemSize]}
-                        onValueChange={(value) => updateFormData("systemSize", value[0])}
-                        min={3}
-                        max={20}
-                        step={0.5}
-                        className="mt-2"
+            {/* System Tab */}
+            <TabsContent value="system" className="space-y-6">
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    System Configuration
+                  </CardTitle>
+                  <CardDescription>Solar system specifications and components</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="systemSize">System Size (kW)</Label>
+                      <Input
+                        id="systemSize"
+                        type="number"
+                        step="0.1"
+                        value={formData.systemSize}
+                        onChange={(e) => updateFormData("systemSize", Number.parseFloat(e.target.value))}
+                        className="bg-slate-700 border-slate-600"
                       />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-white">Panel Type</Label>
-                        <Select
-                          value={formData.panelType}
-                          onValueChange={(value) => updateFormData("panelType", value)}
-                        >
-                          <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="monocrystalline">Monocrystalline</SelectItem>
-                            <SelectItem value="polycrystalline">Polycrystalline</SelectItem>
-                            <SelectItem value="thin-film">Thin Film</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label className="text-white">Inverter Type</Label>
-                        <Select
-                          value={formData.inverterType}
-                          onValueChange={(value) => updateFormData("inverterType", value)}
-                        >
-                          <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="string">String Inverter</SelectItem>
-                            <SelectItem value="power-optimizer">Power Optimizer</SelectItem>
-                            <SelectItem value="microinverter">Microinverter</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="panelType">Panel Type</Label>
+                      <Select value={formData.panelType} onValueChange={(value) => updateFormData("panelType", value)}>
+                        <SelectTrigger className="bg-slate-700 border-slate-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monocrystalline">Monocrystalline</SelectItem>
+                          <SelectItem value="polycrystalline">Polycrystalline</SelectItem>
+                          <SelectItem value="thin-film">Thin Film</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="inverterType">Inverter Type</Label>
+                      <Select
+                        value={formData.inverterType}
+                        onValueChange={(value) => updateFormData("inverterType", value)}
+                      >
+                        <SelectTrigger className="bg-slate-700 border-slate-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="string">String Inverter</SelectItem>
+                          <SelectItem value="power-optimizer">Power Optimizers</SelectItem>
+                          <SelectItem value="microinverter">Microinverters</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="batteryStorage">Battery Storage</Label>
+                      <Select
+                        value={formData.batteryStorage ? "yes" : "no"}
+                        onValueChange={(value) => updateFormData("batteryStorage", value === "yes")}
+                      >
+                        <SelectTrigger className="bg-slate-700 border-slate-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="no">No Battery</SelectItem>
+                          <SelectItem value="yes">Include Battery</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="batteryStorage"
-                        checked={formData.batteryStorage}
-                        onChange={(e) => updateFormData("batteryStorage", e.target.checked)}
-                        className="rounded"
+            {/* Financial Tab */}
+            <TabsContent value="financial" className="space-y-6">
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Financial Analysis
+                  </CardTitle>
+                  <CardDescription>Cost breakdown and financing options</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="installationCost">Installation Cost ($)</Label>
+                      <Input
+                        id="installationCost"
+                        type="number"
+                        value={formData.installationCost}
+                        onChange={(e) => updateFormData("installationCost", Number.parseFloat(e.target.value))}
+                        className="bg-slate-700 border-slate-600"
                       />
-                      <Label htmlFor="batteryStorage" className="text-white flex items-center">
-                        <Battery className="mr-2 h-4 w-4" />
-                        Include Battery Storage
-                      </Label>
                     </div>
-                  </TabsContent>
-
-                  <TabsContent value="financial" className="space-y-6 mt-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="installationCost" className="text-white">
-                          Installation Cost ($)
-                        </Label>
-                        <Input
-                          id="installationCost"
-                          type="number"
-                          value={formData.installationCost}
-                          onChange={(e) => updateFormData("installationCost", Number(e.target.value))}
-                          className="bg-slate-700 border-slate-600 text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="federalTaxCredit" className="text-white">
-                          Federal Tax Credit (%)
-                        </Label>
-                        <Input
-                          id="federalTaxCredit"
-                          type="number"
-                          value={formData.federalTaxCredit}
-                          onChange={(e) => updateFormData("federalTaxCredit", Number(e.target.value))}
-                          className="bg-slate-700 border-slate-600 text-white"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="federalTaxCredit">Federal Tax Credit ($)</Label>
+                      <Input
+                        id="federalTaxCredit"
+                        type="number"
+                        value={formData.federalTaxCredit}
+                        onChange={(e) => updateFormData("federalTaxCredit", Number.parseFloat(e.target.value))}
+                        className="bg-slate-700 border-slate-600"
+                      />
                     </div>
-
-                    <div>
-                      <Label htmlFor="stateIncentives" className="text-white">
-                        State Incentives ($)
-                      </Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="stateIncentives">State Incentives ($)</Label>
                       <Input
                         id="stateIncentives"
                         type="number"
                         value={formData.stateIncentives}
-                        onChange={(e) => updateFormData("stateIncentives", Number(e.target.value))}
-                        className="bg-slate-700 border-slate-600 text-white"
+                        onChange={(e) => updateFormData("stateIncentives", Number.parseFloat(e.target.value))}
+                        className="bg-slate-700 border-slate-600"
                       />
                     </div>
-
-                    <div>
-                      <Label className="text-white">Financing Type</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="financingType">Financing Type</Label>
                       <Select
                         value={formData.financingType}
                         onValueChange={(value) => updateFormData("financingType", value)}
                       >
-                        <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                        <SelectTrigger className="bg-slate-700 border-slate-600">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -395,182 +419,183 @@ export default function ProCalculator() {
                         </SelectContent>
                       </Select>
                     </div>
-
                     {formData.financingType === "loan" && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="loanTerm" className="text-white">
-                            Loan Term (years)
-                          </Label>
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="loanTerm">Loan Term (years)</Label>
                           <Input
                             id="loanTerm"
                             type="number"
                             value={formData.loanTerm}
-                            onChange={(e) => updateFormData("loanTerm", Number(e.target.value))}
-                            className="bg-slate-700 border-slate-600 text-white"
+                            onChange={(e) => updateFormData("loanTerm", Number.parseInt(e.target.value))}
+                            className="bg-slate-700 border-slate-600"
                           />
                         </div>
-
-                        <div>
-                          <Label htmlFor="interestRate" className="text-white">
-                            Interest Rate (%)
-                          </Label>
+                        <div className="space-y-2">
+                          <Label htmlFor="interestRate">Interest Rate (%)</Label>
                           <Input
                             id="interestRate"
                             type="number"
                             step="0.1"
                             value={formData.interestRate}
-                            onChange={(e) => updateFormData("interestRate", Number(e.target.value))}
-                            className="bg-slate-700 border-slate-600 text-white"
+                            onChange={(e) => updateFormData("interestRate", Number.parseFloat(e.target.value))}
+                            className="bg-slate-700 border-slate-600"
                           />
                         </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="downPayment">Down Payment ($)</Label>
+                          <Input
+                            id="downPayment"
+                            type="number"
+                            value={formData.downPayment}
+                            onChange={(e) => updateFormData("downPayment", Number.parseFloat(e.target.value))}
+                            className="bg-slate-700 border-slate-600"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Results Tab */}
+            <TabsContent value="results" className="space-y-6">
+              {!results ? (
+                <Card className="bg-slate-800/50 border-slate-700">
+                  <CardContent className="p-12 text-center">
+                    <Calculator className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-white mb-2">Ready to Calculate</h3>
+                    <p className="text-slate-300 mb-6">
+                      Complete the configuration tabs and click calculate to see your professional solar analysis
+                    </p>
+                    <Button
+                      onClick={calculateResults}
+                      disabled={isCalculating}
+                      className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600"
+                    >
+                      {isCalculating ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Calculating...
+                        </>
+                      ) : (
+                        <>
+                          <Calculator className="mr-2 h-4 w-4" />
+                          Calculate Results
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-6">
+                  {/* Key Metrics */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <Card className="bg-gradient-to-br from-green-500/20 to-green-600/20 border-green-500/50">
+                      <CardContent className="p-6 text-center">
+                        <div className="text-3xl font-bold text-green-400 mb-2">
+                          {results.annualProduction.toLocaleString()}
+                        </div>
+                        <div className="text-sm text-slate-300">kWh/year</div>
+                        <div className="text-xs text-slate-400 mt-1">Annual Production</div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border-blue-500/50">
+                      <CardContent className="p-6 text-center">
+                        <div className="text-3xl font-bold text-blue-400 mb-2">
+                          ${results.annualSavings.toLocaleString()}
+                        </div>
+                        <div className="text-sm text-slate-300">per year</div>
+                        <div className="text-xs text-slate-400 mt-1">Annual Savings</div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-orange-500/20 to-orange-600/20 border-orange-500/50">
+                      <CardContent className="p-6 text-center">
+                        <div className="text-3xl font-bold text-orange-400 mb-2">
+                          {results.paybackPeriod.toFixed(1)}
+                        </div>
+                        <div className="text-sm text-slate-300">years</div>
+                        <div className="text-xs text-slate-400 mt-1">Payback Period</div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border-purple-500/50">
+                      <CardContent className="p-6 text-center">
+                        <div className="text-3xl font-bold text-purple-400 mb-2">{results.roi25Year.toFixed(0)}%</div>
+                        <div className="text-sm text-slate-300">25-year</div>
+                        <div className="text-xs text-slate-400 mt-1">ROI</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Detailed Results */}
+                  <Card className="bg-slate-800/50 border-slate-700">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5" />
+                        Professional Analysis Results
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-white">System Performance</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-slate-300">System Size:</span>
+                              <span className="text-white">{formData.systemSize} kW</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-300">Annual Production:</span>
+                              <span className="text-white">{results.annualProduction.toLocaleString()} kWh</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-300">Production Factor:</span>
+                              <span className="text-white">
+                                {(results.annualProduction / formData.systemSize).toFixed(0)} kWh/kW
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-white">Financial Summary</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-slate-300">System Cost:</span>
+                              <span className="text-white">${results.systemCost.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-300">Net Cost:</span>
+                              <span className="text-white">${results.netCost.toLocaleString()}</span>
+                            </div>
+                            {formData.financingType === "loan" && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-300">Monthly Payment:</span>
+                                <span className="text-white">${results.monthlyPayment.toFixed(0)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </TabsContent>
 
-                  <TabsContent value="results" className="mt-6">
-                    <div className="grid grid-cols-2 gap-6">
-                      <Card className="bg-slate-700/50 border-slate-600">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-lg flex items-center">
-                            <Sun className="mr-2 h-5 w-5 text-yellow-400" />
-                            Annual Production
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold text-yellow-400">
-                            {results.annualProduction.toLocaleString()} kWh
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="bg-slate-700/50 border-slate-600">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-lg flex items-center">
-                            <DollarSign className="mr-2 h-5 w-5 text-green-400" />
-                            Annual Savings
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold text-green-400">
-                            ${results.annualSavings.toLocaleString()}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="bg-slate-700/50 border-slate-600">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-lg">Payback Period</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold text-blue-400">{results.paybackPeriod} years</div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="bg-slate-700/50 border-slate-600">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-lg">25-Year ROI</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold text-purple-400">
-                            ${results.roi25Year.toLocaleString()}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {formData.financingType === "loan" && (
-                      <Card className="bg-slate-700/50 border-slate-600 mt-6">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-lg">Monthly Payment</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold text-orange-400">
-                            ${results.monthlyPayment.toLocaleString()}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Results Summary */}
-          <div className="space-y-6">
-            <Card className="bg-gradient-to-br from-orange-500/10 to-yellow-500/10 border-orange-400">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <BarChart3 className="mr-2 h-5 w-5" />
-                  Quick Results
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Annual Production</span>
-                  <span className="text-yellow-400 font-semibold">{results.annualProduction.toLocaleString()} kWh</span>
+                      <div className="pt-6 border-t border-slate-700">
+                        <Button onClick={() => setActiveTab("property")} variant="outline" className="mr-4">
+                          Modify Inputs
+                        </Button>
+                        <Button className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600">
+                          Generate Report
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-                <Separator className="bg-slate-600" />
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Annual Savings</span>
-                  <span className="text-green-400 font-semibold">${results.annualSavings.toLocaleString()}</span>
-                </div>
-                <Separator className="bg-slate-600" />
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Payback Period</span>
-                  <span className="text-blue-400 font-semibold">{results.paybackPeriod} years</span>
-                </div>
-                <Separator className="bg-slate-600" />
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-300">25-Year ROI</span>
-                  <span className="text-purple-400 font-semibold">${results.roi25Year.toLocaleString()}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <FileText className="mr-2 h-5 w-5" />
-                  Generate Report
-                </CardTitle>
-                <CardDescription className="text-slate-300">
-                  Create a professional PDF report with your calculations
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Download PDF Report
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardHeader>
-                <CardTitle className="text-white">Pro Features</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center text-green-400">
-                  <Crown className="mr-2 h-4 w-4" />
-                  <span className="text-sm">Unlimited calculations</span>
-                </div>
-                <div className="flex items-center text-green-400">
-                  <FileText className="mr-2 h-4 w-4" />
-                  <span className="text-sm">Professional PDF reports</span>
-                </div>
-                <div className="flex items-center text-green-400">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span className="text-sm">Advanced configuration</span>
-                </div>
-                <div className="flex items-center text-green-400">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  <span className="text-sm">Detailed analytics</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
