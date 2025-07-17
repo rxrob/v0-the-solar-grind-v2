@@ -1,516 +1,394 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion, useScroll, useTransform } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Sun, Zap, MapPin, Star, Check, Calculator, BarChart3, FileText } from "lucide-react"
+import { Calculator, BarChart3, FileText, MapPin, Loader2, AlertCircle, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
-import { AnimatedBG } from "@/components/AnimatedBG"
 
-const features = [
-  {
-    icon: Calculator,
-    title: "Smart Solar Calculator",
-    description: "AI-powered calculations using real weather data and satellite imagery",
-  },
-  {
-    icon: BarChart3,
-    title: "Advanced Analytics",
-    description: "Detailed performance predictions and ROI analysis",
-  },
-  {
-    icon: FileText,
-    title: "Professional Reports",
-    description: "Generate comprehensive PDF reports for clients and stakeholders",
-  },
-]
-
-const testimonials = [
-  {
-    name: "Sarah Johnson",
-    role: "Homeowner",
-    content:
-      "The Solar Grind helped me understand exactly how much I could save with solar. The calculations were spot-on!",
-    rating: 5,
-  },
-  {
-    name: "Mike Chen",
-    role: "Solar Installer",
-    content:
-      "This tool has revolutionized how I present solar options to my clients. The reports are professional and detailed.",
-    rating: 5,
-  },
-  {
-    name: "Lisa Rodriguez",
-    role: "Energy Consultant",
-    content:
-      "The accuracy of the weather data integration is impressive. It's become an essential part of my workflow.",
-    rating: 5,
-  },
-]
-
-const stats = [
-  { label: "Solar Analyses", value: "50,000+" },
-  { label: "Energy Saved", value: "2.5M kWh" },
-  { label: "CO₂ Reduced", value: "1,200 tons" },
-  { label: "Happy Users", value: "10,000+" },
-]
+interface LocationData {
+  city: string
+  state: string
+  country: string
+  lat: number
+  lng: number
+  zip_code?: string
+  source?: string
+}
 
 export default function HomePage() {
-  const [userLocation, setUserLocation] = useState<string>("")
-  const [location, setLocation] = useState<{ city: string; region: string } | null>(null)
-  const { scrollYProgress } = useScroll()
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"])
-  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0])
+  const [location, setLocation] = useState<LocationData | null>(null)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch("https://ipapi.co/json/")
-      .then((res) => res.json())
-      .then((data) => {
-        setLocation({ city: data.city, region: data.region })
+    detectLocation()
+  }, [])
+
+  const detectLocation = async () => {
+    setLocationLoading(true)
+    setLocationError(null)
+
+    try {
+      // Get user's coordinates
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation is not supported"))
+          return
+        }
+
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 300000, // 5 minutes cache
+        })
       })
-      .catch(console.error)
-  }, [])
 
-  useEffect(() => {
-    // Get user's location for personalization
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const response = await fetch(
-              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
-            )
-            const data = await response.json()
-            setUserLocation(`${data.city}, ${data.principalSubdivision}`)
-          } catch (error) {
-            console.log("Location fetch failed:", error)
-          }
-        },
-        () => {
-          // Fallback to IP-based location
-          setUserLocation("Your Area")
-        },
-      )
+      const { latitude: lat, longitude: lng } = position.coords
+      console.log("Got coordinates:", { lat, lng })
+
+      // Get location details from coordinates
+      try {
+        const response = await fetch(`/api/geocoding?lat=${lat}&lng=${lng}`)
+        const data = await response.json()
+
+        console.log("Geocoding response:", data)
+
+        if (response.ok && data.success) {
+          setLocation({
+            city: data.city || "Unknown City",
+            state: data.state || "",
+            country: data.country || "US",
+            lat,
+            lng,
+            zip_code: data.zip_code,
+            source: data.source,
+          })
+        } else {
+          // Fallback to showing coordinates with basic location
+          const fallbackCity = getFallbackCityName(lat, lng)
+          setLocation({
+            city: fallbackCity,
+            state: "",
+            country: "US",
+            lat,
+            lng,
+          })
+        }
+      } catch (geocodingError) {
+        console.error("Geocoding error:", geocodingError)
+        // Show coordinates as fallback with better naming
+        const fallbackCity = getFallbackCityName(lat, lng)
+        setLocation({
+          city: fallbackCity,
+          state: "",
+          country: "US",
+          lat,
+          lng,
+        })
+      }
+    } catch (error) {
+      console.error("Location detection error:", error)
+      setLocationError("Unable to detect location. Please enable location services.")
+
+      // Use a default location for demo
+      setLocation({
+        city: "Demo Location",
+        state: "TX",
+        country: "US",
+        lat: 30.2672,
+        lng: -97.7431,
+      })
+    } finally {
+      setLocationLoading(false)
     }
-  }, [])
+  }
+
+  // Simple fallback city naming based on coordinates
+  const getFallbackCityName = (lat: number, lng: number): string => {
+    // Texas coordinates
+    if (lat >= 25.8 && lat <= 36.5 && lng >= -106.6 && lng <= -93.5) {
+      if (lat >= 32.5 && lat <= 33.0 && lng >= -97.5 && lng <= -96.5) {
+        return "Dallas Area"
+      } else if (lat >= 29.5 && lat <= 30.0 && lng >= -95.8 && lng <= -95.0) {
+        return "Houston Area"
+      } else if (lat >= 30.0 && lat <= 30.5 && lng >= -98.0 && lng <= -97.5) {
+        return "Austin Area"
+      } else {
+        return "Texas"
+      }
+    }
+
+    // California
+    if (lat >= 32.5 && lat <= 42.0 && lng >= -124.0 && lng <= -114.0) {
+      return "California"
+    }
+
+    // General US
+    if (lat >= 24.0 && lat <= 49.0 && lng >= -125.0 && lng <= -66.0) {
+      return "United States"
+    }
+
+    return "Your Location"
+  }
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
-      <AnimatedBG />
+    <div className="min-h-screen bg-slate-900 text-white relative overflow-hidden">
+      {/* Animated background particles */}
+      <div className="absolute inset-0">
+        {[...Array(30)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-2 h-2 bg-orange-400/30 rounded-full animate-pulse"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              animationDuration: `${2 + Math.random() * 2}s`,
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Hero Section */}
-      <motion.section className="relative z-10 container mx-auto px-4 pt-28 pb-32" style={{ y, opacity }}>
-        <div className="text-center max-w-4xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-            <Badge variant="secondary" className="mb-4 px-4 py-2 text-sm font-medium">
-              <Sun className="w-4 h-4 mr-2" />
-              AI-Powered Solar Analysis
-            </Badge>
+      <div className="relative z-10">
+        {/* Hero Section */}
+        <section className="container mx-auto px-4 pt-20 pb-16 text-center">
+          <Badge className="mb-6 bg-blue-600/20 text-blue-300 border-blue-500/30">⚡ AI-Powered Solar Analysis</Badge>
 
-            <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 bg-clip-text text-transparent mb-6 drop-shadow-lg">
+          <div className="relative">
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 bg-clip-text text-transparent">
               Smarter Solar Starts Here
             </h1>
 
-            <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-8">
-              AI-powered solar tools designed to maximize your home's savings and energy independence.
-            </p>
+            {/* Yellowish-orange mist effect */}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 translate-y-4">
+              <div className="w-full h-20 bg-gradient-to-b from-yellow-400/20 via-orange-400/15 to-transparent blur-3xl"></div>
+              <div className="absolute top-0 left-1/4 w-3/4 h-16 bg-gradient-to-b from-orange-400/25 via-yellow-400/20 to-transparent blur-2xl"></div>
+              <div className="absolute top-0 left-1/3 w-1/2 h-12 bg-gradient-to-b from-yellow-500/30 via-orange-500/25 to-transparent blur-xl"></div>
+            </div>
+          </div>
 
-            {userLocation && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
-                className="flex items-center justify-center mb-8 text-green-600"
-              >
-                <MapPin className="w-5 h-5 mr-2" />
-                <span className="text-lg">Analyzing solar potential for {userLocation}</span>
-              </motion.div>
-            )}
-          </motion.div>
+          <p className="text-xl text-slate-300 mb-8 max-w-2xl mx-auto mt-12">
+            AI-powered solar tools designed to maximize your home's savings and energy independence.
+          </p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.8 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-          >
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
               asChild
-              size="lg"
-              className="text-lg px-8 py-6 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white"
+              className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white px-8 py-3 text-lg"
             >
-              <Link href="/pro-calculator/step-1">
-                Start Free Analysis
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Link>
+              <Link href="/calculator">Start Free Analysis →</Link>
             </Button>
-
-            <Button asChild variant="outline" size="lg" className="text-lg px-8 py-6 bg-transparent">
+            <Button
+              variant="outline"
+              asChild
+              className="border-slate-600 text-slate-300 hover:bg-slate-800 px-8 py-3 text-lg bg-transparent"
+            >
               <Link href="/pricing">View Pricing</Link>
             </Button>
-          </motion.div>
-        </div>
-      </motion.section>
-
-      {/* Instant AI-Powered Solar Analysis Section */}
-      <section className="w-full max-w-4xl mt-24 px-6">
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4">Instant, AI-Powered Solar Analysis</h1>
-        <p className="max-w-2xl mx-auto text-lg text-muted-foreground mb-8">
-          Get detailed solar potential reports, system size recommendations, and savings estimates for any property in
-          seconds.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button asChild size="lg">
-            <Link href="/pro-calculator/step-1">Get Started for Free</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href="/pricing">View Pro Pricing</Link>
-          </Button>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="w-full max-w-5xl mt-20 px-6">
-        <h2 className="text-3xl font-bold text-center mb-10">How It Works</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="flex flex-col items-center p-6 border rounded-lg">
-            <h3 className="text-xl font-semibold mb-2">1. Enter Address</h3>
-            <p className="text-muted-foreground">Provide a property address to begin the analysis.</p>
           </div>
-          <div className="flex flex-col items-center p-6 border rounded-lg">
-            <h3 className="text-xl font-semibold mb-2">2. AI Analysis</h3>
-            <p className="text-muted-foreground">
-              Our AI analyzes roof geometry, sun exposure, and local utility rates.
-            </p>
-          </div>
-          <div className="flex flex-col items-center p-6 border rounded-lg">
-            <h3 className="text-xl font-semibold mb-2">3. Get Your Report</h3>
-            <p className="text-muted-foreground">
-              Receive a comprehensive report with system recommendations and financial projections.
-            </p>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Solar Potential Check Section */}
-      <section className="mt-24 px-6 w-full flex flex-col items-center">
-        {location ? (
-          <h2 className="text-3xl font-bold mb-4">
-            Solar Potential in {location.city}, {location.region}
-          </h2>
-        ) : (
-          <p>Locating your area...</p>
-        )}
-        <p className="text-muted-foreground mb-6 text-center max-w-md">
-          Analyzing sunlight exposure and yearly energy savings for your location.
-        </p>
-      </section>
-
-      {/* Solar Score & AI Summary */}
-      <section className="mt-32 px-6 w-full flex flex-col items-center text-center">
-        <h2 className="text-3xl font-bold mb-4">Your Solar Score</h2>
-        <div className="bg-gradient-to-tr from-green-400 to-yellow-500 text-white w-40 h-40 rounded-full flex items-center justify-center text-5xl font-extrabold shadow-xl">
-          92
-        </div>
-        <p className="text-muted-foreground mt-4 max-w-lg">
-          This home receives above-average sunlight, has optimal roof orientation, and qualifies for generous local
-          incentives — making it an ideal candidate for solar.
-        </p>
-
-        <div className="mt-8 p-5 max-w-2xl text-left bg-card/50 backdrop-blur-md rounded-xl border border-orange-400 text-card-foreground shadow-md">
-          <p className="text-sm mb-2 font-bold">🤖 SolarGPT Analysis:</p>
-          <p>
-            Based on your property's conditions, you're projected to produce around{" "}
-            <span className="font-semibold text-green-400">10,400 kWh/year</span>. That means you could save up to{" "}
-            <span className="text-green-400 font-semibold">$1,400–$1,800 annually</span> with a properly sized system.
-            This puts your home in the top 15% of solar-qualified properties in your area.
+        {/* Secondary Hero */}
+        <section className="container mx-auto px-4 py-16 text-center">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white">Instant, AI-Powered Solar Analysis</h2>
+          <p className="text-xl text-slate-300 mb-8 max-w-3xl mx-auto">
+            Get detailed solar potential reports, system size recommendations, and savings estimates for any property in
+            seconds.
           </p>
-        </div>
-      </section>
 
-      {/* Background Glow */}
-      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-600 opacity-20 blur-3xl rounded-full pointer-events-none z-0" />
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+            <Button asChild className="bg-white text-slate-900 hover:bg-slate-100 px-8 py-3 text-lg font-semibold">
+              <Link href="/calculator">Get Started for Free</Link>
+            </Button>
+            <Button
+              variant="outline"
+              asChild
+              className="border-slate-600 text-slate-300 hover:bg-slate-800 px-8 py-3 text-lg bg-transparent"
+            >
+              <Link href="/pricing">View Pro Pricing</Link>
+            </Button>
+          </div>
 
-      {/* Features Section */}
-      <motion.section
-        className="relative z-10 py-20 bg-muted/50"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        viewport={{ once: true }}
-      >
-        <div className="container mx-auto px-4">
+          {/* How It Works */}
+          <div className="mb-16">
+            <h3 className="text-3xl font-bold mb-12 text-white">How It Works</h3>
+            <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+              <Card className="bg-slate-800/50 border-slate-700 p-6">
+                <CardContent className="text-center">
+                  <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-white font-bold text-xl">
+                    1
+                  </div>
+                  <h4 className="text-xl font-semibold mb-3 text-white">Enter Address</h4>
+                  <p className="text-slate-300">Provide a property address to begin the analysis.</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-800/50 border-slate-700 p-6">
+                <CardContent className="text-center">
+                  <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-white font-bold text-xl">
+                    2
+                  </div>
+                  <h4 className="text-xl font-semibold mb-3 text-white">AI Analysis</h4>
+                  <p className="text-slate-300">
+                    Our AI analyzes roof geometry, sun exposure, and local utility rates.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-800/50 border-slate-700 p-6">
+                <CardContent className="text-center">
+                  <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-white font-bold text-xl">
+                    3
+                  </div>
+                  <h4 className="text-xl font-semibold mb-3 text-white">Get Your Report</h4>
+                  <p className="text-slate-300">
+                    Receive a comprehensive report with system recommendations and financial projections.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Location Status */}
+          <div className="mb-8">
+            {locationLoading ? (
+              <div className="flex items-center justify-center text-slate-400">
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Locating your area...
+              </div>
+            ) : locationError ? (
+              <div className="flex items-center justify-center text-orange-400">
+                <AlertCircle className="w-4 h-4 mr-2" />
+                {locationError}
+              </div>
+            ) : location ? (
+              <div className="flex items-center justify-center text-green-400">
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Analyzing sunlight exposure and yearly energy savings for your location.
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        {/* Solar Score Section */}
+        {location && (
+          <section className="container mx-auto px-4 py-16 text-center">
+            {/* Location Display */}
+            <div className="mb-8">
+              <div className="flex items-center justify-center text-slate-300 mb-2">
+                <MapPin className="w-4 h-4 mr-2" />
+                <span className="text-lg">
+                  {location.city}
+                  {location.state && `, ${location.state}`}
+                  {location.country && location.country !== "US" && `, ${location.country}`}
+                </span>
+              </div>
+              <div className="text-sm text-slate-500">
+                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                {location.source && (
+                  <span className="ml-2 text-xs text-slate-600">
+                    ({location.source === "google" ? "Google Maps" : "Estimated"})
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <h2 className="text-4xl font-bold mb-12 text-white">Your Solar Score</h2>
+
+            {/* Solar Score Circle */}
+            <div className="mb-8">
+              <div className="w-48 h-48 mx-auto rounded-full bg-gradient-to-br from-green-400 to-yellow-400 flex items-center justify-center">
+                <span className="text-6xl font-bold text-white">92</span>
+              </div>
+            </div>
+
+            <p className="text-lg text-slate-300 mb-8 max-w-3xl mx-auto">
+              This home receives above-average sunlight, has optimal roof orientation, and qualifies for generous local
+              incentives — making it an ideal candidate for solar.
+            </p>
+
+            {/* SolarGPT Analysis */}
+            <Card className="max-w-4xl mx-auto bg-slate-800/50 border-orange-500/50 border-2">
+              <CardContent className="p-6 text-left">
+                <div className="flex items-center mb-4">
+                  <div className="w-6 h-6 bg-orange-500 rounded mr-3">🤖</div>
+                  <h3 className="text-xl font-semibold text-orange-400">SolarGPT Analysis:</h3>
+                </div>
+                <p className="text-slate-300 leading-relaxed">
+                  Based on your property's conditions, you're projected to produce around{" "}
+                  <span className="text-green-400 font-semibold">10,400 kWh/year</span>. That means you could save up to{" "}
+                  <span className="text-green-400 font-semibold">$1,400–$1,800 annually</span> with a properly sized
+                  system. This puts your home in the top 15% of solar-qualified properties in your area.
+                </p>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        {/* Features Section */}
+        <section className="container mx-auto px-4 py-16">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Why Choose The Solar Grind?</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <h2 className="text-4xl font-bold mb-6 text-white">Why Choose The Solar Grind?</h2>
+            <p className="text-xl text-slate-300 max-w-3xl mx-auto">
               Advanced AI technology meets solar expertise to deliver the most accurate analysis available.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.2, duration: 0.6 }}
-                viewport={{ once: true }}
-              >
-                <Card className="h-full hover:shadow-lg transition-shadow duration-300 bg-card">
-                  <CardHeader className="text-center pb-4">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center">
-                      <feature.icon className="w-8 h-8 text-white" />
-                    </div>
-                    <CardTitle className="text-xl font-semibold">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-center leading-relaxed">{feature.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Stats Section */}
-      <motion.section
-        className="relative z-10 py-20"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        viewport={{ once: true }}
-      >
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.1, duration: 0.6 }}
-                viewport={{ once: true }}
-                className="text-center"
-              >
-                <div className="text-3xl md:text-4xl font-bold text-primary mb-2">{stat.value}</div>
-                <div className="text-muted-foreground font-medium">{stat.label}</div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Testimonials Section */}
-      <motion.section
-        className="relative z-10 py-20 bg-muted/50"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        viewport={{ once: true }}
-      >
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">What Our Users Say</h2>
-            <p className="text-xl text-muted-foreground">
-              Join thousands of satisfied customers who've made the switch to solar
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <motion.div
-                key={testimonial.name}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.2, duration: 0.6 }}
-                viewport={{ once: true }}
-              >
-                <Card className="h-full bg-card shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex mb-4">
-                      {[...Array(testimonial.rating)].map((_, i) => (
-                        <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                      ))}
-                    </div>
-                    <p className="text-muted-foreground mb-4 italic">"{testimonial.content}"</p>
-                    <div>
-                      <div className="font-semibold">{testimonial.name}</div>
-                      <div className="text-sm text-muted-foreground">{testimonial.role}</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Pricing Section */}
-      <motion.section
-        className="relative z-10 py-20"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        viewport={{ once: true }}
-      >
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Simple, Transparent Pricing</h2>
-            <p className="text-xl text-muted-foreground">Choose the plan that fits your needs</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Free Plan */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.6 }}
-              viewport={{ once: true }}
-            >
-              <Card className="relative h-full border-2 border-border hover:border-primary/50 transition-colors">
-                <CardHeader className="text-center pb-8">
-                  <CardTitle className="text-2xl font-bold">Free</CardTitle>
-                  <div className="text-4xl font-bold mt-4">$0</div>
-                  <CardDescription>Perfect for homeowners</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>Basic solar calculations</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>Savings estimates</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>Simple reports</span>
-                    </div>
-                  </div>
-                  <Button asChild className="w-full mt-8">
-                    <Link href="/pro-calculator/step-1">Get Started Free</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Pro Plan */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              viewport={{ once: true }}
-            >
-              <Card className="relative h-full border-2 border-primary shadow-lg scale-105">
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-4 py-1">Most Popular</Badge>
+          <div className="grid md:grid-cols-3 gap-8 mb-16">
+            <Card className="bg-slate-800/50 border-slate-700 p-8">
+              <CardContent className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Calculator className="w-8 h-8 text-white" />
                 </div>
-                <CardHeader className="text-center pb-8">
-                  <CardTitle className="text-2xl font-bold">Pro</CardTitle>
-                  <div className="text-4xl font-bold text-primary mt-4">$29</div>
-                  <CardDescription>per month</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>Advanced AI calculations</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>Professional PDF reports</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>Unlimited analyses</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>Priority support</span>
-                    </div>
-                  </div>
-                  <Button asChild className="w-full mt-8 bg-primary hover:bg-primary/90">
-                    <Link href="/pricing">Start Pro Trial</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
+                <h3 className="text-2xl font-semibold mb-4 text-white">Smart Solar Calculator</h3>
+                <p className="text-slate-300">AI-powered calculations using real weather data and satellite imagery</p>
+              </CardContent>
+            </Card>
 
-            {/* Single Report */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.6 }}
-              viewport={{ once: true }}
-            >
-              <Card className="relative h-full border-2 border-border hover:border-green-500/50 transition-colors">
-                <CardHeader className="text-center pb-8">
-                  <CardTitle className="text-2xl font-bold">Single Report</CardTitle>
-                  <div className="text-4xl font-bold text-green-600 mt-4">$9</div>
-                  <CardDescription>One-time purchase</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>One professional report</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>Advanced calculations</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3" />
-                      <span>PDF download</span>
-                    </div>
-                  </div>
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="w-full mt-8 border-green-500 text-green-600 hover:bg-green-500/10 bg-transparent"
-                  >
-                    <Link href="/pricing">Buy Single Report</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
+            <Card className="bg-slate-800/50 border-slate-700 p-8">
+              <CardContent className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <BarChart3 className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-semibold mb-4 text-white">Advanced Analytics</h3>
+                <p className="text-slate-300">Detailed performance predictions and ROI analysis</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-800/50 border-slate-700 p-8">
+              <CardContent className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <FileText className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-semibold mb-4 text-white">Professional Reports</h3>
+                <p className="text-slate-300">Generate comprehensive PDF reports for clients and stakeholders</p>
+              </CardContent>
+            </Card>
           </div>
-        </div>
-      </motion.section>
 
-      {/* CTA Section */}
-      <motion.section
-        className="relative z-10 py-20 bg-gradient-to-r from-blue-600 to-green-600"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        viewport={{ once: true }}
-      >
-        <div className="container mx-auto px-4 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-4xl font-bold text-white mb-6">Ready to Go Solar?</h2>
-            <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-              Join thousands of homeowners who've discovered their solar potential with The Solar Grind. Start your free
-              analysis today.
-            </p>
-            <Button asChild size="lg" variant="secondary" className="text-lg px-8 py-6">
-              <Link href="/pro-calculator/step-1">
-                Start Your Solar Journey
-                <Zap className="ml-2 w-5 h-5" />
-              </Link>
-            </Button>
-          </motion.div>
-        </div>
-      </motion.section>
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div>
+              <div className="text-4xl font-bold text-white mb-2">50,000+</div>
+              <div className="text-slate-400">Solar Analyses</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-white mb-2">2.5M kWh</div>
+              <div className="text-slate-400">Energy Saved</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-white mb-2">1,200 tons</div>
+              <div className="text-slate-400">CO₂ Reduced</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-white mb-2">10,000+</div>
+              <div className="text-slate-400">Happy Users</div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }

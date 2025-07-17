@@ -1,247 +1,260 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuthReal } from "@/hooks/use-auth-real"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Calculator, FileText, Users, Settings, BarChart3, Zap } from "lucide-react"
+import { getCurrentUser } from "@/lib/supabase-browser"
+import { Calculator, FileText, Users, TrendingUp, Crown, Zap, Sun, BarChart3, Settings, Download } from "lucide-react"
+
+interface User {
+  id: string
+  email?: string
+  user_metadata?: {
+    full_name?: string
+    subscription_type?: string
+  }
+}
 
 export default function ProDashboardPage() {
-  const { user, profile, loading, isPro, isIONEmployee, signOut } = useAuthReal()
   const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push("/login")
-        return
-      }
+    const fetchUser = async () => {
+      try {
+        const { user } = await getCurrentUser()
+        if (!user) {
+          router.push("/login")
+          return
+        }
 
-      if (!isPro && !isIONEmployee) {
-        router.push("/dashboard/free")
-        return
+        // Check if user is pro
+        if (user.user_metadata?.subscription_type !== "pro") {
+          router.push("/dashboard")
+          return
+        }
+
+        setUser(user)
+      } catch (error) {
+        console.error("Error fetching user:", error)
+        router.push("/login")
+      } finally {
+        setLoading(false)
       }
     }
-  }, [user, loading, isPro, isIONEmployee, router])
+
+    fetchUser()
+  }, [router])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <Skeleton className="h-8 w-64 mb-2" />
-              <Skeleton className="h-4 w-96" />
-            </div>
-            <Skeleton className="h-10 w-24" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <Skeleton className="h-6 w-32 mb-4" />
-                  <Skeleton className="h-4 w-full mb-2" />
-                  <Skeleton className="h-4 w-3/4" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500"></div>
       </div>
     )
   }
 
-  if (!user || (!isPro && !isIONEmployee)) {
-    return null // Will redirect via useEffect
+  if (!user) {
+    return null
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+    <div className="container mx-auto py-8 px-4">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Pro Dashboard
-              {isIONEmployee && <Badge className="ml-2 bg-orange-500">ION Solar Team</Badge>}
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+              Pro Dashboard 👑
             </h1>
-            <p className="text-gray-600">
-              Welcome back, {profile?.full_name || user.email}! You have unlimited access to all features.
-            </p>
+            <p className="text-muted-foreground mt-2">Advanced AI-powered solar analytics for professionals ⚡</p>
           </div>
-          <Button onClick={signOut} variant="outline">
-            Sign Out
-          </Button>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Reports Generated</p>
-                  <p className="text-2xl font-bold text-gray-900">{profile?.reports_used || 0}</p>
-                </div>
-                <FileText className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Subscription</p>
-                  <p className="text-2xl font-bold text-green-600">Pro</p>
-                </div>
-                <Zap className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Status</p>
-                  <p className="text-2xl font-bold text-blue-600">Active</p>
-                </div>
-                <BarChart3 className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Limit</p>
-                  <p className="text-2xl font-bold text-purple-600">∞</p>
-                </div>
-                <Settings className="h-8 w-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Features */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => router.push("/pro-calculator")}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5 text-blue-600" />
-                Pro Solar Calculator
-              </CardTitle>
-              <CardDescription>
-                Advanced solar calculations with detailed analysis, utility detection, and comprehensive reporting.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full">Start Calculation</Button>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => router.push("/dashboard/pro/reports")}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-green-600" />
-                Report Management
-              </CardTitle>
-              <CardDescription>
-                View, download, and manage all your generated solar reports in one place.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline">
-                View Reports
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => router.push("/dashboard/pro/clients")}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-purple-600" />
-                Client Management
-              </CardTitle>
-              <CardDescription>
-                Manage your clients, track their projects, and organize your solar installations.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline">
-                Manage Clients
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => router.push("/visual-analysis")}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-orange-600" />
-                Visual Analysis
-              </CardTitle>
-              <CardDescription>
-                Advanced roof analysis with satellite imagery and 3D modeling capabilities.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline">
-                Analyze Property
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/billing")}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-gray-600" />
-                Account Settings
-              </CardTitle>
-              <CardDescription>Manage your subscription, billing information, and account preferences.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline">
-                Manage Account
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/calculator")}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-yellow-600" />
-                Quick Calculator
-              </CardTitle>
-              <CardDescription>
-                Fast solar calculations for quick estimates and preliminary assessments.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline">
-                Quick Calc
-              </Button>
-            </CardContent>
-          </Card>
+          <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+            <Crown className="h-4 w-4 mr-1" />
+            Pro Member
+          </Badge>
         </div>
       </div>
+
+      {/* Advanced Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card className="hover:shadow-lg transition-shadow border-orange-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pro Calculations</CardTitle>
+            <Calculator className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">156</div>
+            <p className="text-xs text-muted-foreground">Unlimited usage</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow border-orange-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Client Projects</CardTitle>
+            <Users className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">23</div>
+            <p className="text-xs text-muted-foreground">Active clients</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow border-orange-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Revenue Generated</CardTitle>
+            <TrendingUp className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">$45.2k</div>
+            <p className="text-xs text-muted-foreground">This quarter</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow border-orange-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">System Efficiency</CardTitle>
+            <Sun className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">94.8%</div>
+            <p className="text-xs text-muted-foreground">Average optimization</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Pro Tools */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <Card className="border-orange-200">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Calculator className="h-5 w-5 mr-2 text-orange-500" />
+              Pro Calculator
+            </CardTitle>
+            <CardDescription>Advanced calculations with AI optimization</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => router.push("/pro-calculator")}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Launch Pro Calculator
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-200">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="h-5 w-5 mr-2 text-orange-500" />
+              Client Management
+            </CardTitle>
+            <CardDescription>Manage your solar clients and projects</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => router.push("/dashboard/pro/clients")}
+              variant="outline"
+              className="w-full border-orange-300 text-orange-600 hover:bg-orange-50"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Manage Clients
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-200">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-orange-500" />
+              Advanced Reports
+            </CardTitle>
+            <CardDescription>Generate professional solar reports</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => router.push("/dashboard/pro/reports")}
+              variant="outline"
+              className="w-full border-orange-300 text-orange-600 hover:bg-orange-50"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              View Reports
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Pro Activity */}
+      <Card className="border-orange-200">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <BarChart3 className="h-5 w-5 mr-2 text-orange-500" />
+            Recent Pro Activity
+          </CardTitle>
+          <CardDescription>Your latest professional calculations and client work</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center">
+                  <Calculator className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">Commercial Solar Analysis</p>
+                  <p className="text-sm text-muted-foreground">Client: ABC Corp - 500kW system</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Badge className="bg-green-100 text-green-700">Complete</Badge>
+                <Button size="sm" variant="outline">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">Residential Report Generated</p>
+                  <p className="text-sm text-muted-foreground">Client: Johnson Family - 12kW system</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Badge className="bg-blue-100 text-blue-700">Delivered</Badge>
+                <Button size="sm" variant="outline">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">ROI Analysis Complete</p>
+                  <p className="text-sm text-muted-foreground">Client: Green Energy LLC - Multi-site</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Badge className="bg-orange-100 text-orange-700">In Review</Badge>
+                <Button size="sm" variant="outline">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

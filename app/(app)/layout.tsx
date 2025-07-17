@@ -1,11 +1,15 @@
 import type React from "react"
 import { SiteNavigation } from "@/components/site-navigation"
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AppLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <div className="relative flex min-h-screen flex-col">
+    <div className="min-h-screen bg-slate-900">
       <SiteNavigation />
-      <main className="flex-1">{children}</main>
+      {children}
     </div>
   )
 }

@@ -1,260 +1,313 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuthReal } from "@/hooks/use-auth-real"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Calculator, FileText, Crown, Zap, Lock } from "lucide-react"
+import { getCurrentUser } from "@/lib/supabase-browser"
+import { Calculator, FileText, Crown, Zap, Sun, Lock, Star, ArrowRight } from "lucide-react"
+
+interface User {
+  id: string
+  email?: string
+  user_metadata?: {
+    full_name?: string
+    subscription_type?: string
+  }
+}
 
 export default function FreeDashboardPage() {
-  const { user, profile, loading, isPro, isIONEmployee, signOut } = useAuthReal()
   const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push("/login")
-        return
-      }
+    const fetchUser = async () => {
+      try {
+        const { user } = await getCurrentUser()
+        if (!user) {
+          router.push("/login")
+          return
+        }
 
-      if (isPro || isIONEmployee) {
-        router.push("/dashboard/pro")
-        return
+        // Redirect pro users to pro dashboard
+        if (user.user_metadata?.subscription_type === "pro") {
+          router.push("/dashboard/pro")
+          return
+        }
+
+        setUser(user)
+      } catch (error) {
+        console.error("Error fetching user:", error)
+        router.push("/login")
+      } finally {
+        setLoading(false)
       }
     }
-  }, [user, loading, isPro, isIONEmployee, router])
+
+    fetchUser()
+  }, [router])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <Skeleton className="h-8 w-64 mb-2" />
-              <Skeleton className="h-4 w-96" />
-            </div>
-            <Skeleton className="h-10 w-24" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <Skeleton className="h-6 w-32 mb-4" />
-                  <Skeleton className="h-4 w-full mb-2" />
-                  <Skeleton className="h-4 w-3/4" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500"></div>
       </div>
     )
   }
 
-  if (!user || isPro || isIONEmployee) {
-    return null // Will redirect via useEffect
+  if (!user) {
+    return null
   }
 
-  const reportsUsed = profile?.reports_used || 0
-  const maxReports = profile?.max_reports || 3
-  const reportsRemaining = Math.max(0, maxReports - reportsUsed)
-  const usagePercentage = (reportsUsed / maxReports) * 100
+  // Mock usage data for free tier
+  const calculationsUsed = 3
+  const calculationsLimit = 5
+  const reportsUsed = 1
+  const reportsLimit = 2
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+    <div className="container mx-auto py-8 px-4">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Free Dashboard
-              <Badge className="ml-2 bg-blue-500">Free Plan</Badge>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+              Free Dashboard ⚡
             </h1>
-            <p className="text-gray-600">
-              Welcome back, {profile?.full_name || user.email}! You have {reportsRemaining} reports remaining.
-            </p>
+            <p className="text-muted-foreground mt-2">Get started with basic solar calculations</p>
           </div>
-          <Button onClick={signOut} variant="outline">
-            Sign Out
-          </Button>
+          <Badge variant="secondary">Free Plan</Badge>
         </div>
+      </div>
 
-        {/* Usage Stats */}
-        <Card className="mb-8">
+      {/* Usage Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <Card className="border-orange-200">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-600" />
-              Report Usage
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center">
+                <Calculator className="h-5 w-5 mr-2 text-orange-500" />
+                Calculations
+              </span>
+              <span className="text-sm font-normal text-muted-foreground">
+                {calculationsUsed}/{calculationsLimit}
+              </span>
             </CardTitle>
-            <CardDescription>Track your monthly report usage and upgrade when needed.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <Progress value={(calculationsUsed / calculationsLimit) * 100} className="h-2" />
+              <p className="text-sm text-muted-foreground">
+                {calculationsLimit - calculationsUsed} calculations remaining this month
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-200">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center">
+                <FileText className="h-5 w-5 mr-2 text-orange-500" />
+                Reports
+              </span>
+              <span className="text-sm font-normal text-muted-foreground">
+                {reportsUsed}/{reportsLimit}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <Progress value={(reportsUsed / reportsLimit) * 100} className="h-2" />
+              <p className="text-sm text-muted-foreground">{reportsLimit - reportsUsed} reports remaining this month</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Calculator className="h-5 w-5 mr-2 text-orange-500" />
+              Basic Calculator
+            </CardTitle>
+            <CardDescription>Calculate solar potential for residential properties</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Reports Used</span>
-                <span className="text-sm text-gray-600">
-                  {reportsUsed} / {maxReports}
-                </span>
-              </div>
-              <Progress value={usagePercentage} className="w-full" />
-              {reportsRemaining <= 1 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <p className="text-orange-800 text-sm">
-                    ⚠️ You're running low on reports! Upgrade to Pro for unlimited access.
-                  </p>
-                </div>
+              <Button
+                onClick={() => router.push("/calculator")}
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                disabled={calculationsUsed >= calculationsLimit}
+              >
+                {calculationsUsed >= calculationsLimit ? (
+                  <>
+                    <Lock className="h-4 w-4 mr-2" />
+                    Limit Reached
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Start Calculation
+                  </>
+                )}
+              </Button>
+              {calculationsUsed >= calculationsLimit && (
+                <p className="text-sm text-orange-600 text-center">Upgrade to Pro for unlimited calculations</p>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Upgrade Prompt */}
-        <Card className="mb-8 border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-800">
-              <Crown className="h-5 w-5 text-yellow-600" />
-              Upgrade to Pro
+            <CardTitle className="flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-orange-500" />
+              Basic Reports
             </CardTitle>
-            <CardDescription className="text-orange-700">
-              Unlock unlimited reports, advanced features, and priority support.
-            </CardDescription>
+            <CardDescription>Generate simple solar analysis reports</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div className="space-y-2">
-                <h4 className="font-semibold text-orange-800">Pro Features:</h4>
-                <ul className="text-sm text-orange-700 space-y-1">
-                  <li>• Unlimited solar reports</li>
-                  <li>• Advanced utility detection</li>
-                  <li>• Client management system</li>
-                  <li>• Priority customer support</li>
-                </ul>
-              </div>
-              <div className="space-y-2">
-                <h4 className="font-semibold text-orange-800">Advanced Tools:</h4>
-                <ul className="text-sm text-orange-700 space-y-1">
-                  <li>• Detailed financial analysis</li>
-                  <li>• Custom branding options</li>
-                  <li>• Bulk report generation</li>
-                  <li>• API access</li>
-                </ul>
-              </div>
+            <div className="space-y-4">
+              <Button
+                onClick={() => router.push("/reports")}
+                variant="outline"
+                className="w-full border-orange-300 text-orange-600 hover:bg-orange-50"
+                disabled={reportsUsed >= reportsLimit}
+              >
+                {reportsUsed >= reportsLimit ? (
+                  <>
+                    <Lock className="h-4 w-4 mr-2" />
+                    Limit Reached
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Generate Report
+                  </>
+                )}
+              </Button>
+              {reportsUsed >= reportsLimit && (
+                <p className="text-sm text-orange-600 text-center">Upgrade to Pro for unlimited reports</p>
+              )}
             </div>
-            <Button onClick={() => router.push("/pricing")} className="w-full bg-orange-600 hover:bg-orange-700">
-              Upgrade to Pro - $29/month
-            </Button>
           </CardContent>
         </Card>
-
-        {/* Available Features */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/calculator")}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5 text-blue-600" />
-                Basic Solar Calculator
-              </CardTitle>
-              <CardDescription>
-                Generate basic solar calculations and estimates for residential properties.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" disabled={reportsRemaining === 0}>
-                {reportsRemaining === 0 ? "No Reports Left" : "Start Calculation"}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/reports")}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-green-600" />
-                My Reports
-              </CardTitle>
-              <CardDescription>View and download your previously generated solar reports.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline">
-                View Reports
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="opacity-60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5 text-gray-400" />
-                Pro Calculator
-                <Badge variant="secondary">Pro Only</Badge>
-              </CardTitle>
-              <CardDescription>
-                Advanced calculations with utility detection and detailed analysis. Upgrade to unlock.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline" disabled>
-                Upgrade Required
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="opacity-60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5 text-gray-400" />
-                Client Management
-                <Badge variant="secondary">Pro Only</Badge>
-              </CardTitle>
-              <CardDescription>
-                Organize clients and track their solar projects. Available with Pro subscription.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline" disabled>
-                Upgrade Required
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="opacity-60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5 text-gray-400" />
-                Visual Analysis
-                <Badge variant="secondary">Pro Only</Badge>
-              </CardTitle>
-              <CardDescription>
-                Advanced roof analysis with satellite imagery. Upgrade to access this feature.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline" disabled>
-                Upgrade Required
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/pricing")}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-yellow-600" />
-                Upgrade Account
-              </CardTitle>
-              <CardDescription>View pricing plans and upgrade your account for unlimited access.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline">
-                View Pricing
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
       </div>
+
+      {/* Pro Features Preview */}
+      <Card className="border-orange-200 bg-gradient-to-r from-orange-50 to-red-50">
+        <CardHeader>
+          <CardTitle className="flex items-center text-orange-700">
+            <Crown className="h-5 w-5 mr-2" />
+            Unlock Pro Features
+          </CardTitle>
+          <CardDescription>See what you're missing with our professional tools</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Star className="h-4 w-4 text-orange-500" />
+                <span className="text-sm">Unlimited calculations</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Star className="h-4 w-4 text-orange-500" />
+                <span className="text-sm">Advanced AI optimization</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Star className="h-4 w-4 text-orange-500" />
+                <span className="text-sm">Professional reports</span>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Star className="h-4 w-4 text-orange-500" />
+                <span className="text-sm">Client management</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Star className="h-4 w-4 text-orange-500" />
+                <span className="text-sm">Priority support</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Star className="h-4 w-4 text-orange-500" />
+                <span className="text-sm">Commercial calculations</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-lg font-semibold text-orange-700">Starting at $29/month</p>
+              <p className="text-sm text-orange-600">Cancel anytime • 14-day free trial</p>
+            </div>
+            <Button
+              onClick={() => router.push("/pricing")}
+              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+            >
+              Upgrade Now
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Activity */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Sun className="h-5 w-5 mr-2 text-orange-500" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Your latest calculations and reports</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {calculationsUsed > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                <div>
+                  <p className="font-medium">Residential Calculation</p>
+                  <p className="text-sm text-muted-foreground">2 hours ago</p>
+                </div>
+                <Badge variant="secondary">Complete</Badge>
+              </div>
+              {calculationsUsed > 1 && (
+                <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">Basic Solar Analysis</p>
+                    <p className="text-sm text-muted-foreground">1 day ago</p>
+                  </div>
+                  <Badge variant="secondary">Complete</Badge>
+                </div>
+              )}
+              {calculationsUsed > 2 && (
+                <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">Energy Estimate</p>
+                    <p className="text-sm text-muted-foreground">3 days ago</p>
+                  </div>
+                  <Badge variant="secondary">Complete</Badge>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Sun className="h-12 w-12 text-orange-300 mx-auto mb-4" />
+              <p className="text-muted-foreground">No calculations yet. Start your first solar analysis!</p>
+              <Button
+                onClick={() => router.push("/calculator")}
+                className="mt-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+              >
+                Get Started
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

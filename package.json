@@ -11,7 +11,6 @@
     "start": "next start"
   },
   "dependencies": {
-    "@emotion/is-prop-valid": "latest",
     "@hookform/resolvers": "^3.9.1",
     "@next/bundle-analyzer": "latest",
     "@radix-ui/react-accordion": "latest",
@@ -42,6 +41,7 @@
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
     "@react-google-maps/api": "latest",
+    "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
     "autoprefixer": "^10.4.20",
@@ -50,7 +50,7 @@
     "cmdk": "latest",
     "date-fns": "4.1.0",
     "embla-carousel-react": "latest",
-    "framer-motion": "latest",
+    "framer-motion": "^11.3.8",
     "fs": "latest",
     "google-maps": "latest",
     "immer": "latest",
@@ -61,6 +61,7 @@
     "next-themes": "latest",
     "path": "latest",
     "pdfjs-dist": "latest",
+    "pdfkit": "latest",
     "process": "latest",
     "react": "^18",
     "react-day-picker": "latest",
