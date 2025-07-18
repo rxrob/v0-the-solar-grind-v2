@@ -42,7 +42,6 @@
     "@radix-ui/react-tooltip": "latest",
     "@react-google-maps/api": "latest",
     "@remix-run/react": "latest",
-    "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
     "@sveltejs/kit": "latest",

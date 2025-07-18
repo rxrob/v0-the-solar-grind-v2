@@ -2,307 +2,236 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MapPin, Sun, TrendingUp, ChevronDown, ChevronUp } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { Badge } from "@/components/ui/badge"
+import { MapPin, Zap, DollarSign, Leaf, ChevronUp, ChevronDown, X } from "lucide-react"
 
 interface LocationData {
   latitude: number
   longitude: number
   city?: string
   state?: string
-  zipCode?: string
+  country?: string
 }
 
-interface SolarData {
+interface SolarAnalysis {
   score: number
-  factors: {
-    sunlight: number
-    roofOrientation: number
-    shading: number
-    incentives: number
-  }
-  estimatedSavings: {
-    monthly: number
-    annual: number
-  }
-  systemSize: number
+  annualProduction: number
+  annualSavings: number
+  co2Reduction: number
+  roiYears: number
+  incentives: string[]
 }
 
-export function SolarLocationBanner() {
+export default function SolarLocationBanner() {
   const [location, setLocation] = useState<LocationData | null>(null)
-  const [solarData, setSolarData] = useState<SolarData | null>(null)
+  const [solarAnalysis, setSolarAnalysis] = useState<SolarAnalysis | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
+  const [isVisible, setIsVisible] = useState(false)
+  const [isDismissed, setIsDismissed] = useState(false)
 
   useEffect(() => {
-    detectLocation()
-  }, [])
+    if (isDismissed) return
 
-  const detectLocation = async () => {
-    try {
-      if (!navigator.geolocation) {
-        setIsLoading(false)
-        return
-      }
+    const getUserLocation = async () => {
+      if (!navigator.geolocation) return
 
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords
 
-          // Get location details
-          const locationData = await getLocationDetails(latitude, longitude)
-          setLocation(locationData)
+          try {
+            // Get city and state from coordinates
+            const response = await fetch(`/api/geocoding?lat=${latitude}&lng=${longitude}`)
+            const data = await response.json()
 
-          // Calculate solar score
-          const solar = calculateSolarScore(locationData)
-          setSolarData(solar)
+            const locationData = {
+              latitude,
+              longitude,
+              city: data.city,
+              state: data.state,
+              country: data.country,
+            }
 
-          setIsLoading(false)
+            setLocation(locationData)
+
+            // Calculate solar analysis
+            const analysis = calculateSolarAnalysis(locationData)
+            setSolarAnalysis(analysis)
+            setIsVisible(true)
+          } catch (error) {
+            console.error("Error getting location details:", error)
+          }
         },
         (error) => {
-          console.warn("Geolocation error:", error)
-          setIsLoading(false)
+          console.warn("Error getting location:", error.message)
         },
-        { timeout: 10000, enableHighAccuracy: false },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 300000, // 5 minutes
+        },
       )
-    } catch (error) {
-      console.warn("Location detection error:", error)
-      setIsLoading(false)
     }
-  }
 
-  const getLocationDetails = async (lat: number, lng: number): Promise<LocationData> => {
-    try {
-      // Mock location data - in real app, use Google Geocoding API
-      return {
-        latitude: lat,
-        longitude: lng,
-        city: "Austin",
-        state: "TX",
-        zipCode: "78701",
-      }
-    } catch (error) {
-      return { latitude: lat, longitude: lng }
+    getUserLocation()
+  }, [isDismissed])
+
+  const calculateSolarAnalysis = (location: LocationData): SolarAnalysis => {
+    // Calculate solar score based on latitude and state
+    const latitudeScore = Math.max(0, Math.min(100, 100 - Math.abs(location.latitude - 35) * 2))
+
+    // State-based incentive multipliers
+    const stateMultipliers: Record<string, number> = {
+      CA: 1.2, // California
+      TX: 1.1, // Texas
+      FL: 1.15, // Florida
+      NY: 1.1, // New York
+      AZ: 1.25, // Arizona
+      NV: 1.2, // Nevada
+      NC: 1.1, // North Carolina
+      NJ: 1.1, // New Jersey
     }
-  }
 
-  const calculateSolarScore = (location: LocationData): SolarData => {
-    // Mock solar calculation - in real app, use NREL API
-    const baseScore = 75 + Math.floor(Math.random() * 20)
+    const stateMultiplier = location.state ? stateMultipliers[location.state] || 1.0 : 1.0
+    const baseScore = latitudeScore * stateMultiplier
+    const finalScore = Math.min(100, Math.max(0, Math.round(baseScore)))
+
+    // Calculate estimates based on score
+    const annualProduction = Math.round(finalScore * 120 + 8000) // 8,000-20,000 kWh
+    const annualSavings = Math.round(annualProduction * 0.12) // $0.12/kWh average
+    const co2Reduction = Math.round(annualProduction * 0.0007 * 1000) // lbs CO2
+    const roiYears = Math.round((25000 / annualSavings) * 10) / 10 // Assuming $25k system
+
+    const incentives = []
+    if (finalScore >= 80) incentives.push("Federal Tax Credit", "State Rebates", "Net Metering")
+    else if (finalScore >= 60) incentives.push("Federal Tax Credit", "Net Metering")
+    else incentives.push("Federal Tax Credit")
 
     return {
-      score: baseScore,
-      factors: {
-        sunlight: 85 + Math.floor(Math.random() * 10),
-        roofOrientation: 80 + Math.floor(Math.random() * 15),
-        shading: 70 + Math.floor(Math.random() * 20),
-        incentives: 90 + Math.floor(Math.random() * 10),
-      },
-      estimatedSavings: {
-        monthly: 120 + Math.floor(Math.random() * 80),
-        annual: 1400 + Math.floor(Math.random() * 800),
-      },
-      systemSize: 6 + Math.floor(Math.random() * 4),
+      score: finalScore,
+      annualProduction,
+      annualSavings,
+      co2Reduction,
+      roiYears,
+      incentives,
     }
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 90) return "from-green-500 to-emerald-600"
-    if (score >= 80) return "from-yellow-500 to-orange-500"
-    if (score >= 70) return "from-orange-500 to-red-500"
-    return "from-red-500 to-red-700"
+    if (score >= 80) return "text-green-400"
+    if (score >= 60) return "text-yellow-400"
+    return "text-orange-400"
   }
 
-  const getScoreBadgeColor = (score: number) => {
-    if (score >= 90) return "bg-green-500/20 text-green-300 border-green-500/30"
-    if (score >= 80) return "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-    if (score >= 70) return "bg-orange-500/20 text-orange-300 border-orange-500/30"
-    return "bg-red-500/20 text-red-300 border-red-500/30"
+  const getScoreLabel = (score: number) => {
+    if (score >= 80) return "Excellent"
+    if (score >= 60) return "Good"
+    return "Fair"
   }
 
-  const handleGetStarted = () => {
-    // Track the click event
-    if (typeof window !== "undefined" && (window as any).trackEvent) {
-      ;(window as any).trackEvent("location_banner_cta_click", {
-        location: location,
-        solarScore: solarData?.score,
-        timestamp: Date.now(),
-      })
-    }
-    router.push("/pro-calculator/step-1")
-  }
-
-  if (isLoading) {
-    return (
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-gray-900/40 to-black/30 rounded-xl blur-xl"></div>
-        <Card className="relative bg-gradient-to-r from-orange-50/90 via-amber-50/90 to-orange-50/90 backdrop-blur-md border-orange-200/50 shadow-xl">
-          <CardContent className="p-6 text-center">
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <div className="w-4 h-4 bg-orange-400 rounded-full animate-pulse"></div>
-              <span className="text-gray-600">Locating your area...</span>
-            </div>
-            <p className="text-sm text-gray-500">
-              Analyzing sunlight exposure and yearly energy savings for your location.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (!location || !solarData) {
-    return null
-  }
+  if (!isVisible || isDismissed || !location || !solarAnalysis) return null
 
   return (
-    <div className="relative">
-      <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-gray-900/50 to-black/40 rounded-xl blur-2xl"></div>
-
-      <Card className="relative bg-gradient-to-r from-orange-50/95 via-amber-50/95 to-orange-50/95 backdrop-blur-md border-orange-200/50 shadow-2xl">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <div className="absolute inset-0 bg-orange-400/30 rounded-full blur-sm"></div>
-                <div className="relative bg-gradient-to-r from-orange-500 to-red-500 p-2 rounded-full">
-                  <MapPin className="w-4 h-4 text-white" />
-                </div>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800">
-                  {location.city}, {location.state}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
-                </p>
-              </div>
+    <div className="fixed bottom-4 left-4 right-4 z-50 max-w-md mx-auto">
+      <Card className="bg-slate-800/95 backdrop-blur-sm border-orange-500/30 shadow-2xl">
+        <CardContent className="p-4">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-orange-400" />
+              <span className="text-sm text-slate-300">
+                {location.city}, {location.state}
+              </span>
             </div>
-
-            <div className="text-center">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-orange-400/20 to-red-400/20 rounded-full blur-lg"></div>
-                <div
-                  className={`relative bg-gradient-to-r ${getScoreColor(solarData.score)} text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold shadow-lg`}
-                >
-                  {solarData.score}
-                </div>
-              </div>
-              <Badge className={`mt-2 ${getScoreBadgeColor(solarData.score)}`}>Solar Score</Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="h-6 w-6 p-0 text-slate-400 hover:text-orange-400"
+              >
+                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsDismissed(true)}
+                className="h-6 w-6 p-0 text-slate-400 hover:text-red-400"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-gray-800/10 to-black/10 rounded-lg blur-sm"></div>
-            <div className="relative bg-gradient-to-r from-orange-100/80 to-amber-100/80 rounded-lg p-4 border border-orange-200/30">
-              <div className="flex items-center space-x-2 mb-2">
-                <Sun className="w-4 h-4 text-orange-600" />
-                <span className="font-medium text-gray-800">🤖 AI Solar Analysis:</span>
+          {/* Solar Score */}
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-orange-400" />
+                <span className="text-white font-medium">Solar Score</span>
               </div>
-              <p className="text-sm text-gray-700">
-                Based on your property's conditions, you're projected to produce around{" "}
-                <span className="font-semibold text-green-600">
-                  {(solarData.systemSize * 1600).toLocaleString()} kWh/year
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`text-2xl font-bold ${getScoreColor(solarAnalysis.score)}`}>
+                  {solarAnalysis.score}
                 </span>
-                . That means you could save up to{" "}
-                <span className="text-green-600 font-semibold">
-                  ${solarData.estimatedSavings.monthly}–${solarData.estimatedSavings.monthly + 50} monthly
-                </span>{" "}
-                with a properly sized system. This puts your home in the top 15% of solar-qualified properties in your
-                area.
-              </p>
+                <Badge variant="outline" className="text-xs border-orange-500/30 text-orange-300">
+                  {getScoreLabel(solarAnalysis.score)}
+                </Badge>
+              </div>
             </div>
+            <Button size="sm" className="btn-orange">
+              Get Full Report
+            </Button>
           </div>
 
+          {/* Expanded Details */}
           {isExpanded && (
-            <div className="mt-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/5 via-gray-800/5 to-black/5 rounded-lg blur-sm"></div>
-                  <div className="relative bg-white/60 rounded-lg p-3 border border-orange-200/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Sunlight</span>
-                      <span className="font-semibold text-orange-600">{solarData.factors.sunlight}%</span>
-                    </div>
+            <div className="space-y-3 pt-3 border-t border-slate-700">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-orange-400" />
+                  <div>
+                    <div className="text-slate-400">Annual Production</div>
+                    <div className="text-white font-medium">{solarAnalysis.annualProduction.toLocaleString()} kWh</div>
                   </div>
                 </div>
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/5 via-gray-800/5 to-black/5 rounded-lg blur-sm"></div>
-                  <div className="relative bg-white/60 rounded-lg p-3 border border-orange-200/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Roof Angle</span>
-                      <span className="font-semibold text-orange-600">{solarData.factors.roofOrientation}%</span>
-                    </div>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-green-400" />
+                  <div>
+                    <div className="text-slate-400">Annual Savings</div>
+                    <div className="text-white font-medium">${solarAnalysis.annualSavings.toLocaleString()}</div>
                   </div>
                 </div>
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/5 via-gray-800/5 to-black/5 rounded-lg blur-sm"></div>
-                  <div className="relative bg-white/60 rounded-lg p-3 border border-orange-200/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Shading</span>
-                      <span className="font-semibold text-orange-600">{solarData.factors.shading}%</span>
-                    </div>
+                <div className="flex items-center gap-2">
+                  <Leaf className="h-4 w-4 text-green-400" />
+                  <div>
+                    <div className="text-slate-400">CO₂ Reduction</div>
+                    <div className="text-white font-medium">{solarAnalysis.co2Reduction.toLocaleString()} lbs</div>
                   </div>
                 </div>
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/5 via-gray-800/5 to-black/5 rounded-lg blur-sm"></div>
-                  <div className="relative bg-white/60 rounded-lg p-3 border border-orange-200/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Incentives</span>
-                      <span className="font-semibold text-orange-600">{solarData.factors.incentives}%</span>
-                    </div>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-blue-400" />
+                  <div>
+                    <div className="text-slate-400">Payback Period</div>
+                    <div className="text-white font-medium">{solarAnalysis.roiYears} years</div>
                   </div>
                 </div>
               </div>
 
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-gray-800/10 to-black/10 rounded-lg blur-sm"></div>
-                <div className="relative bg-gradient-to-r from-green-50/80 to-emerald-50/80 rounded-lg p-3 border border-green-200/30">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm text-gray-600">Estimated Annual Savings</span>
-                      <div className="font-bold text-green-600">
-                        ${solarData.estimatedSavings.annual.toLocaleString()}
-                      </div>
-                    </div>
-                    <TrendingUp className="w-6 h-6 text-green-600" />
-                  </div>
+              {/* Incentives */}
+              <div>
+                <div className="text-sm text-slate-400 mb-2">Available Incentives</div>
+                <div className="flex flex-wrap gap-1">
+                  {solarAnalysis.incentives.map((incentive, index) => (
+                    <Badge key={index} variant="outline" className="text-xs border-orange-500/30 text-orange-300">
+                      {incentive}
+                    </Badge>
+                  ))}
                 </div>
               </div>
             </div>
           )}
-
-          <div className="flex items-center justify-between mt-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-            >
-              {isExpanded ? (
-                <>
-                  Less Details <ChevronUp className="ml-1 w-4 h-4" />
-                </>
-              ) : (
-                <>
-                  More Details <ChevronDown className="ml-1 w-4 h-4" />
-                </>
-              )}
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-orange-600/20 to-red-600/20 rounded-lg blur-sm"></div>
-              <Button
-                onClick={handleGetStarted}
-                className="relative bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white shadow-lg"
-              >
-                Get Full Analysis
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

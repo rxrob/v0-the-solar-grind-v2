@@ -77,3 +77,40 @@ ALTER TABLE public.user_tracking DISABLE ROW LEVEL SECURITY;
 -- Grant permissions
 GRANT ALL ON public.user_tracking TO authenticated;
 GRANT ALL ON public.user_tracking TO anon;
+
+-- Create user tracking events table
+CREATE TABLE IF NOT EXISTS user_tracking_events (
+    id BIGSERIAL PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    event_data JSONB DEFAULT '{}',
+    session_id TEXT,
+    user_id UUID REFERENCES auth.users(id),
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    page_url TEXT,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_user_tracking_events_event_type ON user_tracking_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_user_tracking_events_session_id ON user_tracking_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_user_tracking_events_user_id ON user_tracking_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_tracking_events_timestamp ON user_tracking_events(timestamp);
+
+-- Enable Row Level Security
+ALTER TABLE user_tracking_events ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow inserts for all users (for anonymous tracking)
+CREATE POLICY "Allow insert for all users" ON user_tracking_events
+  FOR INSERT WITH CHECK (true);
+
+-- Create policy to allow users to view their own events
+CREATE POLICY "Users can view own events" ON user_tracking_events
+  FOR SELECT USING (auth.uid() = user_id OR user_id IS NULL);
+
+-- Grant permissions
+GRANT INSERT ON user_tracking_events TO anon;
+GRANT INSERT ON user_tracking_events TO authenticated;
+GRANT SELECT ON user_tracking_events TO authenticated;
+
+COMMENT ON TABLE user_tracking_events IS 'Stores user interaction and page view tracking events';

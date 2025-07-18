@@ -1,91 +1,148 @@
 "use client"
 
 import type React from "react"
+import { useEffect, useRef } from "react"
+import { usePathname } from "next/navigation"
 
-import { createContext, useContext, useEffect, useState } from "react"
-import { trackUserVisit, generateSessionId, getDeviceInfo, type UserTrackingData } from "@/lib/user-tracking"
-
-interface UserTrackingContextType {
-  sessionId: string
-  trackEvent: (eventType: string, eventData: any) => void
+interface TrackingEvent {
+  event_type: string
+  event_data?: Record<string, any>
+  session_id: string
+  timestamp: string
+  page_url: string
+  user_agent?: string
 }
-
-const UserTrackingContext = createContext<UserTrackingContextType | undefined>(undefined)
 
 export function UserTrackingProvider({ children }: { children: React.ReactNode }) {
-  const [sessionId, setSessionId] = useState<string>("")
+  const pathname = usePathname()
+  const sessionId = useRef<string>()
+  const lastPageView = useRef<string>()
 
+  // Generate session ID once
   useEffect(() => {
-    const initializeTracking = async () => {
-      try {
-        const newSessionId = generateSessionId()
-        setSessionId(newSessionId)
-
-        // Get user location if available
-        let locationData = null
-        if (navigator.geolocation) {
-          try {
-            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, {
-                timeout: 10000,
-                enableHighAccuracy: false,
-              })
-            })
-
-            locationData = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            }
-          } catch (error) {
-            console.log("Location not available:", error)
-          }
-        }
-
-        // Prepare tracking data
-        const trackingData: UserTrackingData = {
-          sessionId: newSessionId,
-          userAgent: navigator.userAgent,
-          location: locationData,
-          deviceInfo: getDeviceInfo(),
-          events: [],
-        }
-
-        // Track the visit
-        await trackUserVisit(trackingData)
-      } catch (error) {
-        console.warn("Failed to initialize tracking:", error)
-      }
+    if (!sessionId.current) {
+      sessionId.current = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     }
-
-    initializeTracking()
   }, [])
 
-  const trackEvent = (eventType: string, eventData: any) => {
-    try {
-      // Store event in localStorage for now
-      const existingData = localStorage.getItem("userTrackingData")
-      if (existingData) {
-        const data = JSON.parse(existingData)
-        data.events = data.events || []
-        data.events.push({
-          type: eventType,
-          data: eventData,
-          timestamp: Date.now(),
+  // Track page views
+  useEffect(() => {
+    if (!sessionId.current || lastPageView.current === pathname) return
+
+    lastPageView.current = pathname
+
+    const trackEvent = async (event: TrackingEvent) => {
+      try {
+        await fetch("/api/track-event", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(event),
         })
-        localStorage.setItem("userTrackingData", JSON.stringify(data))
+      } catch (error) {
+        console.warn("Failed to track event:", error)
       }
-    } catch (error) {
-      console.warn("Failed to track event:", error)
     }
-  }
 
-  return <UserTrackingContext.Provider value={{ sessionId, trackEvent }}>{children}</UserTrackingContext.Provider>
-}
+    // Track page view
+    trackEvent({
+      event_type: "page_view",
+      event_data: {
+        path: pathname,
+        referrer: document.referrer,
+        screen_resolution: `${screen.width}x${screen.height}`,
+        viewport_size: `${window.innerWidth}x${window.innerHeight}`,
+      },
+      session_id: sessionId.current,
+      timestamp: new Date().toISOString(),
+      page_url: window.location.href,
+      user_agent: navigator.userAgent,
+    })
 
-export function useUserTracking() {
-  const context = useContext(UserTrackingContext)
-  if (context === undefined) {
-    throw new Error("useUserTracking must be used within a UserTrackingProvider")
-  }
-  return context
+    // Track user visit (first page only)
+    if (pathname === "/") {
+      trackEvent({
+        event_type: "user_visit",
+        event_data: {
+          landing_page: pathname,
+          referrer: document.referrer,
+          user_agent: navigator.userAgent,
+          timestamp: new Date().toISOString(),
+        },
+        session_id: sessionId.current,
+        timestamp: new Date().toISOString(),
+        page_url: window.location.href,
+      })
+    }
+  }, [pathname])
+
+  // Track user interactions
+  useEffect(() => {
+    if (!sessionId.current) return
+
+    const trackInteraction = (event: MouseEvent | KeyboardEvent) => {
+      const target = event.target as HTMLElement
+      if (!target) return
+
+      // Track button clicks
+      if (target.tagName === "BUTTON" || target.closest("button")) {
+        const button = target.tagName === "BUTTON" ? target : target.closest("button")
+        const buttonText = button?.textContent?.trim() || "Unknown Button"
+
+        fetch("/api/track-event", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            event_type: "button_click",
+            event_data: {
+              button_text: buttonText,
+              element_id: button?.id,
+              element_class: button?.className,
+              page_path: pathname,
+            },
+            session_id: sessionId.current,
+            timestamp: new Date().toISOString(),
+            page_url: window.location.href,
+          }),
+        }).catch((error) => console.warn("Failed to track button click:", error))
+      }
+
+      // Track link clicks
+      if (target.tagName === "A" || target.closest("a")) {
+        const link = target.tagName === "A" ? target : target.closest("a")
+        const href = (link as HTMLAnchorElement)?.href
+        const linkText = link?.textContent?.trim() || "Unknown Link"
+
+        fetch("/api/track-event", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            event_type: "link_click",
+            event_data: {
+              link_text: linkText,
+              href: href,
+              element_id: link?.id,
+              page_path: pathname,
+            },
+            session_id: sessionId.current,
+            timestamp: new Date().toISOString(),
+            page_url: window.location.href,
+          }),
+        }).catch((error) => console.warn("Failed to track link click:", error))
+      }
+    }
+
+    document.addEventListener("click", trackInteraction)
+
+    return () => {
+      document.removeEventListener("click", trackInteraction)
+    }
+  }, [pathname])
+
+  return <>{children}</>
 }

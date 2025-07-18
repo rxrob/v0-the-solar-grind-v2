@@ -3,19 +3,26 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase-browser"
+import { createClient } from "@supabase/supabase-js"
 import type { SupabaseClient, User } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
 
 type SupabaseContext = {
-  supabase: SupabaseClient
+  supabase: SupabaseClient<Database>
   user: User | null
   loading: boolean
 }
 
 const Context = createContext<SupabaseContext | undefined>(undefined)
 
-export function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const [supabase] = useState(() => createClient())
+export default function SupabaseProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [supabase] = useState(() =>
+    createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!),
+  )
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -37,7 +44,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [supabase])
 
   return <Context.Provider value={{ supabase, user, loading }}>{children}</Context.Provider>
@@ -50,3 +59,5 @@ export const useSupabase = () => {
   }
   return context
 }
+
+export { SupabaseProvider }
