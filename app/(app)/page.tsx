@@ -1,217 +1,245 @@
-import AnimatedBG from "@/components/AnimatedBG"
-import { UserTrackingProvider } from "@/components/user-tracking-provider"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+"use client"
+
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calculator, Zap, TrendingUp, Shield, Users, Award } from "lucide-react"
+import {
+  Sun,
+  Calculator,
+  FileText,
+  Zap,
+  DollarSign,
+  MapPin,
+  TrendingUp,
+  Shield,
+  Clock,
+  Users,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react"
 import Link from "next/link"
+import { AnimatedBG } from "@/components/AnimatedBG"
+import { SolarLocationBanner } from "@/components/solar-location-banner"
+import { useTracking } from "@/components/user-tracking-provider"
 
 export default function HomePage() {
+  const { trackButtonClick, trackFeatureUsage } = useTracking()
+
+  const features = [
+    {
+      icon: Calculator,
+      title: "Advanced Solar Calculator",
+      description:
+        "Get precise solar estimates with our AI-powered calculator using real satellite data and local utility rates.",
+      href: "/pro-calculator",
+      badge: "Pro",
+      color: "from-orange-500 to-red-500",
+      delay: "0ms",
+    },
+    {
+      icon: FileText,
+      title: "Professional Reports",
+      description:
+        "Generate comprehensive solar reports with ROI analysis, financing options, and installation recommendations.",
+      href: "/reports",
+      badge: "New",
+      color: "from-yellow-500 to-orange-500",
+      delay: "100ms",
+    },
+    {
+      icon: MapPin,
+      title: "Location Intelligence",
+      description: "Analyze solar potential with precise location data, roof analysis, and local incentive programs.",
+      href: "/visual-analysis",
+      badge: "AI",
+      color: "from-orange-500 to-yellow-500",
+      delay: "200ms",
+    },
+    {
+      icon: TrendingUp,
+      title: "ROI Analytics",
+      description: "Track your solar investment performance with detailed analytics and savings projections.",
+      href: "/dashboard",
+      badge: "Pro",
+      color: "from-red-500 to-orange-500",
+      delay: "300ms",
+    },
+  ]
+
+  const stats = [
+    { icon: Users, value: "50K+", label: "Happy Customers" },
+    { icon: Zap, value: "1.2GW", label: "Solar Installed" },
+    { icon: DollarSign, value: "$500M", label: "Savings Generated" },
+    { icon: Shield, value: "99.9%", label: "Uptime" },
+  ]
+
   return (
-    <UserTrackingProvider>
-      <div className="min-h-screen bg-slate-900 animated-bg relative">
-        <AnimatedBG />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
+      {/* Animated Background */}
+      <AnimatedBG />
 
-        {/* Mist Overlay */}
-        <div className="absolute inset-0 mist-overlay pointer-events-none" />
+      {/* Floating Mist Overlays */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-20 left-10 w-96 h-96 bg-gradient-to-r from-orange-500/20 to-yellow-500/20 rounded-full blur-3xl animate-float" />
+        <div className="absolute top-40 right-20 w-80 h-80 bg-gradient-to-r from-yellow-500/15 to-orange-500/15 rounded-full blur-3xl animate-float-delayed" />
+        <div className="absolute bottom-20 left-1/3 w-72 h-72 bg-gradient-to-r from-orange-400/10 to-red-500/10 rounded-full blur-3xl animate-float-slow" />
+      </div>
 
-        {/* Content */}
-        <div className="relative z-10">
+      <div className="relative z-10">
+        <div className="container mx-auto px-4 py-12">
+          {/* Solar Location Banner */}
+          <SolarLocationBanner />
+
           {/* Hero Section */}
-          <section className="container mx-auto px-4 py-20 text-center">
-            <div className="max-w-4xl mx-auto">
-              <Badge className="mb-6 bg-orange-500/20 text-orange-300 border-orange-500/30">
-                ⚡ AI-Powered Solar Analysis
-              </Badge>
-
-              <h1 className="text-5xl md:text-7xl font-bold mb-6 orange-gradient orange-glow">The Solar Grind</h1>
-
-              <p className="text-xl md:text-2xl text-slate-300 mb-8 leading-relaxed">
-                Discover your property's solar potential with our advanced AI analysis. Get instant calculations,
-                detailed reports, and maximize your energy savings.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                <Link href="/pro-calculator">
-                  <Button size="lg" className="btn-orange px-8 py-4 text-lg">
-                    <Calculator className="mr-2 h-5 w-5" />
-                    Start Free Analysis
-                  </Button>
-                </Link>
-
-                <Link href="/pricing">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="px-8 py-4 text-lg border-orange-500/30 text-orange-300 hover:bg-orange-500/10 bg-transparent"
-                  >
-                    View Pricing
-                  </Button>
-                </Link>
-              </div>
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-orange-500/20 to-yellow-500/20 backdrop-blur-sm border border-orange-500/30 rounded-full px-4 py-2 mb-6">
+              <Sparkles className="h-4 w-4 text-orange-400" />
+              <span className="text-sm font-medium text-orange-300">AI-Powered Solar Intelligence</span>
             </div>
-          </section>
+
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent animate-gradient-x drop-shadow-2xl">
+              Solar Intelligence
+              <br />
+              <span className="text-4xl md:text-6xl bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                Reimagined
+              </span>
+            </h1>
+
+            <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
+              Harness the power of AI and satellite data to make informed solar decisions. Get precise calculations,
+              professional reports, and maximize your solar investment.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Button
+                asChild
+                size="lg"
+                className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white shadow-2xl hover:shadow-orange-500/25 transition-all duration-300 transform hover:scale-105 px-8 py-4 text-lg font-semibold animate-pulse-glow"
+                onClick={() => trackButtonClick("hero_cta_calculator", { source: "homepage_hero" })}
+              >
+                <Link href="/pro-calculator" className="flex items-center space-x-2">
+                  <Calculator className="h-5 w-5" />
+                  <span>Start Solar Analysis</span>
+                  <ArrowRight className="h-5 w-5" />
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="border-orange-500/50 text-orange-300 hover:bg-orange-500/10 hover:border-orange-400 backdrop-blur-sm px-8 py-4 text-lg font-semibold transition-all duration-300 bg-transparent"
+                onClick={() => trackButtonClick("hero_cta_demo", { source: "homepage_hero" })}
+              >
+                <Link href="/calculator" className="flex items-center space-x-2">
+                  <Sun className="h-5 w-5" />
+                  <span>Try Free Calculator</span>
+                </Link>
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats Section */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
+            {stats.map((stat, index) => (
+              <Card
+                key={index}
+                className="bg-white/5 backdrop-blur-sm border-orange-500/20 hover:border-orange-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10 hover:-translate-y-1"
+              >
+                <CardContent className="p-6 text-center">
+                  <stat.icon className="h-8 w-8 text-orange-400 mx-auto mb-3" />
+                  <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
+                  <div className="text-sm text-gray-400">{stat.label}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
           {/* Features Grid */}
-          <section className="container mx-auto px-4 py-20">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold mb-4 orange-gradient">Why Choose The Solar Grind?</h2>
-              <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-                Our platform combines cutting-edge technology with real-world data to give you the most accurate solar
-                analysis available.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <Card className="bg-slate-800/50 border-slate-700 hover-lift card-glow">
-                <CardHeader>
-                  <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center mb-4">
-                    <Zap className="h-6 w-6 text-orange-400" />
+          <div className="grid md:grid-cols-2 gap-8 mb-16">
+            {features.map((feature, index) => (
+              <Card
+                key={index}
+                className="group bg-white/5 backdrop-blur-sm border-orange-500/20 hover:border-orange-400/40 transition-all duration-500 hover:shadow-2xl hover:shadow-orange-500/20 hover:-translate-y-2 animate-float-up cursor-pointer"
+                style={{ animationDelay: feature.delay }}
+                onClick={() => {
+                  trackFeatureUsage("feature_card_click", {
+                    feature: feature.title,
+                    href: feature.href,
+                  })
+                  window.location.href = feature.href
+                }}
+              >
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div
+                      className={`p-3 rounded-xl bg-gradient-to-r ${feature.color} shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}
+                    >
+                      <feature.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className="bg-orange-500/20 text-orange-300 border-orange-500/30 group-hover:bg-orange-500/30 transition-all duration-300"
+                    >
+                      {feature.badge}
+                    </Badge>
                   </div>
-                  <CardTitle className="text-white">AI-Powered Analysis</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Advanced machine learning algorithms analyze your property's solar potential
-                  </CardDescription>
+                  <CardTitle className="text-xl text-white group-hover:text-orange-300 transition-colors duration-300">
+                    {feature.title}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2 text-slate-300">
-                    <li>• Roof analysis & shading detection</li>
-                    <li>• Weather pattern integration</li>
-                    <li>• Optimal panel placement</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-800/50 border-slate-700 hover-lift card-glow">
-                <CardHeader>
-                  <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center mb-4">
-                    <TrendingUp className="h-6 w-6 text-orange-400" />
-                  </div>
-                  <CardTitle className="text-white">Financial Modeling</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Detailed ROI calculations and savings projections
+                  <CardDescription className="text-gray-300 group-hover:text-gray-200 transition-colors duration-300 leading-relaxed">
+                    {feature.description}
                   </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-slate-300">
-                    <li>• 25-year savings forecast</li>
-                    <li>• Incentive & rebate tracking</li>
-                    <li>• Payback period analysis</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-800/50 border-slate-700 hover-lift card-glow">
-                <CardHeader>
-                  <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center mb-4">
-                    <Shield className="h-6 w-6 text-orange-400" />
+                  <div className="mt-4 flex items-center text-orange-400 group-hover:text-orange-300 transition-colors duration-300">
+                    <span className="text-sm font-medium">Learn more</span>
+                    <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
                   </div>
-                  <CardTitle className="text-white">Professional Reports</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Comprehensive PDF reports for homeowners and installers
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-slate-300">
-                    <li>• Detailed system specifications</li>
-                    <li>• Installation recommendations</li>
-                    <li>• Permit-ready documentation</li>
-                  </ul>
                 </CardContent>
               </Card>
-
-              <Card className="bg-slate-800/50 border-slate-700 hover-lift card-glow">
-                <CardHeader>
-                  <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center mb-4">
-                    <Users className="h-6 w-6 text-orange-400" />
-                  </div>
-                  <CardTitle className="text-white">Multi-User Access</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Perfect for solar installers and energy consultants
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-slate-300">
-                    <li>• Client project management</li>
-                    <li>• Team collaboration tools</li>
-                    <li>• White-label reports</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-800/50 border-slate-700 hover-lift card-glow">
-                <CardHeader>
-                  <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center mb-4">
-                    <Award className="h-6 w-6 text-orange-400" />
-                  </div>
-                  <CardTitle className="text-white">Industry Leading</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Trusted by thousands of solar professionals
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-slate-300">
-                    <li>• 99.9% uptime guarantee</li>
-                    <li>• Real-time data updates</li>
-                    <li>• 24/7 customer support</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-800/50 border-slate-700 hover-lift card-glow">
-                <CardHeader>
-                  <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center mb-4">
-                    <Calculator className="h-6 w-6 text-orange-400" />
-                  </div>
-                  <CardTitle className="text-white">Easy Integration</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Seamlessly integrate with your existing workflow
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-slate-300">
-                    <li>• API access available</li>
-                    <li>• Export to popular formats</li>
-                    <li>• Custom branding options</li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
+            ))}
+          </div>
 
           {/* CTA Section */}
-          <section className="container mx-auto px-4 py-20">
-            <div className="max-w-4xl mx-auto text-center">
-              <Card className="bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border-orange-500/30 card-glow">
-                <CardContent className="p-12">
-                  <h2 className="text-4xl font-bold mb-6 orange-gradient">Ready to Go Solar?</h2>
-                  <p className="text-xl text-slate-300 mb-8">
-                    Join thousands of homeowners and professionals who trust The Solar Grind for accurate solar analysis
-                    and financial modeling.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Link href="/pro-calculator">
-                      <Button size="lg" className="btn-orange px-8 py-4 text-lg">
-                        <Calculator className="mr-2 h-5 w-5" />
-                        Start Your Analysis
-                      </Button>
+          <Card className="bg-gradient-to-r from-orange-500/10 to-yellow-500/10 backdrop-blur-sm border-orange-500/30 shadow-2xl">
+            <CardContent className="p-12 text-center">
+              <div className="max-w-2xl mx-auto">
+                <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Go Solar?</h2>
+                <p className="text-xl text-gray-300 mb-8">
+                  Join thousands of homeowners who have made the switch to clean, renewable energy. Start your solar
+                  journey today with our professional analysis.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white shadow-2xl hover:shadow-orange-500/25 transition-all duration-300 transform hover:scale-105 px-8 py-4 text-lg font-semibold"
+                    onClick={() => trackButtonClick("cta_get_started", { source: "homepage_bottom" })}
+                  >
+                    <Link href="/pro-calculator" className="flex items-center space-x-2">
+                      <Calculator className="h-5 w-5" />
+                      <span>Get Started Now</span>
                     </Link>
-                    <Link href="/dashboard">
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="px-8 py-4 text-lg border-orange-500/30 text-orange-300 hover:bg-orange-500/10 bg-transparent"
-                      >
-                        View Dashboard
-                      </Button>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="border-orange-500/50 text-orange-300 hover:bg-orange-500/10 hover:border-orange-400 backdrop-blur-sm px-8 py-4 text-lg font-semibold bg-transparent"
+                    onClick={() => trackButtonClick("cta_learn_more", { source: "homepage_bottom" })}
+                  >
+                    <Link href="/pricing" className="flex items-center space-x-2">
+                      <Clock className="h-5 w-5" />
+                      <span>View Pricing</span>
                     </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </UserTrackingProvider>
+    </div>
   )
 }
