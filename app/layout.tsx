@@ -1,31 +1,38 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import "./globals.css"
+import { AnalyticsProvider } from "@/components/analytics-provider"
 import { ThemeProvider } from "@/components/theme-provider"
+import { UserTrackingProvider } from "@/components/user-tracking-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { Inter } from "next/font/google"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "The Solar Grind - AI-Powered Solar Analysis Platform",
-  description: "Get instant, accurate solar analysis with our AI-powered system. Professional reports in seconds.",
-  keywords: "solar analysis, AI solar, automated solar assessment, solar calculator, solar reports",
-    generator: 'v0.dev'
+  title: "v0 App",
+  description: "Created with v0",
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode
-}) {
+}>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          {children}
-          <Toaster />
-        </ThemeProvider>
+        <AnalyticsProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <UserTrackingProvider>
+              <div className="relative flex min-h-screen flex-col">
+                <Toaster />
+                {children}
+              </div>
+            </UserTrackingProvider>
+          </ThemeProvider>
+        </AnalyticsProvider>
       </body>
     </html>
   )

@@ -557,10 +557,10 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Solar Score Section */}
+        {/* Solar Score Section - REMOVED THE POPUP CONTENT BUT KEPT THE SECTION */}
         {location && (
           <section className="container mx-auto px-4 py-16 text-center">
-            {/* Location Display */}
+            {/* Location Display - Simple text only, no popup */}
             <div className="mb-8">
               <div className="flex items-center justify-center text-slate-300 mb-2">
                 <MapPin className="w-4 h-4 mr-2" />
@@ -569,14 +569,6 @@ export default function HomePage() {
                   {location.state && `, ${location.state}`}
                   {location.country && location.country !== "US" && `, ${location.country}`}
                 </span>
-              </div>
-              <div className="text-sm text-slate-500">
-                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                {location.source && (
-                  <span className="ml-2 text-xs text-slate-600">
-                    ({location.source === "google" ? "Google Maps" : "Solar Estimated"})
-                  </span>
-                )}
               </div>
             </div>
 

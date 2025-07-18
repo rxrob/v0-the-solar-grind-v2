@@ -2,68 +2,90 @@
 
 import type React from "react"
 
-import { useEffect } from "react"
-import { trackUserVisit, trackEvent, getSessionId, getDeviceInfo } from "@/lib/user-tracking"
-import { SolarLocationBanner } from "./solar-location-banner"
+import { createContext, useContext, useEffect, useState } from "react"
+import { trackUserVisit, generateSessionId, getDeviceInfo, type UserTrackingData } from "@/lib/user-tracking"
+
+interface UserTrackingContextType {
+  sessionId: string
+  trackEvent: (eventType: string, eventData: any) => void
+}
+
+const UserTrackingContext = createContext<UserTrackingContextType | undefined>(undefined)
 
 export function UserTrackingProvider({ children }: { children: React.ReactNode }) {
+  const [sessionId, setSessionId] = useState<string>("")
+
   useEffect(() => {
+    const initializeTracking = async () => {
+      try {
+        const newSessionId = generateSessionId()
+        setSessionId(newSessionId)
+
+        // Get user location if available
+        let locationData = null
+        if (navigator.geolocation) {
+          try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                timeout: 10000,
+                enableHighAccuracy: false,
+              })
+            })
+
+            locationData = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            }
+          } catch (error) {
+            console.log("Location not available:", error)
+          }
+        }
+
+        // Prepare tracking data
+        const trackingData: UserTrackingData = {
+          sessionId: newSessionId,
+          userAgent: navigator.userAgent,
+          location: locationData,
+          deviceInfo: getDeviceInfo(),
+          events: [],
+        }
+
+        // Track the visit
+        await trackUserVisit(trackingData)
+      } catch (error) {
+        console.warn("Failed to initialize tracking:", error)
+      }
+    }
+
     initializeTracking()
-    setupGlobalTracking()
   }, [])
 
-  const initializeTracking = async () => {
+  const trackEvent = (eventType: string, eventData: any) => {
     try {
-      const sessionId = getSessionId()
-      const deviceInfo = getDeviceInfo()
-
-      const trackingData = {
-        sessionId,
-        userAgent: navigator.userAgent,
-        deviceInfo,
-        events: [
-          {
-            type: "page_visit",
-            data: { page: window.location.pathname },
-            timestamp: Date.now(),
-          },
-        ],
+      // Store event in localStorage for now
+      const existingData = localStorage.getItem("userTrackingData")
+      if (existingData) {
+        const data = JSON.parse(existingData)
+        data.events = data.events || []
+        data.events.push({
+          type: eventType,
+          data: eventData,
+          timestamp: Date.now(),
+        })
+        localStorage.setItem("userTrackingData", JSON.stringify(data))
       }
-
-      const result = await trackUserVisit(trackingData)
-      console.log("User tracking initialized:", result)
     } catch (error) {
-      console.warn("Failed to initialize tracking:", error)
+      console.warn("Failed to track event:", error)
     }
   }
 
-  const setupGlobalTracking = () => {
-    // Make trackEvent available globally
-    ;(window as any).trackEvent = trackEvent
+  return <UserTrackingContext.Provider value={{ sessionId, trackEvent }}>{children}</UserTrackingContext.Provider>
+}
 
-    // Track page visibility changes
-    document.addEventListener("visibilitychange", () => {
-      trackEvent("visibility_change", {
-        hidden: document.hidden,
-        timestamp: Date.now(),
-      })
-    })
-
-    // Track before page unload
-    window.addEventListener("beforeunload", () => {
-      trackEvent("page_unload", {
-        timeOnPage: Date.now() - performance.timing.navigationStart,
-        timestamp: Date.now(),
-      })
-    })
+export function useUserTracking() {
+  const context = useContext(UserTrackingContext)
+  if (context === undefined) {
+    throw new Error("useUserTracking must be used within a UserTrackingProvider")
   }
-
-  return (
-    <>
-      {children}
-      <div className="fixed top-20 left-4 right-4 z-40 md:left-auto md:right-4 md:w-96">
-        <SolarLocationBanner />
-      </div>
-    </>
-  )
+  return context
 }
