@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [])
 
-  const value = useMemo(
+  const contextValue = useMemo(
     () => ({
       user,
       session,
@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [user, session, isLoading],
   )
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = (): AuthContextType => {
