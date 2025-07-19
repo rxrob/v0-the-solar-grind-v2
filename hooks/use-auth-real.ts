@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from "react"
+import React, { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from "react"
 import { supabase } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
 
@@ -54,7 +54,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [user, session, isLoading],
   )
 
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  // Using React.createElement to bypass the JSX parser for this specific line,
+  // which seems to be the source of the persistent build error.
+  return React.createElement(AuthContext.Provider, { value: contextValue }, children)
 }
 
 export const useAuth = (): AuthContextType => {
