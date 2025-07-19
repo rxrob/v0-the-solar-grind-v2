@@ -10,10 +10,15 @@ class UserTracker {
   constructor() {
     this.supabase = createClient()
     this.sessionId = this.generateSessionId()
-    this.gatherInitialInfo()
+    if (typeof window !== "undefined") {
+      this.gatherInitialInfo()
+    }
   }
 
   private generateSessionId(): string {
+    if (typeof window === "undefined") {
+      return `server-session_${Date.now()}`
+    }
     try {
       const existingId = sessionStorage.getItem("tracking_session_id")
       if (existingId) {
@@ -24,12 +29,19 @@ class UserTracker {
       return newId
     } catch (e) {
       const fallbackId = `fallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      sessionStorage.setItem("tracking_session_id", fallbackId)
+      try {
+        sessionStorage.setItem("tracking_session_id", fallbackId)
+      } catch (sessionError) {
+        console.error("Could not set sessionStorage item:", sessionError)
+      }
       return fallbackId
     }
   }
 
   private async gatherInitialInfo() {
+    if (typeof window === "undefined") {
+      return
+    }
     this.userInfo = {
       screen_resolution: `${window.screen.width}x${window.screen.height}`,
       language: navigator.language,
@@ -45,6 +57,10 @@ class UserTracker {
   }
 
   async trackEvent(eventType: string, eventData: Record<string, any> = {}) {
+    if (typeof window === "undefined") {
+      return
+    }
+
     if (!this.sessionId) {
       this.sessionId = this.generateSessionId()
     }
@@ -80,6 +96,7 @@ class UserTracker {
   }
 
   trackPageView(page?: string) {
+    if (typeof window === "undefined") return
     this.trackEvent("page_view", { page: page || window.location.pathname })
   }
 
