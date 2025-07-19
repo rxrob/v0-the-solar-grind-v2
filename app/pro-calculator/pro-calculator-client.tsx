@@ -44,7 +44,6 @@ import {
 } from "lucide-react"
 import { useProCalculatorStore } from "@/lib/store"
 import type { google } from "google-maps"
-import html2pdf from "html2pdf.js"
 
 const libraries: "places"[] = ["places"]
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -348,7 +347,8 @@ export default function ProCalculatorClient({ googleMapsApiKey }: { googleMapsAp
     }
   }, [systemData.systemSizeKw, systemData.annualProductionKwh])
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    const html2pdf = (await import("html2pdf.js")).default
     if (pdfRef.current) {
       const opt = {
         margin: 0.5,
