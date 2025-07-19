@@ -9,22 +9,34 @@ export function cn(...inputs: ClassValue[]) {
  * Constructs a full, absolute URL for a given path.
  * This is essential for features like OAuth redirects and server-side rendering
  * where the application needs to know its own public URL.
+ * This function is designed to be robust for Vercel's build environment.
  *
  * @param {string} [path=""] - The path to append to the base URL (e.g., "/dashboard").
  * @returns {string} The complete absolute URL.
  */
-export const getURL = (path = "") => {
-  // Determine the base URL using Vercel's system environment variables.
-  // `NEXT_PUBLIC_SITE_URL` is the preferred, user-set variable for the production domain.
-  // `NEXT_PUBLIC_VERCEL_URL` is automatically set by Vercel for preview deployments.
-  // Fallback to localhost for local development.
-  const baseURL =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "http://localhost:3000")
+export function getURL(path = ""): string {
+  // First, try to get the site URL from the user-defined environment variable.
+  // This is the most reliable way to get the production domain.
+  let baseURL = process.env.NEXT_PUBLIC_SITE_URL
 
-  // Use the native URL constructor for robust and safe URL creation.
-  // This handles trailing slashes and other edge cases automatically.
-  return new URL(path, baseURL).toString()
+  // If the site URL isn't set, try to use the Vercel-provided URL.
+  // This is useful for preview deployments.
+  if (!baseURL) {
+    baseURL = process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : ""
+  }
+
+  // As a last resort, for local development, use localhost.
+  if (!baseURL) {
+    baseURL = "http://localhost:3000"
+  }
+
+  // Normalize the base URL to ensure it doesn't have a trailing slash.
+  const normalizedBaseURL = baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL
+
+  // Normalize the path to ensure it has a leading slash.
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`
+
+  return `${normalizedBaseURL}${normalizedPath}`
 }
 
 /**
@@ -33,7 +45,7 @@ export const getURL = (path = "") => {
  * @param path - The path to append to the base URL.
  * @returns The full absolute URL.
  */
-export function absoluteUrl(path: string) {
+export function absoluteUrl(path: string): string {
   return getURL(path)
 }
 
