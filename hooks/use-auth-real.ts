@@ -2,13 +2,12 @@
 
 import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from "react"
 import { supabase } from "@/lib/supabase/client"
-import type { User, Session, SupabaseClient } from "@supabase/supabase-js"
+import type { User, Session } from "@supabase/supabase-js"
 
 type AuthContextType = {
   user: User | null
   session: Session | null
   isLoading: boolean
-  supabase: SupabaseClient
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -51,15 +50,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       session,
       isLoading,
-      supabase,
     }),
     [user, session, isLoading],
   )
 
-  // By handling the loading state *before* the main return, we provide a much
-  // simpler JSX structure to the build parser, which will resolve the error.
   if (isLoading) {
-    return null // Or a loading component, but null is safest for fixing the build.
+    // Returning a simple loader or null during the initial loading phase.
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500"></div>
+      </div>
+    )
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
