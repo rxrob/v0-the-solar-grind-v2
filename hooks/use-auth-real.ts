@@ -41,14 +41,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [])
 
-  const value = {
-    user,
-    session,
-    isLoading,
-    supabase,
-  }
-
-  return <AuthContext.Provider value={value}>{!isLoading && children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, session, isLoading, supabase }}>{!isLoading && children}</AuthContext.Provider>
+  )
 }
 
 export const useAuth = (): AuthContextType => {
@@ -59,5 +54,5 @@ export const useAuth = (): AuthContextType => {
   return context
 }
 
-// Alias for backwards compatibility with previous error messages
+// Alias for backwards compatibility
 export const useAuthReal = useAuth
