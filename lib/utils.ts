@@ -6,31 +6,25 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Constructs an absolute URL for the given path.
- * This function is designed to be robust for Vercel deployments and local development.
- * @param path - The path to append to the base URL. Defaults to an empty string.
- * @returns The full absolute URL.
+ * Constructs a full, absolute URL for a given path.
+ * This is essential for features like OAuth redirects and server-side rendering
+ * where the application needs to know its own public URL.
+ *
+ * @param {string} [path=""] - The path to append to the base URL (e.g., "/dashboard").
+ * @returns {string} The complete absolute URL.
  */
 export const getURL = (path = "") => {
-  // 1. Attempt to use the user-defined site URL from environment variables.
-  //    This is the most reliable method for production.
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  // Determine the base URL using Vercel's system environment variables.
+  // `NEXT_PUBLIC_SITE_URL` is the preferred, user-set variable for the production domain.
+  // `NEXT_PUBLIC_VERCEL_URL` is automatically set by Vercel for preview deployments.
+  // Fallback to localhost for local development.
+  const baseURL =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "http://localhost:3000")
 
-  // 2. Fallback to VERCEL_URL, which is automatically set by Vercel in deployments.
-  //    This is ideal for preview deployments where the URL is dynamic.
-  const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-
-  // 3. As a final fallback for local development, use localhost.
-  const localUrl = "http://localhost:3000"
-
-  // Determine the base URL, prioritizing the explicit site URL, then Vercel's URL.
-  const baseUrl = siteUrl || (vercelUrl ? `https://${vercelUrl}` : localUrl)
-
-  // Use the native URL constructor to safely join the base URL and the path.
+  // Use the native URL constructor for robust and safe URL creation.
   // This handles trailing slashes and other edge cases automatically.
-  const absoluteUrl = new URL(path, baseUrl).toString()
-
-  return absoluteUrl
+  return new URL(path, baseURL).toString()
 }
 
 /**
@@ -39,6 +33,24 @@ export const getURL = (path = "") => {
  * @param path - The path to append to the base URL.
  * @returns The full absolute URL.
  */
-export const absoluteUrl = (path: string) => {
+export function absoluteUrl(path: string) {
   return getURL(path)
+}
+
+export function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount)
+}
+
+export function formatNumber(num: number, decimals = 0) {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(num)
+}
+
+export function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
