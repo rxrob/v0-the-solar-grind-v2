@@ -20,12 +20,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const getInitialSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user ?? null)
-      setIsLoading(false)
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        setSession(session)
+        setUser(session?.user ?? null)
+      } catch (error) {
+        console.error("Error getting initial session:", error)
+      } finally {
+        setIsLoading(false)
+      }
     }
 
     getInitialSession()
@@ -51,7 +56,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [user, session, isLoading],
   )
 
-  return <AuthContext.Provider value={value}>{!isLoading && children}</AuthContext.Provider>
+  // By handling the loading state *before* the main return, we provide a much
+  // simpler JSX structure to the build parser, which will resolve the error.
+  if (isLoading) {
+    return null // Or a loading component, but null is safest for fixing the build.
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = (): AuthContextType => {
