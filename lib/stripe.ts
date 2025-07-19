@@ -1,9 +1,20 @@
 import Stripe from "stripe"
+import { loadStripe, type Stripe as StripeClient } from "@stripe/stripe-js"
 
+// Server-side Stripe instance for backend operations
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-06-20",
   typescript: true,
 })
+
+// Client-side Stripe.js loader
+let stripePromise: Promise<StripeClient | null>
+export const getStripe = () => {
+  if (!stripePromise) {
+    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+  }
+  return stripePromise
+}
 
 export const getStripeCustomer = async (email: string, name?: string) => {
   const customers = await stripe.customers.list({

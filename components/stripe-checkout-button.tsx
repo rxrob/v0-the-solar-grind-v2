@@ -1,98 +1,73 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
-import useAuthReal from "@/hooks/use-auth-real"
-import { Loader2, CreditCard } from "lucide-react"
+import { useUser } from "@supabase/auth-helpers-react"
+import { useEffect, useState } from "react"
+import type { Price, Product } from "@/types"
+import { getStripe } from "@/utils/stripe"
+import { supabase } from "@/lib/supabase/client"
 
 interface StripeCheckoutButtonProps {
-  priceId: string
-  mode?: "subscription" | "payment"
-  children: React.ReactNode
-  className?: string
-  disabled?: boolean
+  product: Product
+  prices: Price[]
 }
 
-export function StripeCheckoutButton({
-  priceId,
-  mode = "subscription",
-  children,
-  className,
-  disabled = false,
-}: StripeCheckoutButtonProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
-  const { user, isAuthenticated } = useAuthReal()
+const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({ product, prices }) => {
+  const { isLoading, user } = useUser()
+  const [priceId, setPriceId] = useState<string>("")
+
+  useEffect(() => {
+    if (prices.length > 0) {
+      setPriceId(prices[0].id)
+    }
+  }, [prices])
 
   const handleCheckout = async () => {
-    if (!isAuthenticated || !user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to continue with your purchase.",
-        variant: "destructive",
-      })
+    if (!user) {
+      // Redirect to sign-in page or show a message
+      console.error("User not authenticated")
       return
     }
 
-    setIsLoading(true)
+    if (!priceId) {
+      console.error("Price ID not found")
+      return
+    }
 
     try {
-      const response = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          priceId,
-          userId: user.id,
-          mode,
-        }),
-      })
+      const stripe = await getStripe()
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create checkout session")
+      if (!stripe) {
+        console.error("Stripe is not initialized")
+        return
       }
 
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        throw new Error("No checkout URL received")
+      const { data, error } = await supabase.functions.invoke("create-checkout-session", {
+        body: { price: priceId, product_id: product.id },
+      })
+
+      if (error) {
+        console.error("Error creating checkout session:", error)
+        return
+      }
+
+      if (data?.url) {
+        stripe.redirectToCheckout({ sessionId: data.session.id })
       }
     } catch (error) {
-      console.error("❌ Checkout error:", error)
-      toast({
-        title: "Checkout Error",
-        description: error instanceof Error ? error.message : "Failed to start checkout process",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+      console.error("Error during checkout:", error)
     }
   }
 
   return (
-    <Button onClick={handleCheckout} disabled={disabled || isLoading} className={className}>
-      {isLoading ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Processing...
-        </>
-      ) : (
-        <>
-          <CreditCard className="mr-2 h-4 w-4" />
-          {children}
-        </>
-      )}
-    </Button>
+    <button
+      className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+      onClick={handleCheckout}
+      disabled={isLoading || !priceId}
+    >
+      {isLoading ? "Loading..." : "Checkout"}
+    </button>
   )
 }
 
-// Named export
-
-// Default export
 export default StripeCheckoutButton

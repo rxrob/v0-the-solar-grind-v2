@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Google Maps API key is not configured" }, { status: 500 })
   }
 
-  const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=19&size=600x400&maptype=satellite&key=${apiKey}`
+  const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=21&size=600x400&maptype=satellite&key=${apiKey}`
 
   try {
     const response = await fetch(url)

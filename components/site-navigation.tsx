@@ -1,102 +1,117 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Sun, Menu } from "lucide-react"
+import { Menu, Sun } from "lucide-react"
+import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
+import { useEffect, useState } from "react"
+import type { User } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/client"
+import { ModeToggle } from "./mode-toggle"
 
-export function SiteNavigation() {
-  const [isOpen, setIsOpen] = useState(false)
-  const router = useRouter()
+const navLinks = [{ href: "/pro-calculator", label: "Pro Calculator" }]
+
+export default function SiteNavigation() {
+  const pathname = usePathname()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
+
+  useEffect(() => {
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
+    }
+    getUser()
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
+  }, [supabase])
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-slate-900/60">
-      <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center space-x-2">
-          <Sun className="h-6 w-6 text-yellow-500" />
-          <span className="text-xl font-bold text-white">The Solar Grind</span>
-        </Link>
-
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center space-x-8">
-          <Link href="/pricing" className="text-slate-300 hover:text-white transition-colors duration-200">
-            Pricing
+    <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-transparent backdrop-blur-sm">
+      <div className="container flex h-16 max-w-screen-2xl items-center">
+        <div className="mr-4 hidden md:flex">
+          <Link href="/" className="mr-6 flex items-center space-x-2">
+            <Sun className="h-6 w-6 text-orange-400" />
+            <span className="hidden font-bold sm:inline-block">The Solar Grind</span>
           </Link>
-          <Link href="/pro-calculator" className="text-slate-300 hover:text-white transition-colors duration-200">
-            Pro Calculator
-          </Link>
-        </div>
-
-        {/* Desktop Auth Buttons */}
-        <div className="hidden md:flex items-center space-x-3">
-          <Button
-            onClick={() => router.push("/login")}
-            variant="ghost"
-            className="text-slate-300 hover:text-white hover:bg-slate-800"
-          >
-            Log In
-          </Button>
-          <Button
-            onClick={() => router.push("/signup")}
-            className="bg-white hover:bg-gray-100 text-slate-900 font-medium"
-          >
-            Sign Up
-          </Button>
-          <Button variant="ghost" size="icon" className="text-slate-300 hover:text-white hover:bg-slate-800">
-            <Sun className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {/* Mobile Navigation */}
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild className="md:hidden">
-            <Button variant="ghost" size="icon" className="text-slate-300">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-80 bg-slate-900 border-slate-800">
-            <div className="flex flex-col space-y-4 mt-8">
+          <nav className="flex items-center gap-6 text-sm">
+            {navLinks.map((link) => (
               <Link
-                href="/pricing"
-                onClick={() => setIsOpen(false)}
-                className="text-slate-300 hover:text-white transition-colors duration-200 p-3 rounded-lg hover:bg-slate-800"
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "transition-colors hover:text-foreground/80",
+                  pathname === link.href ? "text-foreground" : "text-foreground/60",
+                )}
               >
-                Pricing
+                {link.label}
               </Link>
-              <Link
-                href="/pro-calculator"
-                onClick={() => setIsOpen(false)}
-                className="text-slate-300 hover:text-white transition-colors duration-200 p-3 rounded-lg hover:bg-slate-800"
-              >
-                Pro Calculator
-              </Link>
-              <div className="pt-4 border-t border-slate-800 space-y-3">
-                <Button
-                  onClick={() => {
-                    router.push("/login")
-                    setIsOpen(false)
-                  }}
-                  variant="ghost"
-                  className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800"
-                >
-                  Log In
+            ))}
+          </nav>
+        </div>
+        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
                 </Button>
-                <Button
-                  onClick={() => {
-                    router.push("/signup")
-                    setIsOpen(false)
-                  }}
-                  className="w-full bg-white hover:bg-gray-100 text-slate-900 font-medium"
-                >
-                  Sign Up
+              </SheetTrigger>
+              <SheetContent side="left" className="bg-[#0a0a1a]">
+                <nav className="grid gap-6 text-lg font-medium">
+                  <Link href="/" className="flex items-center gap-2 text-lg font-semibold">
+                    <Sun className="h-6 w-6 text-orange-400" />
+                    <span>The Solar Grind</span>
+                  </Link>
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={cn(
+                        "transition-colors hover:text-foreground",
+                        pathname === link.href ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
+          <div className="flex items-center gap-4">
+            {loading ? (
+              <div className="h-10 w-40 animate-pulse rounded-md bg-white/10" />
+            ) : user ? (
+              <Button asChild>
+                <Link href="/dashboard">Dashboard</Link>
+              </Button>
+            ) : (
+              <div className="hidden items-center gap-4 sm:flex">
+                <Button variant="ghost" asChild>
+                  <Link href="/login">Log In</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/signup">Sign Up</Link>
                 </Button>
               </div>
-            </div>
-          </SheetContent>
-        </Sheet>
+            )}
+            <ModeToggle />
+          </div>
+        </div>
       </div>
-    </nav>
+    </header>
   )
 }

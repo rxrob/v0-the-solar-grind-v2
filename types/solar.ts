@@ -131,7 +131,7 @@ export interface SolarCalculation {
   projectId?: string
   calculationType: CalculationType
   inputData: SolarCalculationInput
-  resultData: SolarCalculationResult | AdvancedSolarAnalysis | ProSolarAnalysis
+  resultData: SolarCalculationResult | AdvancedSolarAnalysis | ProSolarAnalysis | SystemSizingResult
   createdAt: string
 }
 
@@ -444,6 +444,112 @@ export interface SolarProgram {
   notes: string
 }
 
+export interface SolarProgramInfo {
+  rateType: "netMetering" | "buyback" | "avoidedCost"
+  buybackRatePerkWh: number
+  exportCreditRatePerkWh?: number
+  monthlyCustomerFee: number
+  solarFeeMonthly: number
+  notes: string
+}
+
+export interface UtilityDetectionResult {
+  detectedUtility: string | null
+  confidence: "High" | "Medium" | "Low" | "None"
+  method: "ZIP" | "OCR" | "Address Keyword" | "None"
+  warnings: string[]
+}
+
+// Climate Analysis Types
+export interface ClimateAnalysis {
+  averageIrradiance: number
+  peakSunHours: number
+  temperatureCorrectionFactor: number
+  weatherAdjustmentFactor: number
+  degradationRate: number
+  seasonalVariation: number[]
+  solarPotential: string
+  climateZone: string
+}
+
+// System Sizing Interfaces
+export interface SystemSizingInputs {
+  // Location & Site
+  address: string
+  latitude: number
+  longitude: number
+  elevation: number
+  climateData?: ClimateAnalysis
+
+  // Roof & Shading
+  roofAzimuth: number
+  roofTilt: number
+  roofType: "shingle" | "tile" | "metal" | "flat"
+  roofCondition: "excellent" | "good" | "fair" | "needs_replacement"
+  obstructions: string[]
+
+  // Energy & Lifestyle
+  monthlyKwhUsage: number
+  monthlyElectricityBill: number
+  utilityProvider: string
+  electricityRate: number
+  offsetGoal: number
+  batteryStorage: boolean
+  hasEV?: boolean
+  hasPool?: boolean
+  hasHotTub?: boolean
+
+  // System Preferences
+  panelType?: "standard" | "premium" | "bifacial"
+  inverterType?: "string" | "microinverter"
+  homeSquareFootage: number
+  homeAge: number
+  ratePlan: string
+  timeOfUseBilling: boolean
+}
+
+export interface SystemSizingResult {
+  inputs: SystemSizingInputs
+  systemSizeKw: number
+  panelCount: number
+  panelWattage: number
+  annualProductionKwh: number
+  monthlyProductionKwh: number[]
+  performanceRatio: number
+  capacityFactor: number
+  performanceFactors: {
+    irradiance: number
+    shading: number
+    tiltAndOrientation: number
+    systemLosses: number
+  }
+  systemCost: number
+  costPerWatt: number
+  federalTaxCredit: number
+  netCost: number
+  monthlyBillWithSolar: number
+  monthlySavings: number
+  annualSavings: number
+  paybackPeriod: number
+  roi25Year: number
+  co2OffsetTons: number
+  treesEquivalent: number
+  yearlyProjections: Array<{
+    year: number
+    productionKwh: number
+    savings: number
+    cumulativeSavings: number
+  }>
+  recommendations: {
+    panelBrand: string
+    panelModel: string
+    inverterBrand: string
+    inverterModel: string
+    batteryModel?: string
+  }
+  warnings: string[]
+}
+
 // Export all types for easy importing
 export type {
   SolarCalculationInput,
@@ -486,4 +592,7 @@ export type {
   SolarAnalysisData,
   SolarProgram,
   AnalysisData,
+  SolarProgramInfo,
+  UtilityDetectionResult,
+  ClimateAnalysis,
 }

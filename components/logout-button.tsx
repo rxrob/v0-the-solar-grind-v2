@@ -1,21 +1,18 @@
 "use client"
 
-import { LogOut } from "lucide-react"
-import { useRouter } from "next/navigation"
-import supabase from "@/lib/supabaseClient" // CORRECT: Importing the singleton instance
 import { Button } from "@/components/ui/button"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 
-export function LogoutButton() {
+export default function LogoutButton() {
   const router = useRouter()
+  const supabase = createClient()
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.refresh()
+    router.push("/")
+    router.refresh() // Ensures the server-side state is updated
   }
 
-  return (
-    <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Log out">
-      <LogOut className="h-5 w-5" />
-    </Button>
-  )
+  return <Button onClick={handleLogout}>Logout</Button>
 }

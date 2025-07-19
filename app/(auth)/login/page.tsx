@@ -7,24 +7,24 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { createClient } from "@/lib/supabase-browser"
+import { createClient } from "@/lib/supabase/client"
 import { Sun, Mail, Lock, ArrowRight, Eye, EyeOff, Crown, User, Zap } from "lucide-react"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const [accountType, setAccountType] = useState<"free" | "pro" | "ion" | null>(null)
   const [checkingAccount, setCheckingAccount] = useState(false)
   const router = useRouter()
+  const { toast } = useToast()
+  const supabase = createClient()
 
-  // Check account type when email changes
   useEffect(() => {
     const checkAccountType = async () => {
       if (!email || !email.includes("@")) {
@@ -34,7 +34,6 @@ export default function LoginPage() {
 
       setCheckingAccount(true)
       try {
-        const supabase = createClient()
         const { data, error } = await supabase
           .from("users")
           .select("subscription_type")
@@ -44,7 +43,6 @@ export default function LoginPage() {
         if (data && !error) {
           setAccountType(data.subscription_type as "free" | "pro" | "ion")
         } else {
-          // Check if it's an Ion Solar email domain
           if (email.toLowerCase().includes("@ionsolar.com") || email.toLowerCase().includes("@ion.solar")) {
             setAccountType("ion")
           } else {
@@ -53,7 +51,6 @@ export default function LoginPage() {
         }
       } catch (err) {
         console.log("Account check error:", err)
-        // Check for Ion Solar email patterns
         if (email.toLowerCase().includes("@ionsolar.com") || email.toLowerCase().includes("@ion.solar")) {
           setAccountType("ion")
         } else {
@@ -66,103 +63,54 @@ export default function LoginPage() {
 
     const timeoutId = setTimeout(checkAccountType, 500)
     return () => clearTimeout(timeoutId)
-  }, [email])
+  }, [email, supabase])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError(null)
+    setIsLoading(true)
 
-    try {
-      const supabase = createClient()
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
 
-      // Sign in with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase(),
-        password,
+    if (error) {
+      toast({
+        title: "Login Failed",
+        description: error.message,
+        variant: "destructive",
       })
-
-      if (authError) {
-        setError(authError.message)
-        return
-      }
-
-      if (authData.user) {
-        // Check if user profile exists in our users table
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", authData.user.id)
-          .single()
-
-        let userType = "free"
-
-        if (userError && userError.code === "PGRST116") {
-          // User doesn't exist in our users table, create profile
-          // Determine account type based on email domain
-          if (email.toLowerCase().includes("@ionsolar.com") || email.toLowerCase().includes("@ion.solar")) {
-            userType = "ion"
-          }
-
-          const { error: createError } = await supabase.from("users").insert({
-            id: authData.user.id,
-            email: authData.user.email!,
-            full_name: authData.user.user_metadata?.full_name || null,
-            subscription_type: userType,
-            subscription_status: "active",
-            single_reports_purchased: 0,
-            single_reports_used: 0,
-            pro_trial_used: false,
-          })
-
-          if (createError) {
-            console.error("Error creating user profile:", createError)
-            setError("Failed to create user profile")
-            return
-          }
-        } else {
-          userType = userData?.subscription_type || "free"
-        }
-
-        // Redirect based on account type
-        if (userType === "ion") {
-          router.push("/dashboard/ion")
-        } else if (userType === "pro") {
-          router.push("/dashboard/pro")
-        } else {
-          router.push("/dashboard/free")
-        }
-      }
-    } catch (err) {
-      console.error("Login error:", err)
-      setError(err instanceof Error ? err.message : "Login failed")
-    } finally {
-      setLoading(false)
+    } else {
+      toast({
+        title: "Login Successful",
+        description: "Welcome back! Redirecting to your dashboard.",
+      })
+      router.push("/dashboard")
+      router.refresh()
     }
+    setIsLoading(false)
   }
 
   const handleGoogleLogin = async () => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
+    setIsLoading(true)
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    if (error) {
+      toast({
+        title: "Google Login Failed",
+        description: error.message,
+        variant: "destructive",
       })
-
-      if (error) {
-        setError(error.message)
-      }
-    } catch (err) {
-      console.error("Google login error:", err)
-      setError("Google login failed")
+      setIsLoading(false)
     }
   }
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background particles */}
       <div className="absolute inset-0">
         {[...Array(25)].map((_, i) => (
           <div
@@ -179,7 +127,6 @@ export default function LoginPage() {
       </div>
 
       <div className="w-full max-w-md relative">
-        {/* Purple glow effects */}
         <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/30 via-blue-500/30 to-purple-600/30 rounded-xl blur-sm animate-pulse"></div>
         <div
           className="absolute -inset-2 bg-gradient-to-r from-purple-400/20 via-blue-400/20 to-purple-500/20 rounded-xl blur-md animate-pulse"
@@ -220,7 +167,6 @@ export default function LoginPage() {
                     className="pl-10 pr-20 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400 focus:border-purple-500 focus:ring-purple-500/20"
                     required
                   />
-                  {/* Account type badge */}
                   {checkingAccount && (
                     <div className="absolute right-3 top-3">
                       <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
@@ -301,18 +247,12 @@ export default function LoginPage() {
                 </Link>
               </div>
 
-              {error && (
-                <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
-                  <AlertDescription className="text-red-400">{error}</AlertDescription>
-                </Alert>
-              )}
-
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium py-2.5"
-                disabled={loading}
+                disabled={isLoading}
               >
-                {loading ? (
+                {isLoading ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     Signing in...
@@ -339,7 +279,7 @@ export default function LoginPage() {
               onClick={handleGoogleLogin}
               variant="outline"
               className="w-full border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white bg-transparent"
-              disabled={loading}
+              disabled={isLoading}
             >
               <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
                 <path

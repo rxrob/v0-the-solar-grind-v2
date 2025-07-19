@@ -1,49 +1,42 @@
--- Fix RLS policies for user_tracking_events table
--- This allows anonymous tracking while maintaining security
+-- This script provides the definitive fix for the RLS insert issue.
+-- It removes all ambiguity by deleting old policies and creating one simple, permissive rule for inserts.
 
--- First, ensure the table exists with proper structure
-CREATE TABLE IF NOT EXISTS user_tracking_events (
-    id BIGSERIAL PRIMARY KEY,
-    event_type VARCHAR(255) NOT NULL,
-    event_data JSONB DEFAULT '{}',
-    session_id VARCHAR(255) NOT NULL,
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    timestamp TIMESTAMPTZ DEFAULT NOW(),
-    page_url TEXT,
-    user_agent TEXT,
-    ip_address INET,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Ensure the table exists and RLS is enabled.
+ALTER TABLE public.user_tracking_events ENABLE ROW LEVEL SECURITY;
 
--- Enable RLS
-ALTER TABLE user_tracking_events ENABLE ROW LEVEL SECURITY;
+-- Forcefully drop ALL existing policies on the table to ensure a clean slate.
+-- This is the most critical step to resolve conflicts.
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'user_tracking_events' AND schemaname = 'public') LOOP
+        RAISE NOTICE 'Dropping policy % on user_tracking_events', r.policyname;
+        EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(r.policyname) || ' ON public.user_tracking_events;';
+    END LOOP;
+END;
+$$;
 
--- Drop existing policies if they exist
-DROP POLICY IF EXISTS "Allow anonymous tracking inserts" ON user_tracking_events;
-DROP POLICY IF EXISTS "Allow authenticated user tracking inserts" ON user_tracking_events;
-DROP POLICY IF EXISTS "Users can view their own tracking events" ON user_tracking_events;
-DROP POLICY IF EXISTS "Allow all tracking inserts" ON user_tracking_events;
+-- Create a SINGLE, UNAMBIGUOUS policy for INSERT operations.
+-- This policy allows ONLY authenticated users to insert data.
+-- The `WITH CHECK (true)` clause is a condition that always evaluates to true, thus allowing the insert.
+CREATE POLICY "Enable insert for authenticated users only"
+ON public.user_tracking_events
+FOR INSERT
+TO authenticated
+WITH CHECK (true);
 
--- Create permissive policies for tracking
-CREATE POLICY "Allow all tracking inserts" ON user_tracking_events
-    FOR INSERT 
-    WITH CHECK (true);
+-- Create a policy for SELECT operations.
+-- This allows authenticated users to view ONLY their own tracking data.
+CREATE POLICY "Enable select for authenticated users on their own data"
+ON public.user_tracking_events
+FOR SELECT
+TO authenticated
+USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can view their own tracking events" ON user_tracking_events
-    FOR SELECT 
-    USING (
-        auth.uid() IS NOT NULL AND (
-            user_id = auth.uid() OR 
-            user_id IS NULL
-        )
-    );
+-- Confirm permissions are granted.
+-- We no longer grant INSERT to 'public' or 'anon'.
+GRANT INSERT, SELECT ON TABLE public.user_tracking_events TO authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.user_tracking_events_id_seq TO authenticated;
 
--- Grant necessary permissions
-GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT INSERT, SELECT ON user_tracking_events TO anon, authenticated;
-GRANT USAGE, SELECT ON SEQUENCE user_tracking_events_id_seq TO anon, authenticated;
-
--- Create index for better performance
-CREATE INDEX IF NOT EXISTS idx_user_tracking_events_user_id ON user_tracking_events(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_tracking_events_session_id ON user_tracking_events(session_id);
-CREATE INDEX IF NOT EXISTS idx_user_tracking_events_timestamp ON user_tracking_events(timestamp);
+RAISE NOTICE 'RLS policies for user_tracking_events have been reset to allow authenticated inserts only.';

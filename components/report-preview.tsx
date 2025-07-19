@@ -3,9 +3,10 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Download, Eye, Crown, Loader2 } from "lucide-react"
+import { FileText, Download, Eye, Crown, Loader2, X } from "lucide-react"
+import html2pdf from "html2pdf.js"
+import { toast } from "@/hooks/use-toast"
 
 interface ReportPreviewProps {
   customerData: any
@@ -18,9 +19,12 @@ export function ReportPreview({ customerData, calculationData, onClose }: Report
   const [previewHtml, setPreviewHtml] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const generatePreview = async (reportType: "standard" | "enhanced") => {
     setIsGenerating(true)
+    setError(null)
+    setPreviewHtml("")
     try {
       const response = await fetch("/api/generate-report", {
         method: "POST",
@@ -35,13 +39,15 @@ export function ReportPreview({ customerData, calculationData, onClose }: Report
       })
 
       if (!response.ok) {
-        throw new Error("Failed to generate preview")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to generate preview")
       }
 
       const data = await response.json()
       setPreviewHtml(data.html)
     } catch (error) {
       console.error("Preview generation error:", error)
+      setError(error instanceof Error ? error.message : "Failed to generate preview")
     } finally {
       setIsGenerating(false)
     }
@@ -49,215 +55,215 @@ export function ReportPreview({ customerData, calculationData, onClose }: Report
 
   const downloadPDF = async (reportType: "standard" | "enhanced") => {
     setIsDownloading(true)
-    try {
-      const response = await fetch("/api/generate-pdf-report", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          reportType,
-          customerData,
-          calculationData,
-        }),
-      })
+    setError(null)
+    toast({
+      title: "Generating PDF...",
+      description: "Your report is being prepared. This may take a moment.",
+    })
 
-      if (!response.ok) {
-        throw new Error("Failed to generate PDF")
+    try {
+      // Use the already-generated preview HTML if available, otherwise fetch it.
+      let htmlToConvert = previewHtml
+      if (!htmlToConvert || selectedReportType !== reportType) {
+        const reportResponse = await fetch("/api/generate-report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reportType, customerData, calculationData }),
+        })
+
+        if (!reportResponse.ok) {
+          const errorData = await reportResponse.json()
+          throw new Error(errorData.error || "Failed to generate report content.")
+        }
+        const { html } = await reportResponse.json()
+        htmlToConvert = html
       }
 
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `solar-report-${customerData.customerName.replace(/\s+/g, "-").toLowerCase()}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      if (!htmlToConvert) {
+        throw new Error("Report content is empty.")
+      }
+
+      const element = document.createElement("div")
+      element.innerHTML = htmlToConvert
+      document.body.appendChild(element)
+
+      const opt = {
+        margin: 0.5,
+        filename: `solar-report-${customerData.customerName.replace(/\s+/g, "-").toLowerCase()}-${reportType}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+      }
+
+      await html2pdf().set(opt).from(element).save()
+
+      document.body.removeChild(element)
+
+      toast({
+        title: "Download Complete",
+        description: "Your PDF report has been downloaded successfully.",
+      })
     } catch (error) {
       console.error("PDF download error:", error)
+      setError(error instanceof Error ? error.message : "Failed to download PDF")
+      toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred.",
+      })
     } finally {
       setIsDownloading(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">Solar Analysis Report</h2>
-              <p className="text-gray-600">Preview and download your professional solar report</p>
-            </div>
-            <Button variant="outline" onClick={onClose}>
-              Close
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <Card className="max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <CardHeader className="border-b flex-row items-center justify-between">
+          <div>
+            <CardTitle>Solar Analysis Report</CardTitle>
+            <CardDescription>Preview and download your professional solar report</CardDescription>
+          </div>
+          {onClose && (
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
             </Button>
-          </div>
-        </div>
+          )}
+        </CardHeader>
 
-        <Tabs
-          value={selectedReportType}
-          onValueChange={(value) => setSelectedReportType(value as "standard" | "enhanced")}
-          className="flex-1"
-        >
-          <div className="p-6 pb-0">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="standard">Standard Report</TabsTrigger>
-              <TabsTrigger value="enhanced">
-                <Crown className="h-4 w-4 mr-2" />
-                Enhanced Report
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="standard" className="p-6 pt-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
+        <div className="flex-1 flex overflow-hidden">
+          <div className="w-full md:w-1/3 border-r p-6 overflow-y-auto">
+            <Tabs
+              value={selectedReportType}
+              onValueChange={(value) => {
+                setSelectedReportType(value as "standard" | "enhanced")
+                setPreviewHtml("") // Clear preview on tab change
+                setError(null)
+              }}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="standard">Standard</TabsTrigger>
+                <TabsTrigger value="enhanced">
+                  <Crown className="h-4 w-4 mr-2 text-yellow-500" />
+                  Enhanced
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="standard" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
                       <FileText className="h-5 w-5" />
-                      Standard Solar Report
+                      Standard Report
                     </CardTitle>
-                    <CardDescription>
-                      Professional solar analysis with essential metrics and calculations
-                    </CardDescription>
-                  </div>
-                  <Badge variant="secondary">Free</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-medium mb-2">Includes:</h4>
-                    <ul className="text-sm text-gray-600 space-y-1">
-                      <li>• System sizing and specifications</li>
-                      <li>• Financial analysis and ROI</li>
-                      <li>• Environmental impact calculations</li>
-                      <li>• Basic performance projections</li>
+                    <CardDescription>Key metrics and financial analysis.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>System sizing & specs</li>
+                      <li>Financial analysis & ROI</li>
+                      <li>Environmental impact</li>
+                      <li>Performance projections</li>
                     </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-2">Customer Info:</h4>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>
-                        <strong>Name:</strong> {customerData.customerName}
-                      </div>
-                      <div>
-                        <strong>Property:</strong> {customerData.propertyAddress}
-                      </div>
-                      <div>
-                        <strong>System Size:</strong> {calculationData.systemSizeKw} kW
-                      </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={() => generatePreview("standard")} disabled={isGenerating} variant="outline">
+                        {isGenerating && selectedReportType === "standard" ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4 mr-2" />
+                        )}
+                        Preview
+                      </Button>
+                      <Button onClick={() => downloadPDF("standard")} disabled={isDownloading}>
+                        {isDownloading && selectedReportType === "standard" ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Download PDF
+                      </Button>
                     </div>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={() => generatePreview("standard")} disabled={isGenerating} variant="outline">
-                    {isGenerating ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Eye className="h-4 w-4 mr-2" />
-                    )}
-                    Preview Report
-                  </Button>
-                  <Button onClick={() => downloadPDF("standard")} disabled={isDownloading}>
-                    {isDownloading ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4 mr-2" />
-                    )}
-                    Download PDF
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="enhanced" className="p-6 pt-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Crown className="h-5 w-5 text-yellow-600" />
-                      Enhanced Solar Report
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              <TabsContent value="enhanced" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Crown className="h-5 w-5 text-yellow-500" />
+                      Enhanced Report
                     </CardTitle>
-                    <CardDescription>
-                      Comprehensive professional report with advanced analytics and market insights
-                    </CardDescription>
-                  </div>
-                  <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">Pro</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-medium mb-2">Enhanced Features:</h4>
-                    <ul className="text-sm text-gray-600 space-y-1">
-                      <li>• Advanced performance metrics</li>
-                      <li>• Detailed site assessment</li>
-                      <li>• Multiple financing options</li>
-                      <li>• Warranty and guarantee details</li>
-                      <li>• Market analysis and positioning</li>
-                      <li>• Professional visual design</li>
+                    <CardDescription>Comprehensive, client-ready report.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>All standard features</li>
+                      <li>Advanced performance metrics</li>
+                      <li>Detailed site assessment</li>
+                      <li>Multiple financing options</li>
                     </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-2">Professional Benefits:</h4>
-                    <ul className="text-sm text-gray-600 space-y-1">
-                      <li>• Impress high-end customers</li>
-                      <li>• Detailed technical specifications</li>
-                      <li>• Competitive market analysis</li>
-                      <li>• Enhanced visual presentation</li>
-                      <li>• Comprehensive warranty info</li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={() => generatePreview("enhanced")} disabled={isGenerating} variant="outline">
-                    {isGenerating ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Eye className="h-4 w-4 mr-2" />
-                    )}
-                    Preview Report
-                  </Button>
-                  <Button
-                    onClick={() => downloadPDF("enhanced")}
-                    disabled={isDownloading}
-                    className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
-                  >
-                    {isDownloading ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4 mr-2" />
-                    )}
-                    Download Enhanced PDF
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={() => generatePreview("enhanced")} disabled={isGenerating} variant="outline">
+                        {isGenerating && selectedReportType === "enhanced" ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4 mr-2" />
+                        )}
+                        Preview
+                      </Button>
+                      <Button
+                        onClick={() => downloadPDF("enhanced")}
+                        disabled={isDownloading}
+                        className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white"
+                      >
+                        {isDownloading && selectedReportType === "enhanced" ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Download PDF
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
 
-        {previewHtml && (
-          <div className="p-6 pt-0">
-            <Card>
+          <div className="hidden md:flex w-2/3 p-6 overflow-y-auto flex-col">
+            <Card className="h-full flex flex-col">
               <CardHeader>
                 <CardTitle>Report Preview</CardTitle>
+                <CardDescription>A preview of the selected report will be shown below.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="border rounded-lg overflow-hidden" style={{ height: "500px" }}>
-                  <iframe srcDoc={previewHtml} className="w-full h-full" title="Report Preview" />
+              <CardContent className="flex-1">
+                <div className="border rounded-lg overflow-hidden bg-muted h-full">
+                  {isGenerating ? (
+                    <div className="flex items-center justify-center h-full flex-col gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      <p className="text-muted-foreground">Generating Preview...</p>
+                    </div>
+                  ) : error ? (
+                    <div className="flex items-center justify-center h-full flex-col gap-2 p-4 text-center">
+                      <X className="h-8 w-8 text-destructive" />
+                      <p className="font-semibold text-destructive">Failed to generate preview</p>
+                      <p className="text-sm text-muted-foreground">{error}</p>
+                    </div>
+                  ) : previewHtml ? (
+                    <iframe srcDoc={previewHtml} className="w-full h-full" title="Report Preview" />
+                  ) : (
+                    <div className="flex items-center justify-center h-full flex-col gap-2">
+                      <Eye className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-muted-foreground">Click "Preview" to see the report.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
-        )}
-      </div>
+        </div>
+      </Card>
     </div>
   )
 }

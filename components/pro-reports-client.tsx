@@ -1,120 +1,109 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import type { ColumnDef } from "@tanstack/react-table"
+import { ArrowDownIcon, ArrowUpIcon } from "@radix-ui/react-icons"
+
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import type { Report } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
-import { FileText, Download, Eye, Calendar, MapPin } from "lucide-react"
-import type { Report } from "@/types"
+import { MoreHorizontal } from "lucide-react"
+import { toast } from "sonner"
+
+export const columns: ColumnDef<Report>[] = [
+  {
+    accessorKey: "id",
+    header: "ID",
+  },
+  {
+    accessorKey: "createdAt",
+    header: ({ column }) => {
+      return (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Created
+          {column.getIsSorted() === "asc" ? (
+            <ArrowDownIcon className="ml-2 h-4 w-4" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ArrowUpIcon className="ml-2 h-4 w-4" />
+          ) : null}
+        </Button>
+      )
+    },
+    cell: ({ row }) => {
+      const date = new Date(row.getValue("createdAt"))
+      return <div>{date.toLocaleDateString()}</div>
+    },
+  },
+  {
+    accessorKey: "prompt",
+    header: "Prompt",
+  },
+  {
+    accessorKey: "mood",
+    header: "Mood",
+    cell: ({ row }) => {
+      const mood = row.getValue("mood") as string
+
+      let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "secondary"
+
+      if (mood === "happy") {
+        badgeVariant = "default"
+      } else if (mood === "sad") {
+        badgeVariant = "secondary"
+      } else if (mood === "angry") {
+        badgeVariant = "destructive"
+      }
+
+      return <Badge variant={badgeVariant}>{mood}</Badge>
+    },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => {
+      const report = row.original
+
+      const handleCopy = () => {
+        navigator.clipboard.writeText(JSON.stringify(report))
+        toast("Copied report to clipboard")
+      }
+
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => {}}>Edit</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleCopy}>Copy</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>Delete</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    },
+  },
+]
+
+import { DataTable } from "@/components/ui/data-table"
 
 interface ProReportsClientPageProps {
   reports: Report[]
 }
 
 export function ProReportsClientPage({ reports }: ProReportsClientPageProps) {
-  const handleDownload = (reportId: string) => {
-    // Simulate download
-    console.log("Downloading report:", reportId)
-    // In a real app, this would likely trigger an API call to generate and download a file
-  }
-
-  const handlePreview = (reportId: string) => {
-    // Simulate preview
-    console.log("Previewing report:", reportId)
-    // In a real app, this might open a modal or navigate to a preview page
-  }
-
-  const getStatusBadge = (status: Report["status"]) => {
-    const variants = {
-      generated: "default",
-      pending: "secondary",
-      error: "destructive",
-    } as const
-
-    return <Badge variant={variants[status]}>{status}</Badge>
-  }
-
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Generated Reports</h1>
-        <p className="text-muted-foreground">View and download your solar analysis reports</p>
-      </div>
-
-      <div className="grid gap-6">
-        {reports.map((report) => (
-          <Card key={report.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    {report.title}
-                  </CardTitle>
-                  <CardDescription className="mt-2">
-                    <div className="flex items-center gap-4 text-sm">
-                      <span>Client: {report.client}</span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        {report.location}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {new Date(report.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </CardDescription>
-                </div>
-                {getStatusBadge(report.status)}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <div className="text-sm text-muted-foreground">System Size</div>
-                    <div className="font-semibold">{report.systemSize} kW</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Report Type</div>
-                    <div className="font-semibold">{report.systemSize > 20 ? "Commercial" : "Residential"}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Format</div>
-                    <div className="font-semibold">PDF</div>
-                  </div>
-                </div>
-
-                {report.status === "generated" && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handlePreview(report.id)}>
-                      <Eye className="h-4 w-4 mr-2" />
-                      Preview
-                    </Button>
-                    <Button size="sm" onClick={() => handleDownload(report.id)}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
-                  </div>
-                )}
-
-                {report.status === "pending" && (
-                  <div className="text-sm text-muted-foreground">Report generation in progress...</div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {reports.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <div className="text-muted-foreground mb-4">No reports generated yet.</div>
-            <Button>Create Your First Report</Button>
-          </CardContent>
-        </Card>
-      )}
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Pro Reports</h1>
+      <DataTable columns={columns} data={reports} />
     </div>
   )
 }

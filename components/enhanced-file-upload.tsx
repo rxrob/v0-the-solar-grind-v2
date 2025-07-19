@@ -5,12 +5,14 @@ import { useDropzone } from "react-dropzone"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Loader2, FileUp, X, CheckCircle } from "lucide-react"
+import type { OCRResult } from "@/lib/ocr-service"
 
 interface EnhancedFileUploadProps {
-  onOcrResult: (text: string) => void
+  onOcrResult: (result: NonNullable<OCRResult["data"]>) => void
+  onError: (error: string) => void
 }
 
-export function EnhancedFileUpload({ onOcrResult }: EnhancedFileUploadProps) {
+export function EnhancedFileUpload({ onOcrResult, onError }: EnhancedFileUploadProps) {
   const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -21,53 +23,41 @@ export function EnhancedFileUpload({ onOcrResult }: EnhancedFileUploadProps) {
       setFile(selectedFile)
       setIsLoading(true)
       setIsSuccess(false)
+      setPreview(URL.createObjectURL(selectedFile))
 
-      const reader = new FileReader()
-      reader.readAsDataURL(selectedFile)
-      reader.onloadend = async () => {
-        const base64data = reader.result as string
-        setPreview(base64data)
+      try {
+        const formData = new FormData()
+        formData.append("file", selectedFile)
 
-        try {
-          const response = await fetch("/api/ocr", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ image: base64data }),
-          })
+        const response = await fetch("/api/ocr", {
+          method: "POST",
+          body: formData,
+        })
 
-          if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.error || "Failed to process file.")
-          }
-
-          const result = await response.json()
-
-          if (result.IsErroredOnProcessing) {
-            throw new Error(result.ErrorMessage.join("\n"))
-          }
-
-          const parsedText = result.ParsedResults[0]?.ParsedText || ""
-          if (!parsedText) {
-            throw new Error("OCR could not extract any text from the document.")
-          }
-
-          onOcrResult(parsedText)
-          toast.success("Utility bill processed successfully!")
-          setIsSuccess(true)
-        } catch (error: any) {
-          toast.error(`OCR Error: ${error.message}`)
-          setFile(null)
-          setPreview(null)
-        } finally {
-          setIsLoading(false)
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to process file.")
         }
-      }
-      reader.onerror = () => {
-        toast.error("Failed to read file.")
+
+        const result: OCRResult = await response.json()
+
+        if (!result.success || !result.data) {
+          throw new Error(result.error || "OCR could not extract any data from the document.")
+        }
+
+        onOcrResult(result.data)
+        toast.success("Utility bill processed successfully!")
+        setIsSuccess(true)
+      } catch (error: any) {
+        onError(error.message)
+        setFile(null)
+        if (preview) URL.revokeObjectURL(preview)
+        setPreview(null)
+      } finally {
         setIsLoading(false)
       }
     },
-    [onOcrResult],
+    [onOcrResult, onError, preview],
   )
 
   const onDrop = useCallback(
@@ -86,6 +76,9 @@ export function EnhancedFileUpload({ onOcrResult }: EnhancedFileUploadProps) {
   })
 
   const removeFile = () => {
+    if (preview) {
+      URL.revokeObjectURL(preview)
+    }
     setFile(null)
     setPreview(null)
     setIsSuccess(false)
@@ -98,10 +91,17 @@ export function EnhancedFileUpload({ onOcrResult }: EnhancedFileUploadProps) {
           {file?.type.startsWith("image/") ? (
             <img src={preview || "/placeholder.svg"} alt="Preview" className="max-h-48 mx-auto rounded-md" />
           ) : (
-            <p className="text-white p-4 bg-gray-800 rounded-md">{file?.name}</p>
+            <div className="p-4 bg-gray-800 rounded-md">
+              <FileUp className="mx-auto h-12 w-12 text-gray-400" />
+              <p className="text-white mt-2">{file?.name}</p>
+            </div>
           )}
-          <p className="text-sm text-gray-400 mt-2">{file?.name}</p>
-          <Button onClick={removeFile} variant="ghost" size="sm" className="absolute top-2 right-2">
+          <Button
+            onClick={removeFile}
+            variant="ghost"
+            size="sm"
+            className="absolute top-2 right-2 text-white hover:bg-gray-700"
+          >
             <X className="h-4 w-4" />
           </Button>
           {isLoading && (
