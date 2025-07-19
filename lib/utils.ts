@@ -31,3 +31,21 @@ export function formatNumber(num: number, decimals = 0) {
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
+
+// Add the getURL function to the end of the file
+export const getURL = (path = "") => {
+  // Check for Vercel-specific environment variables to determine the base URL
+  const baseURL = process.env.NEXT_PUBLIC_SITE_URL
+    ? process.env.NEXT_PUBLIC_SITE_URL
+    : process.env.NEXT_PUBLIC_VERCEL_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : "http://localhost:3000"
+
+  // Ensure the base URL has a trailing slash
+  const normalizedBaseURL = baseURL.endsWith("/") ? baseURL : `${baseURL}/`
+
+  // Ensure the path does not have a leading slash to prevent double slashes
+  const normalizedPath = path.startsWith("/") ? path.slice(1) : path
+
+  return new URL(normalizedPath, normalizedBaseURL).toString()
+}

@@ -1,49 +1,48 @@
 "use client"
 
-import { useSession } from "next-auth/react"
 import { useState } from "react"
-import { toast } from "react-hot-toast"
+import { Button } from "@/components/ui/button"
+import { useAuth } from "@/hooks/use-auth-real"
+import { toast } from "sonner"
 
-import { supabase } from "@/lib/supabase/client"
-
-const BillingPortalButton = () => {
-  const { data: session } = useSession()
+export function BillingPortalButton() {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
 
-  const handleManageSubscription = async () => {
+  const handleBillingPortal = async () => {
     setLoading(true)
-    try {
-      if (!session?.user?.id) {
-        throw new Error("No user signed in")
-      }
+    if (!user) {
+      toast.error("You must be logged in to manage billing.")
+      setLoading(false)
+      return
+    }
 
-      const { data, error } = await supabase.functions.invoke("create-manage-link", {
-        body: {
-          customer: session?.user?.id,
+    try {
+      const response = await fetch("/api/stripe/portal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
       })
 
-      if (error) {
-        throw error
+      if (!response.ok) {
+        const { error } = await response.json()
+        throw new Error(error.message || "Could not create billing portal session.")
       }
 
-      window.location.href = data.url
-    } catch (error: any) {
-      toast.error(error.message)
+      const { url } = await response.json()
+      window.location.href = url
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : "An unknown error occurred.")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <button
-      className="bg-brand-500 hover:bg-brand-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:bg-gray-500 disabled:cursor-not-allowed"
-      onClick={handleManageSubscription}
-      disabled={loading}
-    >
-      {loading ? "Loading..." : "Manage Subscription"}
-    </button>
+    <Button onClick={handleBillingPortal} disabled={loading}>
+      {loading ? "Loading..." : "Manage Billing"}
+    </Button>
   )
 }
-
-export default BillingPortalButton

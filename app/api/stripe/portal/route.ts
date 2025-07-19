@@ -1,49 +1,41 @@
-import { type NextRequest, NextResponse } from "next/server"
-import Stripe from "stripe"
-import { createSupabaseServiceClient } from "@/lib/supabase-server"
+import { createClient } from "@/lib/supabase/server"
+import { stripe } from "@/lib/stripe"
+import { getURL } from "@/lib/utils"
+import { cookies } from "next/headers"
+import { NextResponse } from "next/server"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
-})
-
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
-    const { userId } = await req.json()
+    const cookieStore = cookies()
+    const supabase = createClient(cookieStore)
 
-    if (!userId) {
-      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), { status: 401 })
     }
 
-    const supabase = createSupabaseServiceClient()
-
-    // Get user's Stripe customer ID
-    const { data: user, error } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("users")
-      .select("stripe_customer_id, subscription_type")
-      .eq("id", userId)
+      .select("stripe_customer_id")
+      .eq("id", user.id)
       .single()
 
-    if (error || !user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    if (profileError || !profile?.stripe_customer_id) {
+      console.error("Stripe customer ID not found for user:", user.id, profileError)
+      return new NextResponse(JSON.stringify({ error: { message: "Stripe customer not found." } }), { status: 400 })
     }
 
-    if (!user.stripe_customer_id) {
-      return NextResponse.json({ error: "No Stripe customer found" }, { status: 400 })
-    }
-
-    if (user.subscription_type !== "pro") {
-      return NextResponse.json({ error: "Only Pro users can access billing portal" }, { status: 403 })
-    }
-
-    // Create billing portal session
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: user.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_BASE_URL}/billing`,
+    const { url } = await stripe.billingPortal.sessions.create({
+      customer: profile.stripe_customer_id,
+      return_url: `${getURL()}/dashboard`,
     })
 
-    return NextResponse.json({ url: portalSession.url })
-  } catch (error) {
-    console.error("❌ Billing portal error:", error)
-    return NextResponse.json({ error: "Failed to create billing portal session" }, { status: 500 })
+    return NextResponse.json({ url })
+  } catch (err: any) {
+    console.error("Stripe portal session creation error:", err)
+    return new NextResponse(JSON.stringify({ error: { message: err.message } }), { status: 500 })
   }
 }

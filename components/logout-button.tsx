@@ -1,18 +1,25 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { LogOut } from "lucide-react"
 
-export default function LogoutButton() {
+import { useAuth } from "@/hooks/use-auth-real"
+import { Button } from "@/components/ui/button"
+
+export function LogoutButton() {
+  const { supabase } = useAuth()
   const router = useRouter()
-  const supabase = createClient()
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push("/")
-    router.refresh() // Ensures the server-side state is updated
+    router.refresh()
   }
 
-  return <Button onClick={handleLogout}>Logout</Button>
+  return (
+    <Button variant="ghost" size="sm" onClick={handleLogout}>
+      <LogOut className="mr-2 h-4 w-4" />
+      Logout
+    </Button>
+  )
 }

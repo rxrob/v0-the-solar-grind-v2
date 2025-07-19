@@ -1,69 +1,63 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import type { User } from "@supabase/supabase-js"
-import { createClient } from "@/lib/supabase/client"
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { supabase } from "@/lib/supabase/client"
+import type { User, Session, SupabaseClient } from "@supabase/supabase-js"
 
-interface AuthState {
+type AuthContextType = {
   user: User | null
-  loading: boolean
-  error: string | null
+  session: Session | null
+  isLoading: boolean
+  supabase: SupabaseClient
 }
 
-export function useAuth(): AuthState {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    loading: true,
-    error: null,
-  })
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-  const supabase = createClient()
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Get initial session
     const getInitialSession = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
-        if (error) throw error
-
-        setState({
-          user: session?.user ?? null,
-          loading: false,
-          error: null,
-        })
-      } catch (error) {
-        setState({
-          user: null,
-          loading: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-        })
-      }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setSession(session)
+      setUser(session?.user ?? null)
+      setIsLoading(false)
     }
 
     getInitialSession()
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setState({
-        user: session?.user ?? null,
-        loading: false,
-        error: null,
-      })
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setIsLoading(false)
     })
 
-    return () => subscription.unsubscribe()
-  }, [supabase])
+    return () => {
+      authListener?.subscription.unsubscribe()
+    }
+  }, [])
 
-  return state
+  const value = {
+    user,
+    session,
+    isLoading,
+    supabase,
+  }
+
+  return <AuthContext.Provider value={value}>{!isLoading && children}</AuthContext.Provider>
 }
 
-export function useAuthReal(): AuthState {
-  return useAuth()
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
 }
 
-export default useAuthReal
+// Alias for backwards compatibility with previous error messages
+export const useAuthReal = useAuth

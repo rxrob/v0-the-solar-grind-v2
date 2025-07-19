@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MapPin, Sun, AlertTriangle } from "lucide-react"
+import { MapPin, Sun } from "lucide-react"
 import { getSolarAnalysis } from "@/lib/user-tracking"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -42,12 +42,7 @@ export function SolarLocationBanner() {
   }
 
   if (error) {
-    return (
-      <div className="w-full bg-destructive/10 backdrop-blur-sm border border-destructive/50 rounded-lg p-4 flex items-center justify-center text-destructive-foreground">
-        <AlertTriangle className="h-5 w-5 mr-3" />
-        <p className="text-sm font-medium">{error}</p>
-      </div>
-    )
+    return null
   }
 
   return (

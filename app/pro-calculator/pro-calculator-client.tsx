@@ -140,7 +140,7 @@ const HeatmapPanelOverlay = ({ layout }: { layout: any }) => {
   )
 }
 
-export default function ProCalculatorClient({ googleMapsApiKey }: { googleMapsApiKey: string }) {
+export default function ProCalculatorClient() {
   const { propertyData, energyData, roofData, systemData, setPropertyData, setEnergyData, setRoofData, setSystemData } =
     useProCalculatorStore()
 
@@ -163,8 +163,34 @@ export default function ProCalculatorClient({ googleMapsApiKey }: { googleMapsAp
   const [solarLayout, setSolarLayout] = useState<any | null>(null)
   const [layoutLoading, setLayoutLoading] = useState(false)
   const [layoutError, setLayoutError] = useState<string | null>(null)
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null)
+  const [configError, setConfigError] = useState<string | null>(null)
+  const [isConfigLoading, setIsConfigLoading] = useState(true)
 
   const onLoad = (ac: google.maps.places.Autocomplete) => setAutocomplete(ac)
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const response = await fetch("/api/maps-config")
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to fetch configuration")
+        }
+        const data = await response.json()
+        if (data.error) {
+          throw new Error(data.error)
+        }
+        setGoogleMapsApiKey(data.apiKey)
+      } catch (err: any) {
+        setConfigError(err.message || "Could not load Google Maps configuration.")
+      } finally {
+        setIsConfigLoading(false)
+      }
+    }
+
+    fetchConfig()
+  }, [])
 
   const onPlaceChanged = async () => {
     if (autocomplete !== null) {
@@ -1307,6 +1333,28 @@ export default function ProCalculatorClient({ googleMapsApiKey }: { googleMapsAp
     { number: 4, title: "Financing", icon: DollarSign },
     { number: 5, title: "Final Proposal", icon: FileText },
   ]
+
+  if (isConfigLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-amber-400 mx-auto" />
+          <p className="mt-4">Loading Configuration...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (configError) {
+    return (
+      <div className="flex items-center justify-center h-screen text-red-500 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="p-8 bg-slate-800 rounded-lg border border-red-500/50 text-center">
+          <h2 className="text-xl font-bold mb-2">Configuration Error</h2>
+          <p>{configError}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <TooltipProvider>
