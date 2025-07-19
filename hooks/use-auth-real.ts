@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from "react"
 import { supabase } from "@/lib/supabase/client"
 import type { User, Session, SupabaseClient } from "@supabase/supabase-js"
 
@@ -41,9 +41,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [])
 
-  return (
-    <AuthContext.Provider value={{ user, session, isLoading, supabase }}>{!isLoading && children}</AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      session,
+      isLoading,
+      supabase,
+    }),
+    [user, session, isLoading],
   )
+
+  return <AuthContext.Provider value={value}>{!isLoading && children}</AuthContext.Provider>
 }
 
 export const useAuth = (): AuthContextType => {
