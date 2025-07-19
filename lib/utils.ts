@@ -5,13 +5,29 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function absoluteUrl(path: string) {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000"
+export const getURL = (path = "") => {
+  // Check for Vercel-specific environment variables to determine the base URL
+  let url =
+    process.env.NEXT_PUBLIC_SITE_URL ?? // Set this to your site URL in production
+    process.env.NEXT_PUBLIC_VERCEL_URL ?? // Automatically set by Vercel
+    "http://localhost:3000/"
 
-  return new URL(path, baseUrl).toString()
+  // Make sure to include `https://` when not localhost.
+  url = url.includes("http") ? url : `https://${url}`
+  // Make sure to include a trailing `/`.
+  url = url.charAt(url.length - 1) === "/" ? url : `${url}/`
+
+  // Remove leading slash from path
+  const normalizedPath = path.startsWith("/") ? path.slice(1) : path
+
+  return new URL(normalizedPath, url).toString()
+}
+
+/**
+ * @deprecated Use getURL instead
+ */
+export function absoluteUrl(path: string) {
+  return getURL(path)
 }
 
 export function formatCurrency(amount: number) {
@@ -30,22 +46,4 @@ export function formatNumber(num: number, decimals = 0) {
 
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-// Add the getURL function to the end of the file
-export const getURL = (path = "") => {
-  // Check for Vercel-specific environment variables to determine the base URL
-  const baseURL = process.env.NEXT_PUBLIC_SITE_URL
-    ? process.env.NEXT_PUBLIC_SITE_URL
-    : process.env.NEXT_PUBLIC_VERCEL_URL
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : "http://localhost:3000"
-
-  // Ensure the base URL has a trailing slash
-  const normalizedBaseURL = baseURL.endsWith("/") ? baseURL : `${baseURL}/`
-
-  // Ensure the path does not have a leading slash to prevent double slashes
-  const normalizedPath = path.startsWith("/") ? path.slice(1) : path
-
-  return new URL(normalizedPath, normalizedBaseURL).toString()
 }
