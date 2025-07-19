@@ -54,15 +54,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [user, session, isLoading],
   )
 
-  if (isLoading) {
-    // Returning a simple loader or null during the initial loading phase.
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500"></div>
-      </div>
-    )
-  }
-
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
